@@ -24,8 +24,13 @@ namespace LangGraph\Pregel\Checkpoint;
  * A run that dies between `putWrites` and `put` resumes by replaying the
  * committed checkpoint and re-attaching the already-recorded writes, so tasks
  * that succeeded are not re-executed.
+ *
+ * This is the engine's view of the contract. The full port — with a serializer,
+ * the version scheme, and the pending-sends migration — lives in
+ * {@see \LangGraph\Checkpoint\BaseCheckpointSaver}, which this class extends, so
+ * a checkpointer that implements either one is usable here.
  */
-abstract class BaseCheckpointSaver
+abstract class BaseCheckpointSaver extends \LangGraph\Checkpoint\BaseCheckpointSaver
 {
     /**
      * Read the latest checkpoint for a thread/namespace.
@@ -61,14 +66,13 @@ abstract class BaseCheckpointSaver
     /**
      * List checkpoints for a thread, newest first.
      *
-     * @param  array<string, mixed> $config
+     * The second argument accepts a bare limit (what this engine passes) or a
+     * {@see \LangGraph\Checkpoint\CheckpointListOptions} carrying the same limit
+     * plus the `before` cursor and the metadata filter. PHP has no overloading, so
+     * the two are one union type rather than two methods.
+     *
+     * @param  array<string, mixed>                                  $config
      * @return list<CheckpointTuple>
      */
-    abstract public function list(array $config, ?int $limit = null): array;
-
-    /** The next version number for a channel counter. */
-    public function getNextVersion(?int $current): int
-    {
-        return $current === null ? 1 : $current + 1;
-    }
+    abstract public function list(array $config, \LangGraph\Checkpoint\CheckpointListOptions|int|null $options = null): array;
 }

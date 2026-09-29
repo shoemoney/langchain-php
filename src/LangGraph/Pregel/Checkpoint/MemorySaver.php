@@ -147,8 +147,9 @@ class MemorySaver extends BaseCheckpointSaver
         return $config;
     }
 
-    public function list(array $config, ?int $limit = null): array
+    public function list(array $config, \LangGraph\Checkpoint\CheckpointListOptions|int|null $options = null): array
     {
+        $limit = \LangGraph\Checkpoint\CheckpointListOptions::of($options)->limit;
         $threadId = $this->threadId($config);
         if ($threadId === null) {
             return [];
@@ -156,7 +157,7 @@ class MemorySaver extends BaseCheckpointSaver
 
         $checkpoints = $this->storage[$threadId] ?? [];
         if ($limit !== null) {
-            $checkpoints = array_slice($checkpoints, 0, $limit);
+            $checkpoints = array_slice($checkpoints, max(0, $limit));
         }
 
         return array_map(

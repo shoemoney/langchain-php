@@ -14,6 +14,10 @@ use Ramsey\Uuid\Uuid;
  */
 final class CheckpointFunctions
 {
+    /** The last millisecond handed out, and the 100ns counter within it. */
+    private static int $lastMsecs = 0;
+    private static int $lastNsecs = 0;
+
     private function __construct()
     {
     }
@@ -157,16 +161,39 @@ final class CheckpointFunctions
     /**
      * A time-ordered id, so checkpoint ids sort chronologically as strings.
      *
-     * Port of `uuid6`.
+     * Port of `uuid6`. The clock is kept strictly monotonic: if the wall clock
+     * has not advanced since the previous call, the sub-millisecond counter is
+     * bumped (rolling into the next millisecond at 10,000) so the emitted time
+     * bits still increase.
+     *
+     * The monotonicity is load-bearing, not a nicety. Savers order a thread's
+     * history by comparing ids as *strings*, so two checkpoints minted inside one
+     * millisecond have to come out in the order they were written. A random
+     * sub-millisecond value would order them arbitrarily — which is exactly what
+     * the upstream `id.ts` comment is about: it keeps this counter for the same
+     * reason, because a saver that picked the "latest" checkpoint by string
+     * comparison would then read back the wrong one.
+     *
+     * @param int $clockSeq Disambiguates concurrent generators; folded into the
+     *                      id but never allowed to affect time ordering.
      */
     public static function uuid6(int $clockSeq = 0): string
     {
-        $ms = (int) (microtime(true) * 1000);
-        $nanos = random_int(0, 999);
+        $msecs = (int) (microtime(true) * 1000);
+        if ($msecs <= self::$lastMsecs) {
+            self::$lastNsecs++;
+            if (self::$lastNsecs >= 10000) {
+                self::$lastNsecs = 0;
+                $msecs = self::$lastMsecs + 1;
+            }
+        } else {
+            self::$lastNsecs = 0;
+        }
+        self::$lastMsecs = $msecs;
 
-        $timeHigh = ($ms >> 20) & 0xFFF;
-        $timeMid = ($ms >> 4) & 0xFFFF;
-        $timeLow = ($ms & 0xF) << 12 | ($nanos & 0xFFF);
+        $timeHigh = ($msecs >> 20) & 0xFFF;
+        $timeMid = ($msecs >> 4) & 0xFFFF;
+        $timeLow = (($msecs & 0xF) << 12) | (self::$lastNsecs & 0xFFF);
         $seq = $clockSeq & 0x3FFF;
 
         $bytes = chr(($timeHigh >> 8) & 0xFF) . chr($timeHigh & 0xFF)

@@ -39,11 +39,11 @@ composer test
 | `documents` (`Document`) | ✅ | |
 | `prompt_values` | ✅ | `StringPromptValue`, `ChatPromptValue` |
 | `text_splitters` | ✅ | Character, RecursiveCharacter, Markdown, Latex, 16 language tables |
-| `language_models` | ⬜ | Next |
-| `prompts` | ⬜ | |
-| `output_parsers` | ⬜ | |
-| `tools` | ⬜ | |
-| `tracers` / `callbacks` | ⬜ | |
+| `language_models` | ✅ | `BaseLangChain`, `BaseLanguageModel`, `BaseChatModel`, `BaseLLM`, `LLM`, `SimpleChatModel`, `ChatResult`/`LLMResult`/`Generation{,Chunk}`/`ChatGeneration{,Chunk}`, fakes. No per-provider subfolders. |
+| `prompts` | ✅ | |
+| `output_parsers` | ✅ | |
+| `tools` | ✅ | `StructuredTool`, `Tool`, `DynamicTool`, `DynamicStructuredTool`, `tool()`, `BaseToolkit`, `ToolRuntime`, `ToolException`. Schema is **JSON Schema**, not Zod — see below. |
+| `tracers` / `callbacks` | ✅ | `BaseCallbackHandler` + method-bag handlers, `CallbackManager` and the four run managers, `BaseTracer`, `ConsoleCallbackHandler`, `RunCollectorCallbackHandler`, `Run`. No LangSmith HTTP transport. |
 | `embeddings` / `vectorstores` | ⬜ | |
 | `utils` (env, json patch, function_calling, standard_schema, tiktoken) | ⬜ | |
 | `structured_query`, `indexing`, `example_selectors` | ⬜ | |
@@ -77,10 +77,12 @@ composer test
 
 | Subsystem | Status | Notes |
 |---|---|---|
-| `BaseCheckpointSaver` | ⬜ | |
-| `MemorySaver` | ⬜ | |
-| `serde` (`Serialization`) | ⬜ | |
-| `sqlite` / `postgres` / `redis` / `mongodb` savers | ⬜ | |
+| `BaseCheckpointSaver` | ✅ | `LangGraph\Checkpoint\BaseCheckpointSaver` — `get`/`getTuple`/`list`/`put`/`putWrites`/`deleteThread`, `getNextVersion`, `getDeltaChannelHistory`, the pending-sends migration, the `lc:2` write-index map. The engine's own contract (`Pregel\Checkpoint\BaseCheckpointSaver`) now extends it, so either one is a usable checkpointer |
+| `Checkpoint` / `CheckpointTuple` / `CheckpointMetadata` / `ChannelVersions` / `uuid6`/`uuid5` | ✅ | Wire form is the TS `snake_case` record, so a checkpoint written here is readable by the JS savers |
+| `MemorySaver` | ✅ | Serialises on write, so it doubles as the serde's integration test |
+| `serde` (`Serialization`, `JsonPlusSerializer`) | ✅ | The `lc:2` envelope: constructor records, `DeltaSnapshot`, `Send` packets, `undefined`, byte strings, LangChain `lc:1` objects, circular-reference replacement, and an inert-by-default reviver |
+| `sqlite` saver | ✅ | PDO, WAL, `checkpoints`/`writes` schema, `before`/`limit`/metadata-filter in SQL |
+| `postgres` / `redis` / `mongodb` savers | ⬜ | |
 
 ## langgraph (client SDK)
 
@@ -95,11 +97,25 @@ composer test
 
 ## Known non-exact behaviours
 
+Places where PHP cannot reproduce JavaScript at all, or where this port makes a
+deliberate different choice. Each is pinned by a test so the boundary stays
+visible rather than being rediscovered as a surprise.
+
 Places where PHP genuinely cannot reproduce JavaScript, documented rather than
 papered over. Each is pinned by a test so the boundary stays visible.
 
 | Behaviour | Why | Where |
 |---|---|---|
+| **Tool input schemas are JSON Schema, not Zod** | PHP has no Zod. The TypeScript `StructuredTool` accepts either a Zod schema (validated via `interopParseAsync`) or a raw JSON Schema (validated via `@cfworker/json-schema`); this port accepts only JSON Schema. The observable contract is unchanged — bad arguments throw `ToolException`, good arguments reach the body — but Zod *transforms* are gone: a schema that renamed a key or coerced `"3"` to `3` no longer does so on the way through. A tool needing coercion should do it at the top of its body, where the intent is visible. | `Tools\Schema`, `Tools\StructuredTool::callToolWithValidation()` |
+| **`BaseLangChain` re-declares the serialization surface** instead of extending `Serializable` | PHP has single inheritance and `Runnable` is the base that matters — it is what makes a model pipeable. So `lcId`/`kwargs`/`toSerializedConstructor` are declared on `BaseLangChain` rather than inherited, keeping the runnable contract primary. | `LanguageModels\BaseLangChain` |
+| **Callback hooks are concrete no-ops, not optional methods** | TypeScript declares every hook optional (`handleLLMStart?`) and calls through optional chaining, so a handler declares only what it cares about. PHP has no optional methods, so every hook is a concrete no-op on `BaseCallbackHandler` and a subclass overrides what it needs. Un-overridden hooks still do nothing, so behaviour is identical — but `instanceof`-style "does this handler implement X?" checks need `implements()`, which the chat-model `handleLLMStart` fallback depends on. | `Tracers\BaseCallbackHandler::implements()` |
+| **`awaitHandlers` is always true** | The TS flag selects between fire-and-forget background dispatch and awaiting the handler. PHP callbacks are synchronous, so there is nothing to background. The property is retained because `CallbackManager::configure()` reads it. | `Tracers\BaseCallbackHandler` |
+| **Handler failures are recorded, not `console.warn`ed** | The original logs with `console.warn`. This records into `BaseRunManager::handlerErrors()` instead, because `E_USER_WARNING` under `failOnWarning="true"` is a test failure — a decorated-but-noisy handler would take down the suite that was merely observing it. | `Tracers\BaseRunManager::dispatch()` |
+| **`LangChainTracer` collects runs instead of POSTing them** | The upstream tracer posts to LangSmith through the `langsmith` client, a separate package with its own retry/batching/multipart machinery. That transport is not ported. Everything up to persistence is: the run tree, dotted orders, trace ids. Override `persistRun()` to ship runs somewhere real. | `Tracers\LangChainTracer` |
+| **Token usage is read from `response_metadata['usage_metadata']`** | Upstream reads a first-class `usage_metadata` field on `AIMessageChunk`, which the already-committed Messages port does not carry. `MessageMerge::mergeDicts()` sums the numbers under `response_metadata` identically, so the accumulation — the property actually under test — is preserved. | `LanguageModels\BaseChatModel::llmOutputFromUsage()` |
+| **An orphan child run is promoted to a root, not left dangling** | Faithful. A run with a `parent_run_id` but no `dotted_order` is rejected outright by LangSmith, so the parent link is dropped. This is the upstream behaviour and it is lossy-but-loadable rather than unpersistable. | `Tracers\BaseTracer::addRunToRunMap()` |
+| **A tool's `_serialized_start_time` borrows its execution order** | JS `Date.now()` is milliseconds and sub-millisecond precision is not information we have. Inventing it would make sibling runs claim distinguishable start instants they provably do not have; borrowing the execution order keeps start times consistent with dotted order, which is the property downstream sorting relies on. | `Tracers\Run::microsecondPrecisionDatestring()` |
+| **`ToolRuntime::fromConfig()` reads state from `configurable['__state']`** | Upstream receives `state` from LangGraph's `Runtime` injection. LangGraph is a separate subsystem with no `Runtime` in this port yet, so the graph state is read from the config bag where a LangGraph node would put it. Everything else on the runtime (tool-call id, config, context, store, writer) is direct. | `Tools\ToolRuntime` |
 | **Tasks in a superstep run sequentially, not concurrently** | PHP has no event loop and no `AbortSignal`. Observable state still matches, because `applyWrites` sorts by task path before folding — but *which* task runs first, and *which* error surfaces when several fail, are properties of the sort rather than of the runtime. JS reports an `AggregateError`; this port raises a `RuntimeException` naming the superstep. | `tests/Unit/Pregel/SuperstepBarrierTest.php` |
 | `stream()` is a `\Generator` yielding `[mode, payload]` | The TS loop is an `AsyncGenerator` that `invoke()` awaits and `stream()` yields outward. PHP has one primitive for both, so `invoke()` and `stream()` are the *same* generator and cannot disagree. | `PregelLoop::run()`, `Pregel::stream()` |
 | `interrupt()` reaches the task config through a static | A node body is `fn (array $state) => ...` with no `$config`, and PHP has no `AsyncLocalStorage`. Safe because the engine is synchronous and nested tasks run inside the parent's call stack; the previous value is always restored, including on throw. | `PregelScratchpad::withConfig()` |
@@ -111,6 +127,12 @@ papered over. Each is pinned by a test so the boundary stays visible.
 | `Topic`'s `seen` set keys on a type-tagged serialization | PHP arrays have no reference identity, so `1` and `"1"` would otherwise collide | `Topic::key()` |
 | `NamedBarrierValue` compares set membership, not sequence | Arrival order is nondeterministic under concurrency | `barrierSatisfied()` |
 | `fromCheckpoint()` is an instance method, not static | Matches the TS prototype-call shape; a static call would lose the channel's config | all channel classes |
+| **A checkpoint with no children serialises empty maps as `[]`, not `{}`** | PHP has one array type, so an empty map and an empty list are the same value and `json_encode` cannot tell them apart. The reverse direction is unaffected (a stored `{}` reads back as `[]`, which every consumer treats as "empty"), and forcing `{}` would corrupt a genuinely empty *list* channel value. | `JsonPlusEncoder::walk()` |
+| **`Set` and `Map` need no envelope on the way out** | JS has to distinguish them from arrays in JSON; a PHP array already is the set *and* the map. The `lc:2` `Set`/`Map` records are still *read*, so a checkpoint written by the JS runtime arrives intact. | `JsonPlusEncoder::envelopeFor()` |
+| **A `RegExp` constructor record stays inert** | A JS pattern is not a PCRE pattern, and translating one by hand yields a matcher that silently disagrees with the one that wrote it. Inert is the honest outcome, and it is the upstream rule for a record the reader cannot validate. | `JsonPlusDecoder::reviveConstructorRecord()` |
+| **An `Error` record revives to a `\RuntimeException` carrying only its message** | That is all the envelope persists. The class cannot round-trip because the JS `Error` hierarchy has no PHP equivalent. | `JsonPlusDecoder::reviveConstructorRecord()` |
+| **`list()` takes `CheckpointListOptions|int|null`, not a bare options object** | The engine calls `list($config, $limit)` and PHP has no overloading, so the limit and the options bag are one union type rather than two methods. | `BaseCheckpointSaver::list()` |
+| **`MemorySaver` and `SqliteSaver` group a cross-thread `list()` differently** | The in-process saver iterates threads then namespaces; the database orders by `checkpoint_id` globally. Both are newest-first *within* a thread and namespace, which is the only ordering the `before` cursor and the engine depend on, and the upstream spec compares the list as a set for the same reason. | `MemorySaver::list()`, `SqliteSaver::list()` |
 
 ---
 
@@ -127,4 +149,11 @@ papered over. Each is pinned by a test so the boundary stays visible.
 | `pregel io` + errors | — | 42 |
 | `superstep barrier` (PHP/JS divergence, documented) | — | 6 |
 | `state graph` (builder, validation, wiring) | — | 28 |
-| **Total so far** | | **575** |
+| `checkpoint` (`jsonplus.test.ts`, `checkpoints.test.ts` base/id/versions blocks) | 3 suites | 63 |
+| `checkpoint` shared saver spec (`put`, `putWrites`, `getTuple`, `list`, `deleteThread`) run against **both** savers | 5 specs | 216 (the `list` argument matrix is 648 cases x 2 savers) |
+| `checkpoint-sqlite` (`checkpoints.test.ts`) | 1 suite | 7 |
+| `checkpoint` <-> `pregel` integration (a real graph, resumable, per saver) | — | 6 |
+| `tools` (`tools/tests/tools.test.ts`) | 28 | 55 |
+| `language_models` (`chat_models.test.ts`, `llms.test.ts`, `outputs.ts`) | ~15 | 41 |
+| `tracers` / `callbacks` (`tracer.test.ts`, `manager.test.ts`, `run_collector.test.ts`) | ~13 | 65 |
+| **Total so far** | | **1734** |

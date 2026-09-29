@@ -24,6 +24,7 @@
         },
         "files": [
             "src/LangChain/Runnables/coerceToRunnable.php",
+            "src/LangChain/Tools/createTool.php",
             "src/LangGraph/Pregel/interrupt.php"
         ]
     },

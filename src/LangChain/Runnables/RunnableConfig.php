@@ -34,6 +34,16 @@ final class RunnableConfig
      * @param string|null               $checkpointId    LangGraph checkpoint to resume from.
      * @param string|null               $checkpointMap   LangGraph checkpoint namespace.
      * @param string                    $configurable      Values exposed to tools/prompts.
+     * @param array<string, mixed>      $options   Per-call options that are *not* runnable
+     *                                  config — the TypeScript `CallOptions extends RunnableConfig`
+     *                                  extras: `stop`, `maxRetries`, `tools`, `tool_choice`,
+     *                                  `outputVersion`, `thrownErrorString`, and whatever a
+     *                                  provider adds.
+     * @param mixed                     $toolCall  The tool call that triggered this run, when the
+     *                                  runnable is a tool. This is the `ToolRunnableConfig` in the
+     *                                  TypeScript source; it is what lets a tool know which
+     *                                  `tool_call_id` to stamp on the `ToolMessage` it returns.
+     * @param mixed                     $context   Runtime context, forwarded to tools by agents.
      */
     public function __construct(
         public array $tags = [],
@@ -49,6 +59,9 @@ final class RunnableConfig
         public ?string $checkpointId = null,
         public ?string $checkpointMap = null,
         public array $configurable = [],
+        public array $options = [],
+        public mixed $toolCall = null,
+        public mixed $context = null,
     ) {
     }
 
@@ -95,6 +108,9 @@ final class RunnableConfig
             checkpointId: $pick('checkpoint_id') === null ? null : (string) $pick('checkpoint_id'),
             checkpointMap: $pick('checkpoint_map') === null ? null : (string) $pick('checkpoint_map'),
             configurable: (array) $pick('configurable', []),
+            options: (array) $pick('options', []),
+            toolCall: $pick('tool_call'),
+            context: $pick('context'),
         );
     }
 

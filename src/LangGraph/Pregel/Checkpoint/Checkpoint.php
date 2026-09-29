@@ -24,7 +24,7 @@ namespace LangGraph\Pregel\Checkpoint;
  * unchanged channel does not re-trigger a node, and why re-running from an old
  * checkpoint replays exactly the nodes that were live at that point.
  */
-final class Checkpoint
+class Checkpoint
 {
     /**
      * @param int                          $v               Checkpoint format version.

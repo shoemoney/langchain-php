@@ -11,7 +11,7 @@ use LangChain\Runnables\RunnableConfig;
  *
  * Port of `CheckpointTuple`.
  */
-final class CheckpointTuple
+class CheckpointTuple
 {
     /**
      * @param array<string, mixed>                $config         Config identifying this checkpoint.
