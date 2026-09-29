@@ -35,24 +35,26 @@ class Topic extends BaseChannel
     public array $values = [];
 
     /**
-     * Membership set for `unique`: internal key => the original value.
+     * Membership set for `unique`.
      *
-     * The value is stored alongside the key so a checkpoint can return real
-     * values; returning the keys would corrupt the value list on restore.
-     *
-     * @var array<string, mixed>
+     * {@see ValueSet} rather than a plain array: PHP key coercion would collapse
+     * `0`, `"0"`, `false` and `null` onto one key, where JavaScript's Set treats
+     * them as four distinct members. It also holds the real values, so a
+     * checkpoint can return them instead of the internal fingerprints.
      */
-    protected array $seen = [];
+    protected ValueSet $seen;
 
     public function __construct(bool $unique = false, bool $accumulate = false)
     {
         $this->unique = $unique;
         $this->accumulate = $accumulate;
+        $this->seen = new ValueSet();
     }
 
     public function fromCheckpoint(mixed $checkpoint = null): self
     {
         $empty = new static($this->unique, $this->accumulate);
+        $empty->seen = new ValueSet();
         if ($checkpoint === null) {
             return $empty;
         }
@@ -65,9 +67,7 @@ class Topic extends BaseChannel
             && array_key_exists(1, $checkpoint)
             && is_array($checkpoint[1])
         ) {
-            foreach ($checkpoint[0] as $v) {
-                $empty->seen[self::key($v)] = $v;
-            }
+            $empty->seen = new ValueSet($checkpoint[0]);
             $empty->values = array_values($checkpoint[1]);
 
             return $empty;
@@ -78,9 +78,7 @@ class Topic extends BaseChannel
             // A flat checkpoint carries no `seen` history, so seed it from the
             // restored buffer; otherwise `unique` could re-deliver on resume.
             if ($empty->unique) {
-                foreach ($empty->values as $v) {
-                    $empty->seen[self::key($v)] = $v;
-                }
+                $empty->seen = new ValueSet($empty->values);
             }
         }
 
@@ -115,10 +113,9 @@ class Topic extends BaseChannel
 
         if ($this->unique) {
             foreach ($flat as $value) {
-                $k = self::key($value);
-                if (!isset($this->seen[$k])) {
+                if (!$this->seen->has($value)) {
                     $updated = true;
-                    $this->seen[$k] = $value;
+                    $this->seen->add($value);
                     $this->values[] = $value;
                 }
             }
@@ -149,7 +146,7 @@ class Topic extends BaseChannel
     public function checkpoint(): mixed
     {
         if ($this->unique) {
-            return [array_values($this->seen), $this->values];
+            return [$this->seen->toArray(), $this->values];
         }
 
         return $this->values;
@@ -158,21 +155,5 @@ class Topic extends BaseChannel
     public function isAvailable(): bool
     {
         return $this->values !== [];
-    }
-
-    /**
-     * A stable identity for `seen` membership.
-     *
-     * PHP arrays have no reference identity, so scalars are keyed by a
-     * type-tagged string and objects by their serialized form. Without the type
-     * tag, the integer 1 and the string "1" would collide.
-     */
-    private static function key(mixed $value): string
-    {
-        if (is_scalar($value) || $value === null) {
-            return get_debug_type($value) . ':' . var_export($value, true);
-        }
-
-        return 'complex:' . md5(serialize($value));
     }
 }

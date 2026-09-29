@@ -119,13 +119,19 @@ final class ValueSet
         }
 
         // JavaScript has a single number type: 1 and 1.0 are the same member,
-        // and -0 === 0. PHP distinguishes int from float, so fold integral
-        // floats back onto their int key. Non-finite floats keep their own
-        // deterministic serialize() form (NAN, INF and -INF are each stable).
+        // and -0 === 0. PHP distinguishes int from float, so BOTH sides have to
+        // agree on one key form — an int must use the same `i:` prefix a folded
+        // float uses, or `1` and `1.0` silently become two members.
+        if (is_int($value)) {
+            return 'i:' . $value;
+        }
+
         if (is_float($value) && is_finite($value) && floor($value) === $value) {
             return 'i:' . (int) $value;
         }
 
+        // Non-finite floats (NAN, INF, -INF) keep their own deterministic
+        // serialize() form; each is stable across calls.
         return 's:' . serialize($value);
     }
 }

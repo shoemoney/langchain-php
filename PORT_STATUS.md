@@ -127,6 +127,12 @@ papered over. Each is pinned by a test so the boundary stays visible.
 | `Topic`'s `seen` set keys on a type-tagged serialization | PHP arrays have no reference identity, so `1` and `"1"` would otherwise collide | `Topic::key()` |
 | `NamedBarrierValue` compares set membership, not sequence | Arrival order is nondeterministic under concurrency | `barrierSatisfied()` |
 | `fromCheckpoint()` is an instance method, not static | Matches the TS prototype-call shape; a static call would lose the channel's config | all channel classes |
+| Tasks in a superstep run sequentially, not concurrently | PHP fibers exist but a fiber cannot be resumed from inside a synchronous callback. Observable *state* still matches because `applyWrites` sorts by task path, but which task runs first is now a property of that sort. JS reports an `AggregateError`; this raises a `RuntimeException` naming the superstep. **The one place the port is not behaviourally identical.** | `Pregel\Algorithm` |
+| `interrupt()` reaches the task config through a static, restored in `finally` | JS uses `AsyncLocalStorage` | `Pregel\interrupt()` |
+| `undefined` has no PHP equivalent | The `lc:2` undefined record is *read* (→ `null`), never written | `JsonPlusDecoder` |
+| `RegExp` serde records stay inert | A hand translation to PCRE would silently disagree with the writer | `JsonPlusDecoder` |
+| An `Error` revives as `\RuntimeException` | Only the message is persisted; a PHP class name would not survive a cross-runtime read | `JsonPlusDecoder` |
+| An empty map serialises as `[]` | One PHP array type. Forcing `{}` would corrupt genuinely-empty *list* channel values. | `JsonPlusEncoder` |
 | **A checkpoint with no children serialises empty maps as `[]`, not `{}`** | PHP has one array type, so an empty map and an empty list are the same value and `json_encode` cannot tell them apart. The reverse direction is unaffected (a stored `{}` reads back as `[]`, which every consumer treats as "empty"), and forcing `{}` would corrupt a genuinely empty *list* channel value. | `JsonPlusEncoder::walk()` |
 | **`Set` and `Map` need no envelope on the way out** | JS has to distinguish them from arrays in JSON; a PHP array already is the set *and* the map. The `lc:2` `Set`/`Map` records are still *read*, so a checkpoint written by the JS runtime arrives intact. | `JsonPlusEncoder::envelopeFor()` |
 | **A `RegExp` constructor record stays inert** | A JS pattern is not a PCRE pattern, and translating one by hand yields a matcher that silently disagrees with the one that wrote it. Inert is the honest outcome, and it is the upstream rule for a record the reader cannot validate. | `JsonPlusDecoder::reviveConstructorRecord()` |
@@ -144,6 +150,10 @@ papered over. Each is pinned by a test so the boundary stays visible.
 | `runnables` | ~90 | 29 |
 | `text_splitters` | 37 | 35 verbatim + 71 added |
 | `langgraph channels` | 74 | 62 |
+| `langgraph pregel` | ~200 | 162 |
+| `langgraph checkpointer` | ~400 | 992 (upstream validation spec, run against 2 savers) |
+| `prompts` + `output_parsers` | ~180 | 141 |
+| `tools` + `language_models` + `tracers` | ~220 | 161 |
 | `pregel algo` (`algo.test.ts` + scheduling assertions) | 3 suites | 42 |
 | `pregel loop` (behaviour from `pregel.test.ts`, `python_port/*`) | — | 41 |
 | `pregel io` + errors | — | 42 |
