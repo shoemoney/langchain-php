@@ -7,11 +7,33 @@ namespace LangChain\Messages;
 /**
  * A chunk of a tool result, produced while a tool streams its output.
  *
- * Port of `ToolMessageChunk` from `@langchain/core/messages/tool`.
+ * Port of `ToolMessageChunk` from `@langchain_core/messages/tool`.
+ *
+ * Like `AIMessageChunk`, this extends `BaseMessageChunk` rather than
+ * {@see ToolMessage} — in the TypeScript original the chunk and the message
+ * are siblings, and the chunk branch is what makes it foldable. The tool-call
+ * correlation fields are therefore carried here directly.
  */
-class ToolMessageChunk extends ToolMessage
+class ToolMessageChunk extends BaseMessageChunk
 {
     public string $type = BaseMessage::ROLE_TOOL;
+
+    public string $toolCallId = '';
+
+    public ?string $toolName = null;
+
+    public function __construct(string|array $fields = [])
+    {
+        parent::__construct($fields);
+        if (is_array($fields)) {
+            $id = $fields['tool_call_id'] ?? $fields['toolCallId'] ?? '';
+            $this->toolCallId = is_string($id) ? $id : '';
+            $name = $fields['tool_name'] ?? $fields['toolName'] ?? null;
+            $this->toolName = is_string($name) ? $name : null;
+        }
+
+        $this->kwargs['tool_call_id'] = $this->toolCallId;
+    }
 
     public static function lcId(): array
     {
