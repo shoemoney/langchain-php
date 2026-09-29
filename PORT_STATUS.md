@@ -44,7 +44,7 @@ composer test
 | `output_parsers` | ✅ | |
 | `tools` | ✅ | `StructuredTool`, `Tool`, `DynamicTool`, `DynamicStructuredTool`, `tool()`, `BaseToolkit`, `ToolRuntime`, `ToolException`. Schema is **JSON Schema**, not Zod — see below. |
 | `tracers` / `callbacks` | ✅ | `BaseCallbackHandler` + method-bag handlers, `CallbackManager` and the four run managers, `BaseTracer`, `ConsoleCallbackHandler`, `RunCollectorCallbackHandler`, `Run`. No LangSmith HTTP transport. |
-| `embeddings` / `vectorstores` | ⬜ | |
+| `embeddings` / `vectorstores` | ⬜ | Interfaces are the seam; no concrete backend yet |
 | `utils` (env, json patch, function_calling, standard_schema, tiktoken) | ⬜ | |
 | `structured_query`, `indexing`, `example_selectors` | ⬜ | |
 | `load/import_map`, `load/import_constants` | ⬜ | |
@@ -69,9 +69,9 @@ composer test
 | `pregel` | ✅ | **The core.** `Algorithm` (applyWrites, prepareNextTasks, prepareSingleTask, procInput, localRead/Write, scratchpad, shouldInterrupt, candidateNodes), `PregelLoop` as a `\Generator`, `PregelRunner`, `IO`, `PregelNode`, `ChannelRead`/`ChannelWrite`, `Send`/`Command`, retry policy, `MemorySaver`, `interrupt()` |
 | `graph` | ⬜ | `Graph` (the low-level builder), `MessageGraph`, drawing |
 | `func` | ⬜ | `entrypoint`/`task` |
-| `prebuilt` | ⬜ | `createReactAgent`, `ToolNode` |
-| `interrupt` | ⬜ | |
-| `constants`, `hash`, `utils` | ⬜ | |
+| `prebuilt` | ⬜ | `createReactAgent`, `ToolNode` — **the next big item**; everything it needs now exists |
+| `interrupt` | 🟡 | `GraphInterrupt`/`NodeInterrupt`/`interrupt()` exist and are thrown by the loop; the resume-with-values path is unported |
+| `constants`, `hash`, `utils` | 🟡 | `Constants` ported; `hash` and `utils` not |
 
 ## langgraph-checkpoint
 
@@ -166,4 +166,4 @@ papered over. Each is pinned by a test so the boundary stays visible.
 | `tools` (`tools/tests/tools.test.ts`) | 28 | 55 |
 | `language_models` (`chat_models.test.ts`, `llms.test.ts`, `outputs.ts`) | ~15 | 41 |
 | `tracers` / `callbacks` (`tracer.test.ts`, `manager.test.ts`, `run_collector.test.ts`) | ~13 | 65 |
-| **Total so far** | | **1734** |
+| **Total so far** | | **1745** |
