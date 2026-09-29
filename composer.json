@@ -23,7 +23,8 @@
             "LangGraph\\": "src/LangGraph/"
         },
         "files": [
-            "src/LangChain/Runnables/coerceToRunnable.php"
+            "src/LangChain/Runnables/coerceToRunnable.php",
+            "src/LangGraph/Pregel/interrupt.php"
         ]
     },
     "autoload-dev": {

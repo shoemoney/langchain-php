@@ -14,7 +14,13 @@ class FunctionMessage extends BaseMessage
 {
     public string $type = BaseMessage::ROLE_FUNCTION;
 
-    public string $name = '';
+    /**
+     * A function message always carries the function's name.
+     *
+     * The type must match the inherited `?string` exactly — narrowing it is a
+     * load-time fatal, not a style complaint.
+     */
+    public ?string $name = '';
 
     public function __construct(string|array $fields = [])
     {

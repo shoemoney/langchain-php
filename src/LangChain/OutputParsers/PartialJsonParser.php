@@ -1,0 +1,342 @@
+<?php
+
+declare(strict_types=1);
+
+namespace LangChain\OutputParsers;
+
+/**
+ * A recursive descent JSON parser that accepts truncated documents.
+ *
+ * Port of `strictParsePartialJson` from `@langchain/core/utils/json`.
+ *
+ * It differs from `json_decode` in exactly one way: hitting the end of the
+ * buffer while a container is still open returns the container as it stands
+ * rather than failing. That is what lets a streamed `{` become `[]` and a
+ * streamed `{"a": 1` become `['a' => 1]` on the way to the finished value.
+ *
+ * Offsets are counted in code points to match the TypeScript original, which
+ * indexes by UTF-16 unit.
+ *
+ * @internal
+ */
+final class PartialJsonParser
+{
+    private int $pos = 0;
+
+    private readonly int $length;
+
+    public function __construct(private readonly string $buffer)
+    {
+        $this->length = mb_strlen($buffer, 'UTF-8');
+    }
+
+    /**
+     * @throws \RuntimeException on malformed input
+     */
+    public function parse(): mixed
+    {
+        $value = $this->parseValue();
+        $this->skipWhitespace();
+
+        if ($this->pos < $this->length) {
+            throw new \RuntimeException(
+                "Unexpected character '{$this->charAt($this->pos)}' at position {$this->pos}"
+            );
+        }
+
+        return $value;
+    }
+
+    private function charAt(int $i): string
+    {
+        return mb_substr($this->buffer, $i, 1, 'UTF-8');
+    }
+
+    private function skipWhitespace(): void
+    {
+        while ($this->pos < $this->length && ctype_space($this->charAt($this->pos))) {
+            $this->pos++;
+        }
+    }
+
+    private function parseValue(): mixed
+    {
+        $this->skipWhitespace();
+
+        if ($this->pos >= $this->length) {
+            throw new \RuntimeException("Unexpected end of input at position {$this->pos}");
+        }
+
+        $char = $this->charAt($this->pos);
+        if ($char === '{') {
+            return $this->parseObject();
+        }
+        if ($char === '[') {
+            return $this->parseArray();
+        }
+        if ($char === '"') {
+            return $this->parseString();
+        }
+
+        $rest = mb_substr($this->buffer, $this->pos, 5, 'UTF-8');
+        if (str_starts_with('null', $rest)) {
+            $this->pos += min(4, $this->length - $this->pos);
+
+            return null;
+        }
+        if (str_starts_with('true', $rest)) {
+            $this->pos += min(4, $this->length - $this->pos);
+
+            return true;
+        }
+        if (str_starts_with('false', $rest)) {
+            $this->pos += min(5, $this->length - $this->pos);
+
+            return false;
+        }
+        if ($char === '-' || ($char >= '0' && $char <= '9')) {
+            return $this->parseNumber();
+        }
+
+        throw new \RuntimeException("Unexpected character '{$char}' at position {$this->pos}");
+    }
+
+    private function parseString(): string
+    {
+        if ($this->charAt($this->pos) !== '"') {
+            throw new \RuntimeException("Expected '\"' at position {$this->pos}");
+        }
+
+        $this->pos++;
+        $result = '';
+        $escaped = false;
+
+        while ($this->pos < $this->length) {
+            $char = $this->charAt($this->pos);
+
+            if ($escaped) {
+                $result .= match ($char) {
+                    'n' => "\n",
+                    't' => "\t",
+                    'r' => "\r",
+                    '\\' => '\\',
+                    '"' => '"',
+                    'b' => "\x08",
+                    'f' => "\f",
+                    '/' => '/',
+                    'u' => $this->parseUnicodeEscape(),
+                    default => throw new \RuntimeException(
+                        "Invalid escape sequence '\\{$char}' at position {$this->pos}"
+                    ),
+                };
+                $escaped = false;
+            } elseif ($char === '\\') {
+                $escaped = true;
+            } elseif ($char === '"') {
+                $this->pos++;
+
+                return $result;
+            } else {
+                $result .= $char;
+            }
+
+            $this->pos++;
+        }
+
+        if ($escaped) {
+            $result .= '\\';
+        }
+
+        return $result;
+    }
+
+    private function parseUnicodeEscape(): string
+    {
+        $hex = mb_substr($this->buffer, $this->pos + 1, 4, 'UTF-8');
+        $hexLength = mb_strlen($hex, 'UTF-8');
+
+        if (preg_match('/^[0-9A-Fa-f]{0,4}$/', $hex) === 1) {
+            if ($hexLength === 4) {
+                $this->pos += $hexLength;
+
+                return mb_chr((int) hexdec($hex), 'UTF-8');
+            }
+
+            return 'u' . $hex;
+        }
+
+        throw new \RuntimeException(
+            "Invalid unicode escape sequence '\\u{$hex}' at position {$this->pos}"
+        );
+    }
+
+    private function parseNumber(): int|float
+    {
+        $start = $this->pos;
+        $numStr = '';
+
+        if ($this->charAt($this->pos) === '-') {
+            $numStr .= '-';
+            $this->pos++;
+        }
+
+        if ($this->pos < $this->length && $this->charAt($this->pos) === '0') {
+            $numStr .= '0';
+            $this->pos++;
+
+            $next = $this->pos < $this->length ? $this->charAt($this->pos) : '';
+            if ($next >= '0' && $next <= '9') {
+                throw new \RuntimeException("Invalid number at position {$start}");
+            }
+        }
+
+        if ($this->pos < $this->length && $this->charAt($this->pos) >= '1' && $this->charAt($this->pos) <= '9') {
+            while ($this->pos < $this->length && $this->charAt($this->pos) >= '0' && $this->charAt($this->pos) <= '9') {
+                $numStr .= $this->charAt($this->pos);
+                $this->pos++;
+            }
+        }
+
+        if ($this->pos < $this->length && $this->charAt($this->pos) === '.') {
+            $numStr .= '.';
+            $this->pos++;
+            while ($this->pos < $this->length && $this->charAt($this->pos) >= '0' && $this->charAt($this->pos) <= '9') {
+                $numStr .= $this->charAt($this->pos);
+                $this->pos++;
+            }
+        }
+
+        if ($this->pos < $this->length && ($this->charAt($this->pos) === 'e' || $this->charAt($this->pos) === 'E')) {
+            $numStr .= $this->charAt($this->pos);
+            $this->pos++;
+            if ($this->pos < $this->length && ($this->charAt($this->pos) === '+' || $this->charAt($this->pos) === '-')) {
+                $numStr .= $this->charAt($this->pos);
+                $this->pos++;
+            }
+            while ($this->pos < $this->length && $this->charAt($this->pos) >= '0' && $this->charAt($this->pos) <= '9') {
+                $numStr .= $this->charAt($this->pos);
+                $this->pos++;
+            }
+        }
+
+        if ($numStr === '' || $numStr === '-' || $numStr === '.') {
+            $this->pos = $start;
+            throw new \RuntimeException("Invalid number '{$numStr}' at position {$start}");
+        }
+
+        if (str_contains($numStr, '.') || str_contains($numStr, 'e') || str_contains($numStr, 'E')) {
+            return (float) $numStr;
+        }
+
+        return (int) $numStr;
+    }
+
+    /** @return list<mixed> */
+    private function parseArray(): array
+    {
+        $arr = [];
+        $this->pos++;
+        $this->skipWhitespace();
+
+        if ($this->pos >= $this->length) {
+            return $arr;
+        }
+        if ($this->charAt($this->pos) === ']') {
+            $this->pos++;
+
+            return $arr;
+        }
+
+        while ($this->pos < $this->length) {
+            $this->skipWhitespace();
+            if ($this->pos >= $this->length) {
+                return $arr;
+            }
+
+            $arr[] = $this->parseValue();
+
+            $this->skipWhitespace();
+            if ($this->pos >= $this->length) {
+                return $arr;
+            }
+
+            $char = $this->charAt($this->pos);
+            if ($char === ']') {
+                $this->pos++;
+
+                return $arr;
+            }
+            if ($char === ',') {
+                $this->pos++;
+                continue;
+            }
+
+            throw new \RuntimeException("Expected ',' or ']' at position {$this->pos}, got '{$char}'");
+        }
+
+        return $arr;
+    }
+
+    /** @return array<string, mixed> */
+    private function parseObject(): array
+    {
+        $obj = [];
+        $this->pos++;
+        $this->skipWhitespace();
+
+        if ($this->pos >= $this->length) {
+            return $obj;
+        }
+        if ($this->charAt($this->pos) === '}') {
+            $this->pos++;
+
+            return $obj;
+        }
+
+        while ($this->pos < $this->length) {
+            $this->skipWhitespace();
+            if ($this->pos >= $this->length) {
+                return $obj;
+            }
+
+            $key = $this->parseString();
+
+            $this->skipWhitespace();
+            if ($this->pos >= $this->length) {
+                return $obj;
+            }
+
+            if ($this->charAt($this->pos) !== ':') {
+                throw new \RuntimeException("Expected ':' at position {$this->pos}");
+            }
+            $this->pos++;
+
+            $this->skipWhitespace();
+            if ($this->pos >= $this->length) {
+                return $obj;
+            }
+
+            $obj[$key] = $this->parseValue();
+
+            $this->skipWhitespace();
+            if ($this->pos >= $this->length) {
+                return $obj;
+            }
+
+            $char = $this->charAt($this->pos);
+            if ($char === '}') {
+                $this->pos++;
+
+                return $obj;
+            }
+            if ($char === ',') {
+                $this->pos++;
+                continue;
+            }
+
+            throw new \RuntimeException("Expected ',' or '}' at position {$this->pos}, got '{$char}'");
+        }
+
+        return $obj;
+    }
+}
