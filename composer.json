@@ -21,7 +21,10 @@
         "psr-4": {
             "LangChain\\": "src/LangChain/",
             "LangGraph\\": "src/LangGraph/"
-        }
+        },
+        "files": [
+            "src/LangChain/Runnables/coerceToRunnable.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
