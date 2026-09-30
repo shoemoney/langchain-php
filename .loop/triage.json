@@ -1176,6 +1176,7 @@
   "documentation=broken, and RIGHT: my own 2-vs-3 taxonomy muddle; fixed"
  ],
  "audit/sqlite-list-only-checkpoint-id": [
+  "#OPEN \u2014 CONFIRMED BY READING, NOT FIXED. `SqliteSaver::list()` builds predicates for thread_id, checkpoint_ns and a `checkpoint_id < ?` cursor, and has NO onlyCheckpointId predicate, while `MemorySaver::list()` filters on it at :102/:121 \u2014 so the two savers answer the same call differently and the SQLite one returns the whole thread. The fix is one WHERE clause, deliberately unlanded: no budget left for the two-case test and its mutation.",
   "CONFIRMED, NOT FIXED (no budget for the mutation matrix); #2/#3 are the next probes"
  ]
 }

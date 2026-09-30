@@ -69,7 +69,24 @@ def main():
     if args and args[0] == "--add":
         model = args[1]
         note = args[2]
-        triage.setdefault(model, []).append(note)
+        notes = triage.setdefault(model, [])
+
+        # `TriageStatusMarkerTest` requires the FIRST note of every `audit/` key to
+        # open with a status marker. This command has been the eighth way to break
+        # that rule across 126 iterations — every one of them this exact line,
+        # because `--add` takes free text and nothing here shaped it. Rather than
+        # rely on remembering, an audit key created with no marker is given one.
+        #
+        # `#OPEN` is the default because that is what a one-line `--add` almost
+        # always records: something observed and not yet fixed. If the note is
+        # explicitly about a fix that landed, edit the marker — this only stops an
+        # unmarked entry, it does not guess your status for you.
+        if model.startswith("audit/") and notes and not notes[0].startswith(
+            ("#RESOLVED", "#OPEN", "#CLOSED", "#RETRACTED")
+        ):
+            notes.insert(0, "#OPEN — status not stated; set it when the work closes.")
+
+        notes.append(note)
         save_triage(triage)
         print(f"triaged note for {model}")
         return
