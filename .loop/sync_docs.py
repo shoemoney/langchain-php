@@ -128,19 +128,39 @@ def main() -> None:
         sys.exit("PORT_STATUS.md has no '**Total so far**' row to update")
     status.write_text(s, encoding="utf-8")
 
-    # BOTH counts. This previously updated only the test-file figure, so adding
-    # a src file left the Size row stale and DocsMatchRealityTest failed on a
-    # number the script was supposed to own.
-    def count(where: str) -> int:
-        return sum(1 for _ in (ROOT / where).rglob("*.php"))
+    # Files AND lines, for both trees.
+    #
+    # This previously updated neither line count: `sync_docs.py` had ZERO
+    # mentions of "lines", so the Size row's totals were frozen at whatever they
+    # were when last typed by hand. Measured drift: HANDOFF.md claimed 33,493
+    # src and 21,361 test lines against a real 33,984 and 23,776 — 491 and 2,415
+    # lines out of date, on a row that is supposed to describe the code as it is.
+    #
+    # It survived because DocsMatchRealityTest checks test counts, assertion
+    # counts and FILE counts, and a line count is none of those. A number nothing
+    # measures is a number nothing keeps true.
+    def measure_tree(where: str) -> tuple[int, int]:
+        files = sorted(p for p in (ROOT / where).rglob("*.php") if p.is_file())
+        lines = 0
+        for p in files:
+            with p.open("rb") as f:
+                lines += sum(1 for _ in f)
+        return len(files), lines
 
-    test_files = count("tests")
-    src_files = count("src")
+    test_files, test_lines = measure_tree("tests")
+    src_files, src_lines = measure_tree("src")
 
     hand = ROOT / "HANDOFF.md"
     s = hand.read_text(encoding="utf-8")
-    s = re.sub(r"· \d+ test files", f"· {test_files} test files", s, count=1)
-    s = re.sub(r"\| Size \| \d+ src files", f"| Size | {src_files} src files", s, count=1)
+    s, n = re.subn(
+        r"\| Size \| [^|]*\|",
+        f"| Size | {src_files} src files / {src_lines:,} lines "
+        f"· {test_files} test files / {test_lines:,} lines |",
+        s,
+        count=1,
+    )
+    if n != 1:
+        sys.exit("HANDOFF.md has no '| Size | ... |' row to update")
     hand.write_text(s, encoding="utf-8")
 
     print(f"  HANDOFF.md + PORT_STATUS.md synced to {tests} / {assertions}, {src_files} src + {test_files} test files")

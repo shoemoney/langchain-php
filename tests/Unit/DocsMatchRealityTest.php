@@ -104,6 +104,52 @@ final class DocsMatchRealityTest extends TestCase
         self::assertSame($testFiles, (int) $m[2], 'HANDOFF.md test file count is stale');
     }
 
+    /**
+     * The Size row's LINE counts must be current.
+     *
+     * Added because they were not. This guard checks test counts, assertion
+     * counts and file counts — and a line count is none of those — so
+     * HANDOFF.md sat claiming 33,493 src and 21,361 test lines against a real
+     * 33,984 and 23,776: 491 and 2,415 lines out of date, suite green
+     * throughout, because sync_docs.py had ZERO mentions of "lines" and so
+     * could never update them.
+     *
+     * A number nothing measures is a number nothing keeps true.
+     */
+    public function testTheSizeRowLineCountsAreCurrent(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $count = static function (string $dir) use ($root): int {
+            $lines = 0;
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $dir)) as $f) {
+                if ($f->isFile() && $f->getExtension() === 'php') {
+                    $lines += count(file($f->getPathname()));
+                }
+            }
+
+            return $lines;
+        };
+
+        $src = $count('src');
+        $test = $count('tests');
+        $doc = (string) file_get_contents($root . '/HANDOFF.md');
+
+        self::assertSame(
+            1,
+            preg_match(
+                '/\| Size \| (\d+) src files \/ ([\d,]+) lines · (\d+) test files \/ ([\d,]+) lines \|/',
+                $doc,
+                $m,
+            ),
+            'the Size row must be machine-parseable: N src files / N lines · N test files / N lines',
+        );
+
+        $num = static fn (string $s): int => (int) str_replace(',', '', $s);
+
+        self::assertSame($num($m[2]), $src, sprintf('HANDOFF.md claims %s src lines; there are %d', $m[2], $src));
+        self::assertSame($num($m[4]), $test, sprintf('HANDOFF.md claims %s test lines; there are %d', $m[4], $test));
+    }
+
     public function testHandoffStatesACurrentSuiteSize(): void
     {
         $tests = self::suiteSize();
