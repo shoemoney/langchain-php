@@ -678,6 +678,41 @@
    "chars": 4440,
    "findings": 5,
    "severity_hits": 5
+  },
+  "moonshotai/kimi-k3": {
+   "model": "moonshotai/kimi-k3",
+   "at": "2026-09-30T11:36:27",
+   "actual_model": "moonshotai/kimi-k3",
+   "usage": {
+    "prompt_tokens": 43722,
+    "completion_tokens": 6190,
+    "total_tokens": 49912,
+    "cost": 0.224016,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.224016,
+     "upstream_inference_prompt_cost": 0.131166,
+     "upstream_inference_completions_cost": 0.09285
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 5228,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 5228,
+   "status": "ok",
+   "file": ".loop/reviews/22-moonshotai__kimi-k3.md",
+   "chars": 3851,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -701,7 +736,8 @@
   "z-ai/glm-4.5v",
   "anthropic/claude-fable-5.1",
   "nex-agi/nex-n2.5-mini",
-  "sakana/fugu-max"
+  "sakana/fugu-max",
+  "moonshotai/kimi-k3"
  ],
  "next_index": 0
 }
