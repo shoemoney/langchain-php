@@ -201,12 +201,32 @@ class PromptTemplate extends StringPromptTemplate
             throw new \RuntimeException('Cannot serialize a prompt template with an output parser');
         }
 
-        return [
+        // `additional_content_fields` is carried, and only when set.
+        //
+        // These are the provider-specific extras a caller attaches to a prompt —
+        // `cache_control`, image detail, a vendor marker — and they were dropped
+        // on serialisation. Measured: a template built with
+        // `['provider' => 'acme']` came back from `deserialize()` with `null`.
+        // The round-trip SUCCEEDED, which is what makes it worth fixing: nothing
+        // errors, the rebuilt template simply no longer carries the extras it was
+        // given, and the loss surfaces much later as a provider that stops
+        // caching or stops rendering a block.
+        //
+        // Partial variable VALUES are deliberately NOT carried, and that is
+        // upstream's own choice rather than an omission here: prompts/base.ts
+        // returns `{ partialVariables: undefined }` from `lc_attributes` with the
+        // comment "python doesn't support this yet".
+        $out = [
             '_type' => $this->getPromptType(),
             'input_variables' => $this->inputVariables,
             'template' => $this->template,
             'template_format' => $this->templateFormat,
         ];
+        if ($this->additionalContentFields !== null && $this->additionalContentFields !== []) {
+            $out['additional_content_fields'] = $this->additionalContentFields;
+        }
+
+        return $out;
     }
 
     /**
@@ -224,6 +244,7 @@ class PromptTemplate extends StringPromptTemplate
             template: $data['template'],
             inputVariables: $data['input_variables'] ?? [],
             templateFormat: $data['template_format'] ?? null,
+            additionalContentFields: $data['additional_content_fields'] ?? null,
         );
     }
 

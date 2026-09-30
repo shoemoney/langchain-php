@@ -2799,6 +2799,41 @@
    "chars": 3890,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~x-ai/grok-latest": {
+   "model": "~x-ai/grok-latest",
+   "at": "2026-09-30T03:51:52",
+   "actual_model": "x-ai/grok-4.7",
+   "usage": {
+    "prompt_tokens": 35487,
+    "completion_tokens": 16905,
+    "total_tokens": 52392,
+    "cost": 0.170676,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 1152,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.170676,
+     "upstream_inference_prompt_cost": 0.069246,
+     "upstream_inference_completions_cost": 0.10143
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 15990,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 15990,
+   "status": "ok",
+   "file": ".loop/reviews/91-~x-ai__grok-latest.md",
+   "chars": 3909,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2951,7 +2986,8 @@
   "perplexity/sonar",
   "~google/gemini-flash-latest",
   "~z-ai/glm-flash-latest",
-  "~moonshotai/kimi-latest"
+  "~moonshotai/kimi-latest",
+  "~x-ai/grok-latest"
  ],
  "next_index": 0
 }
