@@ -174,6 +174,50 @@
    "chars": 1800,
    "findings": 5,
    "severity_hits": 5
+  },
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+   "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+   "at": "2026-09-30T08:05:36",
+   "actual_model": null,
+   "usage": null,
+   "finish_reason": null,
+   "reasoning_tokens": 0,
+   "status": "empty"
+  },
+  "unbiased/pareto": {
+   "model": "unbiased/pareto",
+   "at": "2026-09-30T08:05:45",
+   "actual_model": "unbiased/pareto",
+   "usage": {
+    "prompt_tokens": 77668,
+    "completion_tokens": 18925,
+    "total_tokens": 96593,
+    "cost": 0.25127575,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 37703,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.25127575,
+     "upstream_inference_prompt_cost": 0.10933825,
+     "upstream_inference_completions_cost": 0.1419375
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/07-unbiased__pareto.md",
+   "chars": 10745,
+   "findings": 15,
+   "severity_hits": 11
   }
  },
  "order": [
@@ -181,7 +225,9 @@
   "google/gemini-3.8-flash",
   "google/gemma-4-31b-it",
   "stepfun/step-3.7-flash",
-  "amazon/nova-2-lite-v1"
+  "amazon/nova-2-lite-v1",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "unbiased/pareto"
  ],
  "next_index": 0
 }
