@@ -58,6 +58,26 @@ final class MessageMerge
      */
     public static function mergeContent(mixed $first, mixed $second): mixed
     {
+        // A null side is normalised to the empty string before anything else.
+        //
+        // Upstream reaches its final `else` for a null `secondContent` and
+        // returns `[...left, { type: "text", text: secondContent }]` — a text
+        // block whose text is null. No error; `contentBlocksFromNonStringFirst`
+        // simply returns [] for a null first side.
+        //
+        // The port FATALED on exactly that path: `mergeContent(null, null)` and
+        // `mergeContent([...blocks], null)` both threw
+        // `ContentBlock::text(): Argument #1 ($text) must be of type string,
+        // null given`. Measured, both.
+        //
+        // Null is unreachable through the message classes — `AIMessageChunk`
+        // coerces `content: null` to `[]` — so this only fires when a caller
+        // passes null to this PUBLIC method directly. Normalising to '' keeps
+        // the merge working and loses only the unrepresentable `text: null`,
+        // which PHP's typed block cannot hold. See PORT_STATUS.md.
+        $first ??= '';
+        $second ??= '';
+
         if (is_string($first)) {
             if ($first === '') {
                 return $second;

@@ -25,6 +25,17 @@ Severity (BLOCKER/MAJOR/MINOR), a file:line or test name as Evidence, one line o
 why it matters, and one line on the fix. Be terse — three specific findings beat
 five vague ones, and anything you cannot point at should be left out.
 
+BUDGET — this matters more than it sounds:
+
+* Answer FIRST. Write the findings, then stop. Do not deliberate at length
+  before answering: a reasoning model that spends its whole completion budget
+  thinking produces nothing at all, and that is not a review.
+* Keep each finding SHORT — at most six lines. Brevity is a correctness
+  property here, not a style preference, because a long finding is usually one
+  that was not checked.
+* If you can only verify three, return three. A short review that is right
+  beats a long one padded to five.
+
 EVIDENCE RULES — this is where reviews most often go wrong:
 
 * The packet contains NO line numbers. Do NOT invent one. A citation like
@@ -63,7 +74,18 @@ Format:
 **Fix:** ...
 """
 
-PROMPT = """You are a senior staff engineer doing an ADVISORY review of a PHP library.
+PROMPT = """BUDGET — this matters more than it sounds:
+
+* Answer FIRST. Write the findings, then stop. Do not deliberate at length
+  before answering: a reasoning model that spends its whole completion budget
+  thinking produces nothing at all, and that is not a review.
+* Keep each finding SHORT — at most six lines. Brevity is a correctness
+  property here, not a style preference, because a long finding is usually one
+  that was not checked.
+* If you can only verify three, return three. A short review that is right
+  beats a long one padded to five.
+
+You are a senior staff engineer doing an ADVISORY review of a PHP library.
 
 EVIDENCE RULES — this is where reviews most often go wrong:
 

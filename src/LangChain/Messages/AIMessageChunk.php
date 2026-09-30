@@ -44,7 +44,16 @@ class AIMessageChunk extends BaseMessageChunk
     }
 
     /**
-     * Fold another chunk of the same kind into this one.
+     * A new chunk holding this one folded together with `$other`.
+     *
+     * Returns a NEW instance and leaves `$this` untouched, which is what
+     * upstream does: `ai.ts:432-446` builds a `combinedFields` object and
+     * returns a fresh `AIMessageChunk` from it. The old wording here — "fold
+     * another chunk into this one" — read as an in-place mutation, and a caller
+     * written against that reading would discard the accumulated result.
+     *
+     * So this is a wording fix, not a behaviour fix: the code was already right
+     * and had been for the whole time.
      */
     public function concat(BaseMessageChunk $other): BaseMessageChunk
     {
