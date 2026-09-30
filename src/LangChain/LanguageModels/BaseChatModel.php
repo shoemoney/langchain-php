@@ -117,6 +117,148 @@ abstract class BaseChatModel extends BaseLanguageModel
         return (new \ReflectionMethod($this, 'streamResponseChunks'))->getDeclaringClass()->getName() !== self::class;
     }
 
+    // ---- tool binding ----------------------------------------------------
+
+    /**
+     * Offer a set of tools to the model.
+     *
+     * The base implementation throws. That is not laziness — it is how "this
+     * provider cannot bind tools" is expressed.
+     *
+     * In the TypeScript original `bindTools` is an *optional* method, so a model
+     * without it is detected with `typeof this.bindTools !== "function"`. PHP
+     * has no optional methods, so a model that has not overridden this would
+     * otherwise be indistinguishable from one that has — and
+     * {@see self::withStructuredOutput()} would silently build a chain that
+     * cannot work. Throwing here, and probing with
+     * {@see self::supportsToolBinding()}, preserves the distinction.
+     *
+     * A provider overrides this and returns a *new* instance carrying the
+     * rendered tools. It must not mutate `$this`: a bind that mutated its
+     * receiver would leak one call's tools into the next call's, which is the
+     * bug {@see \LangChain\Runnables\RunnableBinding} exists to prevent.
+     *
+     * `$tools` is provider-shaped. Each client overrides this to accept
+     * `StructuredTool`s and render them, but a caller may also pass the
+     * provider's own wire format directly, which is what makes it possible to
+     * bind a tool this SDK does not know about.
+     *
+     * @param list<mixed>             $tools  `StructuredTool` instances and/or
+     *                                           provider-shaped tool arrays.
+     * @param array<string, mixed>    $kwargs Extra call options to bind alongside.
+     */
+    public function bindTools(array $tools, array $kwargs = []): static
+    {
+        throw new \RuntimeException('Not implemented.');
+    }
+
+    /**
+     * Whether this subclass overrode {@see self::bindTools()}.
+     *
+     * Same reflection probe as {@see self::supportsStreaming()}, for the same
+     * reason: the TypeScript original distinguishes "no `bindTools`" from "a
+     * `bindTools` that throws", and only an override marks the difference.
+     */
+    public function supportsToolBinding(): bool
+    {
+        return (new \ReflectionMethod($this, 'bindTools'))->getDeclaringClass()->getName() !== self::class;
+    }
+
+    /**
+     * Ask the model for a value matching a schema, and get that value back.
+     *
+     * Port of `BaseChatModel.withStructuredOutput` from
+     * `@langchain/core/language_models/chat_models`.
+     *
+     * This is the base implementation and it supports exactly one strategy:
+     * **function calling**. The schema is offered to the model as a tool whose
+     * parameters are the schema, and the answer is the *arguments* of the call
+     * it makes. A model that understands the schema emits a well-formed call; a
+     * model that does not generally does not call the tool at all, which is why
+     * the parser reports "no tool call found" rather than returning a default.
+     *
+     * `jsonMode` is rejected rather than silently approximated: asking a model
+     * for bare JSON and asking it for a tool call are different requests, and
+     * quietly substituting one for the other produces output that looks right
+     * and is not the thing that was asked for. Providers that support JSON mode
+     * implement it themselves.
+     *
+     * A model that declines to call the tool produces `null`, not an exception.
+     * That is upstream's behaviour — see {@see StructuredOutput} — and it is a
+     * distinct fact from "an empty object", so branch on it rather than
+     * expecting a throw.
+     *
+     * `$functionName` has to agree on both sides — the tool offered to the
+     * model and the key the parser looks for. It is taken from an explicit
+     * `$config['name']`, else from a `name` key on a plain schema, else
+     * `extract`.
+     *
+     * @param array<string, mixed> $schema    JSON Schema describing the output.
+     * @param array{name?: string, description?: string, method?: string,
+     *              includeRaw?: bool, strict?: bool} $config
+     *
+     * @return Runnable<mixed, mixed> the model, or
+     *         `{raw: BaseMessage, parsed: array|null}` when `includeRaw` is set
+     */
+    public function withStructuredOutput(array $schema, array $config = []): \LangChain\Runnables\Runnable
+    {
+        if (!$this->supportsToolBinding()) {
+            throw new \RuntimeException(
+                'Chat model must implement ".bindTools()" to use withStructuredOutput.'
+            );
+        }
+
+        if (($config['strict'] ?? false) === true) {
+            throw new \RuntimeException('"strict" mode is not supported for this model by default.');
+        }
+
+        if (($config['method'] ?? 'functionCalling') === 'jsonMode') {
+            throw new \RuntimeException(
+                'Base withStructuredOutput implementation only supports "functionCalling" as a method.'
+            );
+        }
+
+        $functionName = (string) ($config['name'] ?? ($schema['name'] ?? 'extract'));
+        $description = (string) ($config['description'] ?? $this->schemaDescription($schema) ?? 'A function available to call.');
+
+        // `name` is the parser's lookup key, not part of the schema the model
+        // validates against, so it is stripped before the schema is sent.
+        unset($schema['name']);
+
+        $llm = $this->bindTools([[
+            'type' => 'function',
+            'function' => [
+                'name' => $functionName,
+                'description' => $description,
+                'parameters' => $schema,
+            ],
+        ]]);
+
+        $parser = StructuredOutput::createFunctionCallingParser($functionName);
+
+        return StructuredOutput::assembleStructuredOutputPipeline(
+            $llm,
+            $parser,
+            (bool) ($config['includeRaw'] ?? false),
+            ($config['includeRaw'] ?? false) ? 'StructuredOutputRunnable' : 'StructuredOutput',
+        );
+    }
+
+    /**
+     * A schema's own `description`, if it declares one.
+     *
+     * Mirrors upstream's `getSchemaDescription`. A schema with no description
+     * falls back to the generic prompt in {@see self::withStructuredOutput()},
+     * which is what upstream does too — an empty string would read as "this
+     * function intentionally does nothing".
+     */
+    private function schemaDescription(array $schema): ?string
+    {
+        $description = $schema['description'] ?? null;
+
+        return is_string($description) && $description !== '' ? $description : null;
+    }
+
     /**
      * Run the model over message lists.
      *
@@ -170,8 +312,29 @@ abstract class BaseChatModel extends BaseLanguageModel
         foreach ($messageLists as $index => $messageList) {
             $messages = self::coerceMessages($messageList);
 
-            $result = $this->dispatchGenerate($messages, $options, $runManager, $config);
+            // The run manager for THIS prompt, not run manager 0. Upstream
+            // passes `runManagers?.[i]` into `_generate`, and the end/error
+            // hooks below used the same index — so passing 0 here meant the
+            // tokens and the trace callbacks for prompt 3 were attributed to
+            // prompt 1, while the run's own end event went to the right one.
+            $thisRunManager = $runManagers[$index] ?? $runManager;
+
+            try {
+                $result = $this->dispatchGenerate($messages, $options, $thisRunManager, $config);
+            } catch (\Throwable $e) {
+                // Without this the trace shows a run that started and never
+                // ended: no error event, no token counts, and a span that hangs
+                // in any UI reading it. Upstream catches per-prompt
+                // (`allSettled`) and calls `handleLLMError` before rethrowing.
+                $thisRunManager?->handleLLMError($e);
+
+                throw $e;
+            }
+
             foreach ($result->generations as $generation) {
+                // Upstream stamps a missing id from `runManagers.at(0)` here
+                // specifically — the id is a property of the whole batch's run,
+                // not of the individual prompt.
                 $this->stampMessageId($generation, $runManager);
                 $generation->message->response_metadata = array_merge(
                     $generation->generationInfo,
@@ -185,7 +348,7 @@ abstract class BaseChatModel extends BaseLanguageModel
             // output is only what the returned LLMResult carries: token counts
             // are per-prompt facts, and a run told about the batch total instead
             // of its own usage reports a number it cannot have spent.
-            $runManagers[$index]?->handleLLMEnd(new LLMResult([$result->generations], $result->llmOutput));
+            $thisRunManager?->handleLLMEnd(new LLMResult([$result->generations], $result->llmOutput));
         }
 
         return new LLMResult($generations, $this->combineLLMOutput($llmOutputs), $runIds);
@@ -231,6 +394,15 @@ abstract class BaseChatModel extends BaseLanguageModel
         $runManager = $runManagers[0] ?? null;
 
         $aggregated = null;
+        $ended = false;
+
+        // `finally` rather than a trailing call, because this is a generator: a
+        // consumer that stops early — `break` out of a foreach, a `?->` chain
+        // that gives up, an exception in the caller's own loop — abandons the
+        // generator and the code after the loop never runs. Without the
+        // `finally` the trace shows a run that started and never ended: no
+        // completion, no error, no token counts, and a span that hangs forever
+        // in whatever UI is reading it.
         try {
             foreach ($this->streamResponseChunks($messages, $options, $runManager) as $chunk) {
                 $this->stampMessageId($chunk, $runManager);
@@ -239,24 +411,68 @@ abstract class BaseChatModel extends BaseLanguageModel
                     $chunk->message->response_metadata,
                 );
                 $aggregated = $aggregated === null ? $chunk : $aggregated->concat($chunk);
+
+                // A chunk that carries only metadata is folded in but not
+                // surfaced. Upstream captures a trailing usage event in a local
+                // and never yields it (`completions.ts:450-454`); yielding it
+                // put a phantom EMPTY message at the end of every streamed call
+                // — invisible to a consumer that concatenates text, and a
+                // spurious turn to one that counts or renders each chunk.
+                if ($this->isMetadataOnly($chunk)) {
+                    continue;
+                }
+
                 yield [self::CHANNEL_DEFAULT, $chunk->message];
             }
+
+            $ended = true;
+
+            if ($aggregated === null) {
+                $runManager?->handleLLMEnd(new LLMResult([[]], []));
+
+                return;
+            }
+
+            $runManager?->handleLLMEnd(new LLMResult(
+                [[new ChatGeneration($aggregated->message, $aggregated->text, $aggregated->generationInfo)]],
+                $this->llmOutputFromUsage($aggregated->message),
+            ));
         } catch (\Throwable $e) {
+            // Mark the run as accounted for BEFORE rethrowing. A `finally` runs
+            // on the way out of a `catch` too, so without this the abandoned
+            // branch below fires a second `handleLLMError` for the same failure
+            // — two error events for one error, which a collector that keeps
+            // only the last renders as a single event and so hides entirely.
+            $ended = true;
             $runManager?->handleLLMError($e);
 
             throw $e;
+        } finally {
+            // Abandoned mid-stream. This is neither success nor failure: the
+            // consumer stopped, which is a legitimate thing to do with a stream.
+            // Recording it as an ERROR put "Stream abandoned by the consumer"
+            // — stack trace attached — into every error dashboard for what was
+            // usually a deliberate early exit. Ending the run with whatever was
+            // accumulated is both honest and quiet, and a genuine mid-stream
+            // failure never reaches here (the `catch` above already reported it
+            // and marked the run accounted-for).
+            if (!$ended && $runManager !== null) {
+                $runManager->handleLLMEnd(
+                    new LLMResult(
+                        $aggregated === null
+                            ? [[]]
+                            : [[new ChatGeneration($aggregated->message, $aggregated->text, $aggregated->generationInfo)]],
+                        $aggregated === null ? [] : $this->llmOutputFromUsage($aggregated->message),
+                    ),
+                    // Marked, not silent. Ending it plainly says "the consumer
+                    // finished and everything was well", which is a different
+                    // fact from "the consumer stopped"; reporting it as an error
+                    // instead puts a deliberate early exit into error
+                    // dashboards. The flag is how both are told apart.
+                    ['abandoned' => true],
+                );
+            }
         }
-
-        if ($aggregated === null) {
-            $runManager?->handleLLMEnd(new LLMResult([[]], []));
-
-            return;
-        }
-
-        $runManager?->handleLLMEnd(new LLMResult(
-            [[new ChatGeneration($aggregated->message, $aggregated->text, $aggregated->generationInfo)]],
-            $this->llmOutputFromUsage($aggregated->message),
-        ));
     }
 
     /**
@@ -316,14 +532,69 @@ abstract class BaseChatModel extends BaseLanguageModel
     }
 
     /**
-     * Whether any attached handler asked for streamed chunks.
+     * Fold per-prompt `llmOutput` into the one the returned `LLMResult` carries.
      *
-     * @param array<string, mixed> $llmOutputs
+     * Each entry is a single prompt's output; this produces the batch summary.
+     * The base returns an empty array, which means a batch's token usage is
+     * discarded — a caller invoking several prompts at once gets no totals at
+     * all. A provider that wants a different shape (a provider-specific
+     * aggregate, a string join) overrides this.
+     *
+     * @param list<array<string, mixed>> $llmOutputs One entry per prompt.
+     *
      * @return array<string, mixed>
      */
     protected function combineLLMOutput(array $llmOutputs): array
     {
-        return [];
+        $combined = [];
+
+        foreach ($llmOutputs as $output) {
+            $combined = $this->sumOutputs($combined, $output);
+        }
+
+        return $combined;
+    }
+
+    /**
+     * Add `$addend` into `$base`, recursing through nested bags.
+     *
+     * The recursion is not optional. `llmOutput` is shaped
+     * `['tokenUsage' => ['promptTokens' => …, …]]`, so a top-level-only sum
+     * would take the FIRST prompt's numbers and call them a batch total — a
+     * wrong number that looks right, which is the failure mode this whole
+     * exercise keeps finding.
+     *
+     * Non-numeric leaves are first-write-wins: there is no meaningful sum for a
+     * string, and a later prompt's model name replacing an earlier one would
+     * make the batch's identity depend on iteration order.
+     *
+     * @param array<string, mixed> $base
+     * @param array<string, mixed> $addend
+     *
+     * @return array<string, mixed>
+     */
+    private function sumOutputs(array $base, array $addend): array
+    {
+        foreach ($addend as $key => $value) {
+            if (is_int($value) || is_float($value)) {
+                $base[$key] = ($base[$key] ?? 0) + $value;
+
+                continue;
+            }
+
+            if (is_array($value)) {
+                $existing = is_array($base[$key] ?? null) ? $base[$key] : [];
+                $base[$key] = $this->sumOutputs($existing, $value);
+
+                continue;
+            }
+
+            if (!array_key_exists($key, $base)) {
+                $base[$key] = $value;
+            }
+        }
+
+        return $base;
     }
 
     /**
@@ -366,6 +637,38 @@ abstract class BaseChatModel extends BaseLanguageModel
         }
 
         $message->id = 'run-' . $runManager->runId;
+    }
+
+    /**
+     * Whether a chunk carries nothing but metadata.
+     *
+     * Only such a chunk belongs in the accumulated message and not in the
+     * caller's stream: a provider's trailing token count, chiefly. Upstream
+     * captures that event in a local and never yields it
+     * (`completions.ts:450-454`).
+     *
+     * `additional_kwargs` counts as content, not metadata. A refusal, a
+     * reasoning delta and a citation all arrive there with empty content, and
+     * treating them as metadata made a refusal-only response surface **zero
+     * chunks** — the only thing the model said, invisible to the caller.
+     */
+    private function isMetadataOnly(ChatGenerationChunk $chunk): bool
+    {
+        $message = $chunk->message;
+
+        if ($message->content !== '' && $message->content !== []) {
+            return false;
+        }
+
+        if ($message->additional_kwargs !== []) {
+            return false;
+        }
+
+        if ($message instanceof AIMessage && $message->toolCalls !== []) {
+            return false;
+        }
+
+        return $message->toolCallChunks === [];
     }
 
     /**

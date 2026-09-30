@@ -76,11 +76,17 @@ final class FakeStreamingChatModel extends BaseChatModel
      * that mutated its receiver would make one call's tools leak into the next
      * call's, which is the bug `RunnableBinding` exists to avoid.
      *
-     * @param list<StructuredToolSpec> $tools
+     * Accepts the same three shapes a real provider accepts — a
+     * {@see StructuredTool}, a {@see StructuredToolSpec}, or a raw
+     * already-provider-shaped array — so a test written against the fake
+     * exercises the same argument a real call would pass.
+     *
+     * @param list<mixed>          $tools
+     * @param array<string, mixed> $kwargs
      */
-    public function bindTools(array $tools): self
+    public function bindTools(array $tools, array $kwargs = []): static
     {
-        $merged = array_merge($this->boundTools, $tools);
+        $merged = array_merge($this->boundTools, $this->toSpecs($tools));
         $dicts = array_map($this->renderTool(...), $merged);
 
         $next = new self([
@@ -93,14 +99,57 @@ final class FakeStreamingChatModel extends BaseChatModel
         $next->boundTools = $merged;
         $next->kwargs['tools'] = $this->toolStyle === 'google' ? [['functionDeclarations' => $dicts]] : $dicts;
 
+        foreach ($kwargs as $key => $value) {
+            $next->kwargs[$key] = $value;
+        }
+
         return $next;
     }
 
     /**
+     * Reduce anything bindable to the spec this model renders from.
+     *
+     * A raw array passes through untouched, which is what lets a caller bind a
+     * provider-native tool definition this SDK has never heard of.
+     *
+     * @param list<mixed> $tools
+     * @return list<StructuredToolSpec|array<string, mixed>>
+     */
+    private function toSpecs(array $tools): array
+    {
+        return array_map(function (mixed $tool): StructuredToolSpec|array {
+            if ($tool instanceof StructuredTool) {
+                return StructuredToolSpec::fromTool($tool);
+            }
+            if ($tool instanceof StructuredToolSpec) {
+                return $tool;
+            }
+            if (is_array($tool)) {
+                return $tool;
+            }
+
+            throw new \InvalidArgumentException(
+                'Cannot bind ' . get_debug_type($tool) . ' as a tool. Pass a StructuredTool,'
+                . ' a StructuredToolSpec, or a provider-shaped array.'
+            );
+        }, array_values($tools));
+    }
+
+    /**
+     * Render one bound tool in this provider's format.
+     *
+     * An already-shaped array is returned unchanged — it arrived in the
+     * provider's own dialect and re-wrapping it would produce a doubly-nested
+     * definition the model cannot read.
+     *
      * @return array<string, mixed>
      */
-    private function renderTool(StructuredToolSpec $tool): array
+    private function renderTool(StructuredToolSpec|array $tool): array
     {
+        if (is_array($tool)) {
+            return $tool;
+        }
+
         return match ($this->toolStyle) {
             'openai' => [
                 'type' => 'function',
@@ -142,12 +191,19 @@ final class FakeStreamingChatModel extends BaseChatModel
         }
 
         $content = $this->responses[0]?->content ?? $messages[0]->content ?? '';
-        $toolCalls = $this->chunks[0]?->toolCalls ?? [];
+
+        // An `AIMessageChunk` carries *undecoded* `tool_call_chunks`; it has no
+        // `toolCalls` property. Reading one returned null forever, so a fake
+        // scripted with tool calls silently produced a model that never called
+        // anything — and any test asserting on the call passed for the wrong
+        // reason. `parseToolCalls()` is the promotion step.
+        [$toolCalls, $invalidToolCalls] = ($this->chunks[0] ?? null)?->parseToolCalls() ?? [[], []];
 
         return new ChatResult([
             new ChatGeneration(new AIMessage([
                 'content' => $content,
                 'tool_calls' => $toolCalls,
+                'invalid_tool_calls' => $invalidToolCalls,
             ]), ''),
         ]);
     }
@@ -171,7 +227,7 @@ final class FakeStreamingChatModel extends BaseChatModel
                 $cg = new ChatGenerationChunk(
                     new AIMessageChunk([
                         'content' => $msgChunk->content,
-                        'tool_calls' => $msgChunk->toolCalls,
+                        'tool_call_chunks' => $msgChunk->toolCallChunks,
                         'additional_kwargs' => $msgChunk->additional_kwargs,
                     ]),
                     is_string($msgChunk->content) ? $msgChunk->content : '',
