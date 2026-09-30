@@ -86,7 +86,7 @@ final class Run
      *
      * Port of `convertToDottedOrderFormat` from the `langsmith` package, which
      * the TypeScript tracers delegate to. Two runs started in the same
-     * millisecond have the same 14-character timestamp prefix, so the field
+     * millisecond have the same 15-character timestamp prefix, so the field
      * that orders them is the six-digit zero-padded execution order — which is
      * why sorting this string as text reproduces the tree traversal order
      * exactly. The run id is appended last, purely to break ties between two

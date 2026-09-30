@@ -2904,6 +2904,41 @@
    "chars": 4283,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~deepseek/deepseek-flash-latest": {
+   "model": "~deepseek/deepseek-flash-latest",
+   "at": "2026-09-30T04:23:06",
+   "actual_model": "deepseek/deepseek-v4.1-flash",
+   "usage": {
+    "prompt_tokens": 41779,
+    "completion_tokens": 8693,
+    "total_tokens": 50472,
+    "cost": 0.0229653,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0229653,
+     "upstream_inference_prompt_cost": 0.0125337,
+     "upstream_inference_completions_cost": 0.0104316
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 7643,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 7643,
+   "status": "ok",
+   "file": ".loop/reviews/94-~deepseek__deepseek-flash-latest.md",
+   "chars": 4003,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -3059,7 +3094,8 @@
   "~moonshotai/kimi-latest",
   "~x-ai/grok-latest",
   "~anthropic/claude-haiku-latest",
-  "~anthropic/claude-sonnet-latest"
+  "~anthropic/claude-sonnet-latest",
+  "~deepseek/deepseek-flash-latest"
  ],
  "next_index": 0
 }

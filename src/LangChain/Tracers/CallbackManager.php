@@ -510,9 +510,19 @@ final class CallbackManager
 
         $verboseEnabled = ($options['verbose'] ?? false) === true
             || getenv('LANGCHAIN_VERBOSE') === 'true';
+        // `!== false` means "set to ANYTHING", and `getenv` only returns false
+        // when the variable is UNSET. So `LANGCHAIN_TRACING=false`,
+        // `=0`, `=no` and `=""` all enabled tracing — the opposite of what the
+        // user asked for — attaching a LangChainTracer to every run and
+        // collecting runs nobody requested.
+        //
+        // `=== 'true'` matches the verbose line immediately above and upstream,
+        // where `LANGCHAIN_TRACING_V2` is compared as a string
+        // (langsmith_interop.test.ts sets it to "true"). Comparing to the
+        // STRING is what makes `false` and `1` mean what they say.
         $tracingEnabled = ($options['tracing'] ?? false) === true
-            || getenv('LANGCHAIN_TRACING') !== false
-            || getenv('LANGCHAIN_TRACING_V2') !== false;
+            || getenv('LANGCHAIN_TRACING') === 'true'
+            || getenv('LANGCHAIN_TRACING_V2') === 'true';
 
         if ($verboseEnabled) {
             $manager ??= new self();
@@ -606,10 +616,16 @@ final class CallbackManager
         try {
             $handler->{$method}(...$arguments);
         } catch (\Throwable $e) {
+            // Record FIRST, then decide. This path used to rethrow before
+            // recording, while BaseRunManager::dispatch records first — so a
+            // raising handler's failure appeared in the record when it came
+            // through one path and not the other, and handlerErrors() is meant
+            // to be a reliable account of what happened.
+            BaseRunManager::recordHandlerError($handler, $method, $e);
+
             if ($handler->raiseError) {
                 throw $e;
             }
-            BaseRunManager::recordHandlerError($handler, $method, $e);
         }
     }
 }
