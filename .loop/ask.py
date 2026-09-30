@@ -110,6 +110,18 @@ EVIDENCE RULES — this is where reviews most often go wrong:
   quote is verifiable; an invented line number is not.
 * If you do cite a line number, count it in the snippet you were given.
 * Evidence you cannot see in the packet is a guess. Leave the finding out.
+* A DIRECTORY LISTING IS NOT A COVERAGE MEASUREMENT. This is the most common
+  wrong finding in this repo's history, and it rests on the cheapest possible
+  evidence — a file listing that needs no execution to read. "No
+  tests/Unit/X directory exists" does NOT mean X is untested: it may be
+  exercised indirectly, or be support code the suite USES. Measured:
+  LangChain/Utils/Testing has ZERO test files and is referenced by 10 files —
+  RunCollectorCallbackHandler by 10, FakeHttpClient by 10, StructuredToolSpec
+  by 5 — a 0 there is EXPECTED and means nothing. Load/Serializable has no test
+  directory and is consumed by LcConstructorLoader, BaseMessage and Document;
+  Retry/RetryPolicy has none and is wired into Pregel and PregelExecutableTask.
+  A coverage claim needs a REFERENCE COUNT or an executed run; a directory
+  listing alone is not a finding.
 
 The attached image is the architecture. The long text is a review packet: measured
 metrics, the project's own status ledger, and the source of the most important files.
