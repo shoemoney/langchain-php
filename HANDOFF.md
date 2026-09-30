@@ -25,10 +25,10 @@ know before you start.
 |---|---|
 | Path | `/Users/shoemoney/Projects/langchain-php` |
 | Repo | `github.com/shoemoney/langchain-php` (public) |
-| Branch | `main`, clean tree, 10 commits |
+| Branch | `main`, 10 commits (provider work uncommitted — see "Do not") |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **1745 passing, 5303 assertions** |
-| Size | 210 src files / 28,796 lines · 33 test files / 13,918 lines |
+| Tests | **2101 passing, 5963 assertions** |
+| Size | 229 src files / 33,452 lines · 71 test files / 20,613 lines |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
 It is a separate project. It happens to contain two upstream TypeScript
@@ -78,17 +78,32 @@ synchronous, but internals stay promise-shaped so the TS maps line for line.
 A stream carries several interleaved signals on different channels
 (`default`, `retriever`, `tool`, `model`, `prompt`).
 
-### 4. The message merge algebra is the streaming core
+### 4. A provider client is a translation layer, and needs a transport seam
+
+Every provider client in this port is tested without a socket. `LangChain\Utils\Http\HttpClient`
+is the seam; `FakeHttpClient` replays scripted responses and records the request.
+This is not over-engineering: a chat model's logic is almost entirely
+translation, and translation can only be tested against a known payload.
+
+Which means **assert on the request body, not just the response**. Two of the
+bugs in the table below were invisible until a test read back what the client
+actually sent.
+
+### 5. The message merge algebra is the streaming core
 
 `MessageMerge` (`_mergeDicts` / `_mergeLists` / `_mergeObj`) decides per-field
 whether to concatenate, sum, replace, recurse, or skip. Getting it wrong
 silently corrupts reconstructed streams. It is heavily tested — leave it alone.
 
-### 5. PHP parameter types are contravariant — this bit us twice
+### 6. PHP parameter types are contravariant — this bit us three times
 
-An override may **widen** but never narrow a parameter type. Both bugs below
-came from narrowing in TS, which PHP forbids. When a TS signature narrows, keep
-the shared base type and validate at runtime.
+An override may **widen** but never narrow a parameter type, and may not *add* a
+required one. All three bugs below came from a signature that PHP forbids.
+When a TS signature narrows, keep the shared base type and validate at runtime.
+
+The third was self-inflicted this session: adding `array $kwargs = []` to
+`BaseChatModel::bindTools()` broke `FakeStreamingChatModel::bindTools(array
+$tools)` at class-load time, which took down every test in the suite at once.
 
 ---
 
@@ -109,6 +124,23 @@ because each represents a **class** of mistake that is easy to repeat.
 | `RunnableConfig::with()` compared snake_case keys to camelCase properties | Every override silently no-op'd. |
 | `RunnableParallel` narrowed input to `input[$key]` | The TS `RunnableMap` passes the **whole input** to every branch. This is what makes the canonical `{context, question}` RAG map possible. |
 | `coerceToRunnable()` in a plain file | PSR-4 autoloads *classes*, not functions. Added to `composer.json` `files`. |
+| `FakeStreamingChatModel` read `$chunk->toolCalls` on an `AIMessageChunk` | `AIMessageChunk` has no such property — it carries undecoded `tool_call_chunks`. The read returned null forever, so a fake scripted with tool calls silently produced a model that never called anything, and any test asserting on the call passed for the wrong reason. Found only by an end-to-end `withStructuredOutput` test. |
+| `RunnableParallel` rejected non-array inputs | A divergence the port had introduced and a test had encoded. Upstream's `RunnableMap.invoke` applies no type check, and the check made `{raw: llm}` — the first step of every `includeRaw` structured-output pipeline — unusable with a plain string. Source and test both corrected. |
+| `ChatOpenAI::bindTools()` wrote to `kwargs` that `invocationParams()` never read | Bound tools reached `kwargs()` and never the request: the tool was silently not offered. `invocationParams()` now layers options → bound `kwargs` → constructor state. The same class of bug as `RunnableConfig::with()` above. |
+| `Runnable::bind($kwargs)` stored the kwargs and nothing read them | `bind(['temperature' => 0])` was a **silent no-op on every runnable in the SDK**, including both provider clients. `RunnableBinding::mergeConfig()` only ever read `$this->config`. Found by probing, not by review: **zero tests in the suite called `->bind()` at all**. Now merged into `config->options`, matching upstream's `_mergeConfig(options, this.kwargs)`. |
+| `HttpClient` call sites used named arguments | A PHP named argument binds to the *implementing* class's parameter name, so any `HttpClient` that spelled the parameter `$t` instead of `$timeout` died with "Unknown named parameter" despite satisfying the interface. Callers are positional now. |
+| `FakeStreamingChatModel` / `Tools::convert()` indexed before type-checking | `isset($tool['type'])` on a `StructuredTool` is "Cannot use object of type … as array". Ordering, not null-safety. |
+| `ChatAnthropic` read `parameters` off the **outer** tool array | `withStructuredOutput()` builds an OpenAI envelope, so the schema sits under `function.parameters`. Anthropic looked one level too high, sent `input_schema: {type: object, properties: {}}`, and **the model was never told what arguments the tool takes** — with no error anywhere. |
+| `HttpResponse::header()` returned an array from a `?string` method | PSR-7 `getHeaders()` is `array<string, string[]>`. The `FakeHttpClient` used bare strings, so the only header shape any test ever saw was the one the real transport never produces. |
+| `try` wrapped the generator *call* in both `postStream()` paths | `postStream()` is a generator function: calling it runs none of its body, so every streaming connect failure and non-2xx escaped as a bare `HttpException` with the provider's message discarded. |
+| A resolved constructor default in `kwargs` masked a later binding | `bindTools($t, ['max_tokens' => 50])` did nothing because `maxTokens` already sat in `kwargs` from the default. `kwargs` now records only caller-supplied values. |
+| A `FunctionMessage`'s content was dropped on the wire | The legacy `function` role carries the function's RETURN VALUE; omitting it sends a call with no result, which the provider accepts silently. |
+| Five files were written to `…/LanguageModels/Chat/` instead of `…/Chat/{OpenAI,Anthropic}/` | Identical FQCNs, never autoloaded (so the suite stayed green), but `composer dump-autoload -o` fatals on a classmap build. Found by a reviewer grepping for `class ChatOpenAI`. **Check `find src -name '*.php'` against the PSR-4 path when adding a file in a new subtree.** |
+| Anthropic stringified block content in the multi-system-message hoist | Per-block `cache_control` became literal `[{"type":"text",…}]` text, so prompt caching silently did nothing. The code comment claimed the opposite of what the code did. |
+| A no-argument tool call encoded as `{"arguments":"[]"}` | PHP's one array type. A no-argument tool presented itself as taking a positional list. |
+| `user` / `seed` / `responseFormat` recorded in `kwargs` and never sent | In the constructor whitelist, so serialized into every trace — but `invocationParams` read only the per-call layer. |
+| Anthropic's `$streamUsage` was a dead flag | Declared, defaulted, written to `kwargs`, read nowhere. `streamUsage: false` did nothing. |
+| No retry on stream establishment | `maxRetries` applied only to eager calls. A 429 opening a stream — the most common streaming failure — failed on the first attempt. |
 
 **Two structural lessons worth carrying forward:**
 
@@ -180,13 +212,15 @@ there is marked done **only if its tests exist and pass**.
 
 Ordered by what unblocks real usage first.
 
-1. **Provider clients — OpenAI and Anthropic.** ⬜ **Do this first.** Nothing
-   can call a real LLM without them. The seams are ready: `BaseChatModel`,
-   `BaseLanguageModel`, `ChatGeneration`/`ChatResult` types, and the fake models
-   in `src/LangChain/Utils/Testing/`. Every other provider is an HTTP wrapper
-   over these two. Note the `StructuredTool` gap below.
-2. **Prebuilt agents — `createReactAgent`, `ToolNode`.** ⬜ Everything they
-   depend on now exists. This is the payoff step.
+1. **Prebuilt agents — `createReactAgent`, `ToolNode`.** ⬜ **Do this first.**
+   Everything they depend on now exists, including a real provider. This is the
+   payoff step.
+2. **Finish the provider clients.** 🟡 `ChatOpenAI` (Chat Completions) and
+   `ChatAnthropic` are ported and tested. Outstanding: the OpenAI **Responses
+   API** (`converters/responses.ts`, 1,868 lines — a different event protocol,
+   not a flag), `azure/`, model `profiles`, the hosted tools, Anthropic's
+   citation output parsers. Every other provider is an HTTP wrapper over these
+   two.
 3. `langgraph` client SDK (REST) — the `client`/`runs`/`threads`/`stores` HTTP
    surface. ⬜
 4. Vector stores, embeddings, retrievers, memory, document loaders. ⬜
@@ -237,16 +271,13 @@ Each is pinned by a test, documented rather than papered over. See the
 
 Recommended order, and why:
 
-1. **OpenAI + Anthropic clients.** Unblocks everything real. Build
-   `BaseChatModel::bindTools()` first — `StructuredTool` currently does not
-   port `bindTools` / `withStructuredOutput` / provider formatting, and
-   `FakeStreamingChatModel::bindTools()` is already ported and renders all four
-   provider formats with **nothing calling it yet**. That gap is visible now
-   and will be the first thing that looks like a bug.
-2. **`createReactAgent` + `ToolNode`.** The visible payoff, and every
-   dependency now exists.
-3. **Postgres/Redis savers.** Cheapest real coverage per effort — the
+1. **`createReactAgent` + `ToolNode`.** The visible payoff, and every
+   dependency now exists. `ToolNode` needs `BaseToolkit` and `ToolRuntime`,
+   which are ported but currently unreferenced by anything — the orphan audit
+   flags them, and building the agent is what wires them.
+2. **Postgres/Redis savers.** Cheapest real coverage per effort — the
    validation spec already runs against two implementations.
+3. **The OpenAI Responses API**, if a model that needs it matters.
 4. Then work down the NOT-ported list.
 
 When porting a subsystem: read the upstream TS, port the **tests** with it,

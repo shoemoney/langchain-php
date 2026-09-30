@@ -112,7 +112,7 @@ src/
     Utils/         Promise, Await, Observable, env, json, context
     Messages/      BaseMessage + Human/AI/System/Tool/Function, content blocks
     Schema/        Document, PromptValue
-    Runnables/     Runnable, Sequence, Parallel, Branch, Lambda, Binding
+    Runnables/     Runnable, Sequence, Parallel, Branch, Lambda, Binding, Assign, Passthrough
     Prompts/       Prompt templates, chat prompt templates
     LanguageModels/ BaseChatModel, BaseLLM
     OutputParsers/ String, JSON, structured
