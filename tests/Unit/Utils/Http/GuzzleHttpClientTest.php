@@ -113,7 +113,14 @@ final class GappingStream extends StallingStream
 
     public function eof(): bool
     {
-        return false;
+        // The script is exhausted: this stream is GAPPING, not stalled.
+        //
+        // It used to return false forever, which made it a stalled stream that
+        // happened to deliver two chunks before going quiet — so the "a brief
+        // gap is not a stall" test was really re-testing the stall guard, and
+        // only passed because a stall ended silently. When the stall guard
+        // started raising, the fixture showed what it had always been.
+        return $this->script === [];
     }
 
     public function read($length): string
@@ -142,7 +149,7 @@ final class GuzzleHttpClientTest extends TestCase
      * a reviewer's model reading this file; the guard bounds consecutive empty
      * reads, and a healthy blocking stream never produces two in a row.
      */
-    public function testAStalledStreamTerminates(): void
+    public function testAStalledStreamRaisesRatherThanEndingQuietly(): void
     {
         $body = new StallingStream();
         $client = $this->client($body);
@@ -150,9 +157,22 @@ final class GuzzleHttpClientTest extends TestCase
         // spending it.
         $client->streamSilenceLimit = 0.05;
 
-        $chunks = iterator_to_array($client->postStream('https://x.test/', [], 'body'), false);
+        // This test used to be called `testAStalledStreamTerminates` and
+        // asserted that the generator simply ran out — which WAS the bug. A
+        // connection that dies mid-answer returned normally, so
+        // `BaseChatModel::stream()` reached `handleLLMEnd` with a partial
+        // message and the caller got a truncated completion indistinguishable
+        // from a finished one. The test pinned the defect, and the name said so.
+        $threw = null;
+        try {
+            iterator_to_array($client->postStream('https://x.test/', [], 'body'), false);
+        } catch (\LangChain\Utils\Http\HttpException $e) {
+            $threw = $e;
+        }
 
-        self::assertSame([], $chunks);
+        self::assertNotNull($threw, 'a stalled stream must raise, not end the generator cleanly');
+        self::assertStringContainsString('stalled', $threw->getMessage());
+        self::assertStringContainsString('https://x.test/', $threw->getMessage());
         self::assertGreaterThan(1, $body->reads, 'the read loop must have polled, not bailed instantly');
     }
 

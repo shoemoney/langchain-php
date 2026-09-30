@@ -25,8 +25,10 @@ use LangChain\Schema\PromptValue;
  *
  * The default implementations are meaningful rather than abstract, because
  * most runnables only need to override one: `stream` yields a single
- * `default`-channel chunk carrying the `invoke` result, and `batch` is a
- * concurrency-capped `array_map` over `invoke`.
+ * `default`-channel chunk carrying the `invoke` result, and `batch` is a plain
+ * sequential `array_map` over `invoke` — PHP is synchronous, so there is no
+ * concurrency to cap. (`batch()`'s own docblock said so; this one claimed the
+ * opposite, in the same file.)
  */
 interface RunnableInterface
 {
@@ -89,8 +91,20 @@ interface RunnableInterface
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array;
 
     /**
-     * Invoke on the first input only, returning an iterable that streams the
-     * rest concurrently — the JS `streamEvents` entry point.
+     * Stream every input in the iterable, yielding `[channel, chunk]` for each.
+     *
+     * NOT "the first input only" and NOT a `streamEvents` entry point — both of
+     * which this docblock used to claim, and neither of which is true. The base
+     * implementation walks the whole iterable and streams each item as it
+     * arrives.
+     *
+     * Upstream's default (`runnables/base.ts`) instead BUFFERS the entire input
+     * generator into one concatenated chunk and then streams that, so it can
+     * start emitting before input is exhausted only in subclasses that override
+     * it. This port streams per item instead. That is a deliberate divergence:
+     * upstream's version holds the whole input in memory, which on a synchronous
+     * runtime buys nothing that per-item streaming does not, and it lets a long
+     * input stream out progressively. See PORT_STATUS.md.
      *
      * @return \Generator<int, array{0: string, 1: mixed}>
      */

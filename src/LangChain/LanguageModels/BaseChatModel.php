@@ -328,6 +328,22 @@ abstract class BaseChatModel extends BaseLanguageModel
                 // (`allSettled`) and calls `handleLLMError` before rethrowing.
                 $thisRunManager?->handleLLMError($e);
 
+                // …and the runs for every prompt AFTER this one never settle at
+                // all. `handleChatModelStart` opened one run per prompt up
+                // front, so a 3-prompt batch that fails on prompt 2 left 3
+                // runs started and only 2 terminated. Proved by execution: the
+                // collector held 2 of 3. Upstream `allSettled` settles every
+                // promise before the batch rethrows, and a trace that hangs one
+                // span per unattempted prompt is exactly what `allSettled`
+                // exists to prevent.
+                //
+                // These prompts were never sent, so the error recorded is
+                // honest rather than a fabricated provider failure: the batch
+                // as a whole did not complete.
+                for ($j = $index + 1, $n = count($runManagers ?? []); $j < $n; $j++) {
+                    $runManagers[$j]?->handleLLMError($e);
+                }
+
                 throw $e;
             }
 

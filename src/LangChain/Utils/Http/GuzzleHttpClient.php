@@ -126,7 +126,26 @@ final class GuzzleHttpClient implements HttpClient
                         $silentSince ??= microtime(true);
 
                         if ((microtime(true) - $silentSince) >= $this->streamSilenceLimit) {
-                            break;
+                            // Proved with a stalling stream and a 0.05s limit:
+                            // this `break` ended the generator normally, so
+                            // `BaseChatModel::stream()` reached `handleLLMEnd`
+                            // with a half-built message and the caller got a
+                            // truncated completion indistinguishable from a
+                            // finished one. A dropped connection is a failure,
+                            // and it has to be reported as one.
+                            //
+                            // `finally { $stream->close(); }` still runs, so
+                            // the socket is not leaked by throwing here.
+                            throw new HttpException(
+                                sprintf(
+                                    'Stream from %s stalled for %.1fs without EOF; treating the connection as lost '
+                                    . 'rather than returning a truncated answer',
+                                    $url,
+                                    $this->streamSilenceLimit,
+                                ),
+                                0,
+                                '',
+                            );
                         }
 
                         usleep(1000);

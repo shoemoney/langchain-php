@@ -1712,6 +1712,41 @@
    "chars": 3127,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~anthropic/claude-opus-latest": {
+   "model": "~anthropic/claude-opus-latest",
+   "at": "2026-09-29T21:16:02",
+   "actual_model": "anthropic/claude-opus-5.5",
+   "usage": {
+    "prompt_tokens": 43433,
+    "completion_tokens": 2997,
+    "total_tokens": 46430,
+    "cost": 0.233672,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.233672,
+     "upstream_inference_prompt_cost": 0.173732,
+     "upstream_inference_completions_cost": 0.05994
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1633,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1633,
+   "status": "incomplete",
+   "file": ".loop/reviews/55-~anthropic__claude-opus-latest.md",
+   "chars": 3545,
+   "findings": 4,
+   "severity_hits": 4
   }
  },
  "order": [
@@ -1825,7 +1860,8 @@
   "z-ai/glm-4.6v",
   "anthropic/claude-sonnet-5.5",
   "x-ai/grok-4.20-multi-agent",
-  "z-ai/glm-5.3-flashx"
+  "z-ai/glm-5.3-flashx",
+  "~anthropic/claude-opus-latest"
  ],
  "next_index": 0
 }
