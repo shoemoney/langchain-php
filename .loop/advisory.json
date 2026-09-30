@@ -44,5 +44,12 @@
   "file": ".loop/advisory/glm-4-6v.md",
   "chars": 6565,
   "cost": 0.0072
+ },
+ "openai/o4-mini-high": {
+  "status": "ok",
+  "at": "2026-09-30T09:09:36.263431+00:00",
+  "file": ".loop/advisory/o4-mini-high.md",
+  "chars": 6705,
+  "cost": 0.0403
  }
 }
