@@ -34,10 +34,46 @@
    "chars": 4149,
    "findings": 5,
    "severity_hits": 5
+  },
+  "google/gemini-3.8-flash": {
+   "model": "google/gemini-3.8-flash",
+   "at": "2026-09-30T07:32:47",
+   "actual_model": "google/gemini-3.8-flash",
+   "usage": {
+    "prompt_tokens": 39198,
+    "completion_tokens": 23822,
+    "total_tokens": 63020,
+    "cost": 0.118731,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.118731,
+     "upstream_inference_prompt_cost": 0.0293985,
+     "upstream_inference_completions_cost": 0.0893325
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 23036,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 23036,
+   "status": "ok",
+   "file": ".loop/reviews/02-google__gemini-3.8-flash.md",
+   "chars": 3151,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
-  "~z-ai/glm-flash-latest"
+  "~z-ai/glm-flash-latest",
+  "google/gemini-3.8-flash"
  ],
  "next_index": 0
 }

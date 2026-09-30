@@ -1,10 +1,17 @@
 {
  "google/gemini-3.8-flash": [
-  "#1 stall guard truncating a live stream \u2014 ACCEPTED. Count-based bound replaced with a 30s wall-clock bound; both behaviours pinned (GuzzleHttpClientTest).",
-  "#2 RunnableBinding option precedence \u2014 REJECTED against upstream. `_mergeConfig(options, this.kwargs)` puts kwargs last and `mergeConfigs` lets later overwrite, so kwargs winning IS upstream. The reviewer's inference came from a self-contradictory comment; comment rewritten, code untouched.",
-  "#3 `invocationParams() + convert()` union \u2014 ACCEPTED. Converted messages/system now assigned explicitly, matching ChatOpenAI, so a future model parameter named `messages` cannot discard the conversation.",
-  "#4 usage-only chunk lost the response id \u2014 ACCEPTED. The fold kept the last chunk's id, so a streamed call reported `run-\u2026` instead of `chatcmpl-\u2026`. Id now carried on the usage chunk.",
-  "#5 `array_all()` is PHP 8.4+ \u2014 ACCEPTED, most serious. composer.json declares >=8.2 and CI runs 8.2/8.3/8.4, so this was a hard fatal on two of three CI jobs, masked locally by PHP 8.5. Replaced with loops, plus a new guard test that fails on any post-floor function."
+  "#1 'ChatPromptTemplate::fromTemplate drops $options' \u2014 REJECTED on upstream evidence. chat.ts:506-521:",
+  "#     static fromTemplate(template, additionalOptions) {",
+  "#       if (typeof template === \"string\") {",
+  "#         return new this(PromptTemplate.fromTemplate(template, additionalOptions));",
+  "#       }",
+  "#Upstream passes `additionalOptions` into the INNER PromptTemplate and constructs `new this(...)` with no options \u2014 byte-for-byte the same shape as the port's `new static::fromMessages([new HumanMessagePromptTemplate($prompt)])`. The options are not 'dropped'; they are routed to the template that consumes them. Seventh rejection of this family.",
+  "#4 'BasePromptTemplate::invoke discards non-array inputs' \u2014 DEFERRED, and I am explicitly NOT calling this accepted, because the honest reading is ambiguous in both directions. The port does `is_array($input) ? $input : []`. Upstream base.ts:133-146 does `this.formatPromptValue(input)` with no coercion at all, so the port IS a divergence.",
+  "#What stops it being a defect I can act on: upstream's `formatPromptValue(values: TypedPromptInputValues)` expects an OBJECT, and in JS a string is indexable, so passing a string finds no matching variables and yields an UNSUBSTITUTED template. The port, having coerced to [], yields the same unsubstituted template. So the two agree on the observable outcome while disagreeing on the mechanism, and the port's coercion is arguably forced by PHP's type system rather than chosen.",
+  "#The part that WOULD justify a fix is the silence: a type mismatch becomes a rendered prompt with unresolved placeholders instead of an error. But 'upstream also produces a wrong-looking result' is not the same as 'upstream swallows the input', and I have not established which the port's callers rely on. Deferred with that stated reason rather than resolved by guessing, because a wrong fix here would turn a defensive coercion into a fatal on some legitimate path.",
+  "#3 'ChatPromptTemplate::parseImagePrompts mutates message in place' \u2014 ALREADY SETTLED, twice. Fidelity divergence from upstream CONFIRMED (upstream builds a local `content` array and returns `new MsgClass({content})`; the port assigns `$message->content = $blocks`), but the DEFECT was REFUTED by probe: three calls with three values each render their own URL, and the retained-instance edge case the advisory later flagged is refuted too. Recorded as a repeat of a settled finding rather than re-derived \u2014 the model had no way to know, since the review predates the probe.",
+  "#2 'PromptTemplate::fromExamples prepends leading separators when prefix is default' and #5 'PromptTemplate::__construct omits additional_content_fields from $this->kwargs' \u2014 DEFERRED unverified. Neither was executed.",
+  "#1 REJECTED (upstream chat.ts:506-521 identical); #4 deferred as ambiguous; #3 a settled repeat"
  ],
  "anthropic/claude-haiku-4.5": [
   "#1 unknown content blocks overwrite each other \u2014 DEFERRED (round-2/next round).",
