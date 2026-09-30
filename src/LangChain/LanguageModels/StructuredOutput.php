@@ -120,7 +120,22 @@ final class StructuredOutput
             // somewhere in `RunnableBinding`/`BaseChatModel`, and the loss is
             // silent because `name()` falls back to the serialized id rather
             // than reporting nothing. Tracked, not fixed here.
-            $result = $result->bind(['runName' => $runName], []);
+            // The SECOND argument. `Runnable::bind(array $kwargs = [], ?array
+            // $config = null)` (Runnable.php:101) — the name goes in $config.
+            //
+            // This had been wrong twice in opposite directions, and the reason is
+            // worth recording: the diagnosis was done by constructing
+            // `new RunnableBinding($bound, $kwargs, $config)` directly, which
+            // confirmed that $config is where runName is read from — and then the
+            // CALL was written with the arguments the other way round. Verifying
+            // a constructor and then applying the conclusion to a wrapper method
+            // is not the same act, and the wrapper's signature is the one that
+            // ships.
+            //
+            // Measured through bind() itself:
+            //   bind(['runName'=>'x'], [])  -> runName=NULL, options={"runName":"x"}
+            //   bind([], ['runName'=>'x'])  -> runName='x',   options=[]
+            $result = $result->bind([], ['runName' => $runName]);
         }
 
         return $result;

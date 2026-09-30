@@ -2694,6 +2694,41 @@
    "chars": 2893,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~google/gemini-flash-latest": {
+   "model": "~google/gemini-flash-latest",
+   "at": "2026-09-30T03:21:10",
+   "actual_model": "google/gemini-3.8-flash",
+   "usage": {
+    "prompt_tokens": 37814,
+    "completion_tokens": 676,
+    "total_tokens": 38490,
+    "cost": 0.0308955,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0308955,
+     "upstream_inference_prompt_cost": 0.0283605,
+     "upstream_inference_completions_cost": 0.002535
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/88-~google__gemini-flash-latest.md",
+   "chars": 2722,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2843,7 +2878,8 @@
   "openai/gpt-5.1-codex-mini",
   "google/gemini-3.7-flash",
   "bytedance-seed/seed-2.0-mini",
-  "perplexity/sonar"
+  "perplexity/sonar",
+  "~google/gemini-flash-latest"
  ],
  "next_index": 0
 }
