@@ -152,7 +152,7 @@ final class Schema
         }
 
         $errors = [];
-        $this->check($value, $this->schema, '$', $errors);
+        $this->check($value, (array) self::unwrap($this->schema), '$', $errors);
 
         return $errors;
     }
@@ -168,7 +168,48 @@ final class Schema
      */
     public function toJsonSchema(): array
     {
-        return $this->schema === [] ? ['type' => 'object', 'properties' => []] : $this->schema;
+        return $this->schema === []
+            ? ['type' => 'object', 'properties' => []]
+            : (array) self::unwrap($this->schema);
+    }
+
+    /**
+     * Replace every nested {@see self} with its underlying JSON Schema array.
+     *
+     * `Schema::string()` returns a Schema, so `Schema::object(['a' =>
+     * Schema::string()])` is the natural spelling — but the property was then a
+     * Schema OBJECT inside the array, and neither consumer noticed:
+     *
+     *   * `toJsonSchema()` emitted `{"a":{"schema":{"type":"string"}}}`, a shape
+     *     no model can read, so the tool described no argument type at all.
+     *   * `errors()` looked for `$prop['type']`, found nothing, and reported no
+     *     error — so a string argument silently accepted `1` and `null`.
+     *
+     * That second one fails OPEN: the schema looked declared, the tool accepted
+     * input it was supposed to reject, and the tests all passed because they
+     * only ever built properties as plain arrays. Recursion is depth-agnostic
+     * because `object()` accepts a whole subtree, not one leaf.
+     *
+     * Anything that is neither a Schema nor an array is passed through
+     * untouched, so a type union like `['string', 'null']` survives.
+     *
+     * @return array<mixed>|mixed
+     */
+    private static function unwrap(mixed $node): mixed
+    {
+        if ($node instanceof self) {
+            return self::unwrap($node->schema);
+        }
+        if (!is_array($node)) {
+            return $node;
+        }
+
+        $out = [];
+        foreach ($node as $key => $value) {
+            $out[$key] = self::unwrap($value);
+        }
+
+        return $out;
     }
 
     /**
