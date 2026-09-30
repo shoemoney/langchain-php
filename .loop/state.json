@@ -1620,6 +1620,43 @@
    "reasoning_tokens": 0,
    "status": "error",
    "error": "NameError: name 'SYSTEM' is not defined"
+  },
+  "~openai/gpt-astra-latest": {
+   "model": "~openai/gpt-astra-latest",
+   "at": "2026-09-30T17:59:37",
+   "actual_model": "openai/gpt-6-astra",
+   "usage": {
+    "prompt_tokens": 54181,
+    "completion_tokens": 930,
+    "total_tokens": 55111,
+    "cost": 0.723755,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 54178,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.723755,
+     "upstream_inference_prompt_cost": 0.677255,
+     "upstream_inference_completions_cost": 0.0465
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 516,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 516,
+   "topup": ".loop/reviews/50-~openai__gpt-astra-latest-topup.md",
+   "topup_chars": 2671,
+   "status": "incomplete",
+   "file": ".loop/reviews/50-~openai__gpt-astra-latest-topup.md",
+   "chars": 2671,
+   "findings": 4,
+   "severity_hits": 4
   }
  },
  "order": [
@@ -1671,7 +1708,8 @@
   "z-ai/glm-5v-turbo",
   "perplexity/sonar-pro-search",
   "mistralai/ministral-8b-2512",
-  "stealth/space-bunny-alpha"
+  "stealth/space-bunny-alpha",
+  "~openai/gpt-astra-latest"
  ],
  "next_index": 0
 }
