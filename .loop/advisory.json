@@ -58,5 +58,12 @@
   "file": ".loop/advisory/ember-1.md",
   "chars": 14023,
   "cost": 0.2167
+ },
+ "google/gemma-4-31b-it": {
+  "status": "ok",
+  "at": "2026-09-30T09:52:04.577682+00:00",
+  "file": ".loop/advisory/gemma-4-31b-it.md",
+  "chars": 6321,
+  "cost": 0.0062
  }
 }
