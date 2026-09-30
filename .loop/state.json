@@ -3009,6 +3009,41 @@
    "chars": 2927,
    "findings": 3,
    "severity_hits": 3
+  },
+  "~openai/gpt-sol-latest": {
+   "model": "~openai/gpt-sol-latest",
+   "at": "2026-09-30T04:57:13",
+   "actual_model": "openai/gpt-6.1-sol",
+   "usage": {
+    "prompt_tokens": 46957,
+    "completion_tokens": 877,
+    "total_tokens": 47834,
+    "cost": 0.126161,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 46954,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.126161,
+     "upstream_inference_prompt_cost": 0.117391,
+     "upstream_inference_completions_cost": 0.00877
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 256,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 256,
+   "status": "ok",
+   "file": ".loop/reviews/97-~openai__gpt-sol-latest.md",
+   "chars": 2990,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -3167,7 +3202,8 @@
   "~anthropic/claude-sonnet-latest",
   "~deepseek/deepseek-flash-latest",
   "~openai/gpt-luna-latest",
-  "perplexity/sonar-reasoning-pro"
+  "perplexity/sonar-reasoning-pro",
+  "~openai/gpt-sol-latest"
  ],
  "next_index": 0
 }
