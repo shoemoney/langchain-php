@@ -2360,6 +2360,47 @@
    "chars": 28213,
    "findings": 6,
    "compressed": true
+  },
+  "qwen/qwen3.8-flash": {
+   "model": "qwen/qwen3.8-flash",
+   "at": "2026-09-30T01:30:08",
+   "status": "http_429",
+   "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3.8-flash is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Alibaba\",\"is_byok\":false,\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (ht"
+  },
+  "google/gemini-3.6-flash": {
+   "model": "google/gemini-3.6-flash",
+   "at": "2026-09-30T01:30:20",
+   "actual_model": "google/gemini-3.6-flash",
+   "usage": {
+    "prompt_tokens": 35532,
+    "completion_tokens": 16337,
+    "total_tokens": 51869,
+    "cost": 0.08791275,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.08791275,
+     "upstream_inference_prompt_cost": 0.026649,
+     "upstream_inference_completions_cost": 0.06126375
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 15665,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 15665,
+   "status": "ok",
+   "file": ".loop/reviews/77-google__gemini-3.6-flash.md",
+   "chars": 2529,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2497,7 +2538,9 @@
   "google/gemini-3.1-pro-preview-customtools",
   "deepseek/deepseek-v4-flash-vision-exp",
   "openai/o4-mini",
-  "dots-studio/dots-3-note-preview:free"
+  "dots-studio/dots-3-note-preview:free",
+  "qwen/qwen3.8-flash",
+  "google/gemini-3.6-flash"
  ],
  "next_index": 0
 }

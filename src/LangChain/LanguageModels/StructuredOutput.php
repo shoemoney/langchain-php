@@ -86,7 +86,15 @@ final class StructuredOutput
             : $llm->pipe($outputParser);
 
         if ($runName !== null) {
-            $result = $result->bind([], ['run_name' => $runName]);
+            // camelCase, because `RunnableConfig` reads `$runName` and upstream's
+            // `RunnableBinding.kwargs` is typed `Partial<CallOptions>` — a typed
+            // object merged into the config, where `runName` is the canonical
+            // key. `run_name` is not a synonym here: it lands in
+            // `config->options['run_name']` and `config->runName` stays null, so
+            // the tracer never sees the pipeline name and the run shows up
+            // unnamed. A snake_case key that is quietly accepted and quietly
+            // ignored is worse than one that is rejected.
+            $result = $result->bind([], ['runName' => $runName]);
         }
 
         return $result;
