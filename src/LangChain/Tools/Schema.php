@@ -360,7 +360,7 @@ final class Schema
             return;
         }
 
-        if (array_key_exists('const', $schema) && $value !== $schema['const']) {
+        if (array_key_exists('const', $schema) && !self::jsonEquals($value, $schema['const'])) {
             $errors[] = [
                 'path' => $path,
                 'message' => 'expected the constant ' . json_encode($schema['const']),
@@ -369,7 +369,17 @@ final class Schema
             return;
         }
 
-        if (isset($schema['enum']) && is_array($schema['enum']) && !in_array($value, $schema['enum'], true)) {
+        $enumHit = false;
+        if (isset($schema['enum']) && is_array($schema['enum'])) {
+            foreach ($schema['enum'] as $candidate) {
+                if (self::jsonEquals($value, $candidate)) {
+                    $enumHit = true;
+
+                    break;
+                }
+            }
+        }
+        if (isset($schema['enum']) && is_array($schema['enum']) && !$enumHit) {
             $errors[] = [
                 'path' => $path,
                 'message' => 'expected one of ' . json_encode($schema['enum']),
@@ -487,6 +497,36 @@ final class Schema
                 $this->check($item, $schema['items'], $path . '[' . $i . ']', $errors);
             }
         }
+    }
+
+    /**
+     * JSON instance equality, which is NOT PHP's `===`.
+     *
+     * `enum` and `const` are instance-equality keywords: in JSON a number has no
+     * int/float distinction, so 3.0 IS the number 3, and in JS `3 === 3.0` is true.
+     * PHP's `===` says otherwise, and that made one schema contradict itself —
+     * `{"type":"integer"}` ACCEPTED 3.0 while `{"type":"integer","enum":[3]}`
+     * rejected it as "expected one of [3]". A value cannot satisfy a type and fail an
+     * enum over the same number.
+     *
+     * The swap is not to `==`, which is worse: PHP's `==` treats `true == 1` and
+     * `0 == ""` as equal, and JSON has no such coercion. So the comparison is
+     * type-aware: numbers compare numerically, booleans compare as booleans and are
+     * never equal to a number, and everything else falls back to `===`.
+     */
+    private static function jsonEquals(mixed $a, mixed $b): bool
+    {
+        // `is_int(true)` is false and `is_bool(1)` is false, so a bool never
+        // reaches the numeric branch — that is what refuses `true == 1`.
+        if (($a === null || is_int($a) || is_float($a))
+            && ($b === null || is_int($b) || is_float($b))
+            && (is_int($a) || is_float($a))
+            && (is_int($b) || is_float($b))
+        ) {
+            return (float) $a === (float) $b;
+        }
+
+        return $a === $b;
     }
 
     private static function matchesType(mixed $value, string $type): bool

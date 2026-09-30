@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\Tools;
 use LangChain\Tools\{DynamicStructuredTool, Schema, ToolException};
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -160,5 +161,47 @@ final class SchemaSpecSemanticsTest extends TestCase
         $this->assertSame([], $schema->errors(['a' => 1]), 'an assoc array is an object');
 
         $this->assertNotSame([], $schema->errors([1, 2]), 'a non-empty JSON array is NOT an object');
+    }
+
+    /**
+     * `enum`/`const` use JSON instance equality, where 3.0 IS the number 3.
+     *
+     * Measured before the fix: `{"type":"integer"}` ACCEPTED 3.0 while
+     * `{"type":"integer","enum":[3]}` rejected it as "expected one of [3]". One
+     * schema cannot call a value an integer and then not-3.
+     *
+     * In JS `3 === 3.0` is TRUE — a JSON number has no int/float distinction — so
+     * upstream accepts it. PHP's `===` does not, and swapping to `==` would have
+     * been WORSE: PHP's loose comparison equates `true == 1`, `0 == ""` and
+     * `"3" == 3`, none of which JSON does.
+     *
+     * The REFUSED COERCIONS are half the test. Without them the fix could pass by
+     * loosening the comparison into PHP's `==` and losing the type discipline that
+     * makes a schema worth having — which is the tempting wrong repair.
+     *
+     * @param array<string, mixed> $spec
+     */
+    #[DataProvider('enumEqualityCases')]
+    public function testEnumAndConstUseJsonInstanceEquality(
+        array $spec,
+        mixed $value,
+        bool $shouldAccept,
+        string $label,
+    ): void {
+        $errors = (new Schema($spec))->errors($value);
+        $this->assertSame($shouldAccept, $errors === [], $label);
+    }
+
+    public static function enumEqualityCases(): array
+    {
+        return [
+            'enum accepts 3.0 for [3]' => [['type' => 'integer', 'enum' => [3]], 3.0, true, '3.0 is the number 3'],
+            'const accepts 3.0 for 3' => [['type' => 'integer', 'const' => 3], 3.0, true, 'same for const'],
+            'enum rejects a different number' => [['type' => 'integer', 'enum' => [3]], 4, false, '4 is not 3'],
+            'enum does not coerce true to 1' => [['enum' => [true]], 1, false, 'PHP == would accept this'],
+            'enum does not coerce 1 to true' => [['enum' => [1]], true, false, 'and the reverse'],
+            'enum does not coerce "3" to 3' => [['enum' => ['3']], 3, false, 'PHP == would accept this'],
+            'enum does not coerce false to 0' => [['enum' => [0]], false, false, 'and this'],
+        ];
     }
 }
