@@ -731,50 +731,6 @@
   "price": "0.0000002"
  },
  {
-  "id": "thinkingmachines/inkling",
-  "name": "Thinking Machines: Inkling",
-  "in": [
-   "text",
-   "image",
-   "audio"
-  ],
-  "ctx": 524288,
-  "price": "0.000001"
- },
- {
-  "id": "thinkingmachines/inkling-small",
-  "name": "Thinking Machines: Inkling Small",
-  "in": [
-   "text",
-   "image",
-   "audio"
-  ],
-  "ctx": 524288,
-  "price": "0.00000045"
- },
- {
-  "id": "thinkingmachines/inkling-small:free",
-  "name": "Thinking Machines: Inkling Small (free)",
-  "in": [
-   "text",
-   "image",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0"
- },
- {
-  "id": "thinkingmachines/inkling:free",
-  "name": "Thinking Machines: Inkling (free)",
-  "in": [
-   "text",
-   "image",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0"
- },
- {
   "id": "unbiased/pareto",
   "name": "Pareto",
   "in": [

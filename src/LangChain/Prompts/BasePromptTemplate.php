@@ -148,9 +148,23 @@ abstract class BasePromptTemplate extends Runnable implements \JsonSerializable
         $partialValues = [];
 
         foreach ($this->partialVariables as $key => $value) {
+            // Upstream assigns the callable's result UNCAST:
+            //   `partialValues[key] = await (value as () => Promise<string>)();`
+            // (base.ts:112-117). The `(string)` cast here was not a translation
+            // of that line, it was an addition — and it corrupted rather than
+            // failed. Measured with a callable partial returning ['A','B']:
+            // merging produced the string "Array" and the template rendered
+            // `'FArray'`, with a PHP warning on top.
+            //
+            // Upstream's declared type is string-valued, so the common case is
+            // identical either way. The difference only appears outside that
+            // contract, and there the port was quietly inventing text while
+            // upstream would have carried the value and let the template fail
+            // on it. Assigning as-is matches upstream and makes the mistake
+            // visible instead of laundering it.
             $partialValues[$key] = is_string($value)
                 ? $value
-                : (is_callable($value) ? (string) $value() : $value);
+                : (is_callable($value) ? $value() : $value);
         }
 
         return array_merge($partialValues, $userVariables);

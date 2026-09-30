@@ -2138,6 +2138,88 @@
    "chars": 3641,
    "findings": 5,
    "severity_hits": 5
+  },
+  "xiaomi/mimo-v2.6-flash": {
+   "model": "xiaomi/mimo-v2.6-flash",
+   "at": "2026-09-30T00:28:15",
+   "actual_model": "xiaomi/mimo-v2.6-flash",
+   "usage": {
+    "prompt_tokens": 29495,
+    "completion_tokens": 4936,
+    "total_tokens": 34431,
+    "cost": 0.00551138,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.00551138,
+     "upstream_inference_prompt_cost": 0.0041293,
+     "upstream_inference_completions_cost": 0.00138208
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 3907,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 3907,
+   "status": "incomplete",
+   "file": ".loop/reviews/68-xiaomi__mimo-v2.6-flash.md",
+   "chars": 4490,
+   "findings": 0,
+   "severity_hits": 5
+  },
+  "thinkingmachines/inkling-small:free": {
+   "model": "thinkingmachines/inkling-small:free",
+   "at": "2026-09-30T00:30:39",
+   "status": "http_403",
+   "error": "{\"error\":{\"message\":\"thinkingmachines/inkling-small:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps\",\"code\":403,\"metadata\":{\"routing_funnel\":[{\"step\":\"Initial Endpoints\",\"endpoint_count\":1}],\"failed_routing_step\":\"Gate Free Endpoints by Agentic Harness\"}}}"
+  },
+  "thinkingmachines/inkling:free": {
+   "model": "thinkingmachines/inkling:free",
+   "at": "2026-09-30T00:30:43",
+   "status": "http_403",
+   "error": "{\"error\":{\"message\":\"thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps\",\"code\":403,\"metadata\":{\"routing_funnel\":[{\"step\":\"Initial Endpoints\",\"endpoint_count\":1}],\"failed_routing_step\":\"Gate Free Endpoints by Agentic Harness\"}}}"
+  },
+  "google/gemini-3.1-pro-preview": {
+   "model": "google/gemini-3.1-pro-preview",
+   "at": "2026-09-30T00:30:50",
+   "actual_model": "google/gemini-3.1-pro-preview",
+   "usage": {
+    "prompt_tokens": 30818,
+    "completion_tokens": 11852,
+    "total_tokens": 42670,
+    "cost": 0.20386,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.20386,
+     "upstream_inference_prompt_cost": 0.061636,
+     "upstream_inference_completions_cost": 0.142224
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 11228,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 11228,
+   "status": "incomplete",
+   "file": ".loop/reviews/71-google__gemini-3.1-pro-preview.md",
+   "chars": 2478,
+   "findings": 4,
+   "severity_hits": 4
   }
  },
  "order": [
@@ -2267,7 +2349,11 @@
   "qwen/qwen3.6-flash",
   "qwen/qwen3.6-flash",
   "qwen/qwen3.5-flash-02-23",
-  "qwen/qwen3.5-flash-02-23"
+  "qwen/qwen3.5-flash-02-23",
+  "xiaomi/mimo-v2.6-flash",
+  "thinkingmachines/inkling-small:free",
+  "thinkingmachines/inkling:free",
+  "google/gemini-3.1-pro-preview"
  ],
  "next_index": 0
 }

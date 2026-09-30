@@ -186,6 +186,10 @@ heading number and nothing between them:
 NOT_A_REVIEWER = (
     "typesafe/jev", "openrouter/auto", "openrouter/free",
     "safety", "guard", "lyria", "multi-agent",
+    # HTTP 403: "only available on agentic harnesses" — a coding agent, not a
+    # chat completion. Unusable here permanently, so it costs an iteration each
+    # time it is picked.
+    "thinkingmachines/inkling",
 )
 
 
