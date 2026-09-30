@@ -995,6 +995,41 @@
    "chars": 6995,
    "findings": 5,
    "severity_hits": 5
+  },
+  "minimax/minimax-01": {
+   "model": "minimax/minimax-01",
+   "at": "2026-09-30T13:57:08",
+   "actual_model": "minimax/minimax-01",
+   "usage": {
+    "prompt_tokens": 56431,
+    "completion_tokens": 664,
+    "total_tokens": 57095,
+    "cost": 0.0120166,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0120166,
+     "upstream_inference_prompt_cost": 0.0112862,
+     "upstream_inference_completions_cost": 0.0007304
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/32-minimax__minimax-01.md",
+   "chars": 2972,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1028,7 +1063,8 @@
   "baidu/ernie-4.5-vl-424b-a47b",
   "rekaai/reka-edge",
   "qwen/qwen3-vl-235b-a22b-thinking",
-  "~anthropic/claude-haiku-latest"
+  "~anthropic/claude-haiku-latest",
+  "minimax/minimax-01"
  ],
  "next_index": 0
 }
