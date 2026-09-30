@@ -41,11 +41,16 @@ final class TextSplitterTest extends TestCase
      * Run `$fn` with user-level PHP warnings swallowed.
      *
      * A few upstream cases deliberately produce chunks larger than `chunkSize`.
-     * The JS original reports that with `console.warn`, which vitest ignores; the
-     * PHP port raises an `E_USER_WARNING` so the condition is visible to error
-     * handlers, and this suite runs with `failOnWarning="true"`. The warning
-     * itself is asserted separately in
-     * {@see self::testOversizedChunkRaisesAWarning()}.
+     * Upstream reports that with `console.warn`; the port RECORDS it
+     * ({@see TextSplitter::oversizedChunkWarnings()}) rather than raising an
+     * `E_USER_WARNING`, because this suite runs with `failOnWarning="true"` and
+     * the library could not otherwise be tested for its own documented case.
+     *
+     * This helper is now a no-op kept so those call sites read as they did: the
+     * behaviour it existed to contain is gone. Retained deliberately rather
+     * than deleted — it is the thing that makes a regression here visible, since
+     * a warning would be swallowed again by someone who did not know why the
+     * wrapper was there.
      */
     private static function ignoringUserWarnings(callable $fn): mixed
     {
@@ -164,15 +169,27 @@ final class TextSplitterTest extends TestCase
         new CharacterTextSplitter(chunkSize: 4, chunkOverlap: 4);
     }
 
-    public function testOversizedChunkRaisesAWarning(): void
+    /**
+     * An oversized chunk is RECORDED, and nothing is raised.
+     *
+     * This asserted the opposite for the life of the bug: it required an
+     * `E_USER_WARNING`, and the rest of the file was contorted to swallow that
+     * warning under `failOnWarning="true"`. The pin meant the defect could not
+     * be fixed without also rewriting the test that enshrined it — which is
+     * what happened, and the reason the fix looked larger than it was.
+     */
+    public function testAnOversizedChunkIsRecordedAndNothingIsRaised(): void
     {
+        TextSplitter::clearOversizedChunkWarnings();
         $splitter = new CharacterTextSplitter(separator: ' ', chunkSize: 2, chunkOverlap: 0);
 
-        $seen = self::capturingUserWarnings(static fn (): array => $splitter->splitText('foo  bar'));
+        $raised = self::capturingUserWarnings(static fn (): array => $splitter->splitText('foo  bar'));
 
+        $this->assertSame([], $raised, 'an oversized chunk must not raise E_USER_WARNING');
         $this->assertSame(
             ['Created a chunk of size 3, which is longer than the specified 2'],
-            $seen,
+            TextSplitter::oversizedChunkWarnings(),
+            'the notice must still be reported, just not as a PHP warning',
         );
     }
 

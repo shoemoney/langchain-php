@@ -84,8 +84,26 @@ class RecursiveCharacterTextSplitter extends TextSplitter
         /** @var list<string> $finalChunks */
         $finalChunks = [];
 
-        // Get appropriate separator to use
-        $separator = $separators[count($separators) - 1];
+        // Get appropriate separator to use.
+        //
+        // Upstream is the same expression with no guard —
+        // `separators[separators.length - 1]` (text_splitter.ts:301). In
+        // JavaScript an empty list indexes to `undefined`, and
+        // `String.split(undefined)` returns the whole string, so upstream
+        // returns `[text]`.
+        //
+        // In PHP the same expression is a warning plus a fatal: an empty list
+        // gives "Undefined array key -1" and then
+        // `splitOnSeparator(): Argument #2 ($separator) must be of type string,
+        // null given`. Measured, both, on a splitter constructed with
+        // `separators: []`.
+        //
+        // So this resolves to '' — the floor separator — which reproduces
+        // upstream's `[text]` result. A constructor guard would also stop the
+        // fatal, but it would REJECT an input upstream accepts, and this is a
+        // port: the language difference is the port's problem to absorb, not
+        // the caller's.
+        $separator = $separators === [] ? '' : $separators[count($separators) - 1];
         $newSeparators = null;
         foreach ($separators as $i => $s) {
             if ($s === '') {

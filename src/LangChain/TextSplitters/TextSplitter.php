@@ -256,10 +256,48 @@ abstract class TextSplitter extends BaseDocumentTransformer
      */
     protected function warnOversizedChunk(int $size): void
     {
-        trigger_error(
-            "Created a chunk of size {$size}, which is longer than the specified {$this->chunkSize}",
-            E_USER_WARNING,
-        );
+        // Upstream calls `console.warn` here — a LOG, not a failure, and
+        // execution continues either way.
+        //
+        // `trigger_error(E_USER_WARNING)` is not that. This package's own
+        // phpunit.xml sets `failOnWarning="true"`, so a test that exercises an
+        // oversized chunk — the splitter's documented behaviour when no
+        // separator can bring a fragment under budget — failed the suite.
+        // Measured: `CharacterTextSplitter(chunkSize: 3)` over
+        // "aaaa bbbbbbbbbbbbbbbb" printed "Created a chunk of size 4, which is
+        // longer than the specified 3" and exited 1. The library could not be
+        // tested for its own documented case.
+        //
+        // This is the same translation problem already settled in
+        // {@see \LangChain\Tracers\BaseRunManager::recordHandlerError()}, for
+        // the same reason and with the same shape: record it where it can be
+        // read, instead of emitting a PHP warning that a strict runner treats
+        // as a test failure.
+        self::$oversizedChunkWarnings[] = "Created a chunk of size {$size}, "
+            . "which is longer than the specified {$this->chunkSize}";
+    }
+
+    /** @var list<string> Every oversized-chunk notice, for tests and callers. */
+    private static array $oversizedChunkWarnings = [];
+
+    /**
+     * Chunks emitted over budget, newest last.
+     *
+     * Upstream writes this to the console and forgets it. That is fine for a
+     * library user watching a terminal and wrong for a test runner, which has
+     * no console to write to and treats the notice as a failure. Recording it
+     * keeps the information reachable from both.
+     *
+     * @return list<string>
+     */
+    public static function oversizedChunkWarnings(): array
+    {
+        return self::$oversizedChunkWarnings;
+    }
+
+    public static function clearOversizedChunkWarnings(): void
+    {
+        self::$oversizedChunkWarnings = [];
     }
 
     /**
