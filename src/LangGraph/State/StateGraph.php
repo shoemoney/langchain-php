@@ -214,7 +214,13 @@ class StateGraph
      */
     public function addConditionalEdges(string $start, callable|RunnableInterface $path, ?array $pathMap = null): self
     {
-        if (!isset($this->nodes[$start])) {
+        // START is permitted here exactly as addEdge() permits it, and exactly as
+        // upstream's own fixtures use it — `addConditionalEdges(START, fanOut,
+        // ["review"])` appears in langgraph-js' multi-interrupt-graph.ts:48 and
+        // mock-server.ts:540. Guarding on `$this->nodes` alone rejected a call
+        // pattern upstream exercises, while the sibling addEdge() accepted it, so
+        // the two edge-adding methods disagreed about START.
+        if ($start !== Constants::START && !isset($this->nodes[$start])) {
             throw new \InvalidArgumentException('Node `' . $start . '` not found');
         }
 

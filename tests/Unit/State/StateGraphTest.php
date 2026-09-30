@@ -400,4 +400,38 @@ final class StateGraphTest extends TestCase
 
         $this->assertNull($graph->checkpointer);
     }
+
+    /**
+     * START is a legal source for conditional edges, exactly as it is for addEdge().
+     *
+     * The guard consulted `$this->nodes` alone, so START — which is a constant,
+     * not a node — was rejected while `addEdge(START, ...)` was accepted. Measured
+     * before the fix:
+     *
+     *     addConditionalEdges('a')          -> OK
+     *     addConditionalEdges('__start__')  -> InvalidArgumentException: Node `__start__` not found
+     *     addEdge(START)                    -> OK
+     *
+     * Upstream exercises the rejected pattern in its own fixtures —
+     * `addConditionalEdges(START, fanOut, ["review"])` in langgraph-js'
+     * multi-interrupt-graph.ts:48 and mock-server.ts:540 — so this was not a
+     * stricter-than-upstream choice, it was a call pattern upstream supports and
+     * this port refused.
+     *
+     * The third assertion is the one that keeps the fix honest: an UNKNOWN node
+     * must still throw, so the guard cannot be made to pass by being dropped.
+     */
+    public function testConditionalEdgesAcceptStartAsASource(): void
+    {
+        $graph = new StateGraph(['value' => ['type' => 'string']]);
+        $graph->addNode('a', static fn ($s) => $s);
+
+        $graph->addConditionalEdges(Constants::START, static fn ($s) => 'a');
+        $graph->addConditionalEdges('a', static fn ($s) => 'a');
+
+        $this->addToAssertionCount(2);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $graph->addConditionalEdges('nope', static fn ($s) => 'a');
+    }
 }
