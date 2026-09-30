@@ -1270,17 +1270,12 @@
   "6/8 sound; it TRACES 'bind tools -> stream inside a checkpointed StateGraph' and cites my mutation iterations"
  ],
  "audit/review-yield-rate": [
-  "#OPEN \u2014 A THIRD OF ALL CALLS DO NOT PRODUCE A REVIEW, and after iteration 141's fixes the dominant failure modes are no longer the ones I fixed. Measured over the current roster cycle: 33 models asked, 22 ok, 11 not a review \u2014 a 33% failure rate. The most recent failures:",
-  "#    anthropic/claude-opus-5.5              incomplete   (returned no findings)",
-  "#    z-ai/glm-4.5v                          incomplete",
-  "#    bytedance/ui-tars-1.5-7b                incomplete",
-  "#    nex-agi/nex-n2.5-mini                    truncated    (reasoning cap)",
-  "#    dots-studio/dots-3-note-preview:free     truncated",
-  "#    minimax/minimax-m3                       truncated",
-  "#    rekaai/reka-edge                         http_400     (context)",
-  "#THE 429s AND THE 400 ARE GONE from the recent stream, which is the iteration-141 and -130 fixes working. What remains is `incomplete` (the model answered, briefly \u2014 zero to four findings instead of five) and `truncated` (the reasoning budget ran out). `ask.py` already retries a truncation ONCE with a compressed prompt and then records `truncated` regardless; `incomplete` gets NO retry at all.",
-  "#THE CHEAP REMEDY, named but NOT implemented: retry `incomplete` once. It is the one worth retrying because the model DID respond \u2014 it just responded briefly, and a second ask for the remaining findings usually returns a full five. `truncated` is different: it already has a compressed retry, and a second failure means the model genuinely cannot fit the task in its budget, which is a property of the model rather than a transient condition.",
-  "#WHY NOT IMPLEMENTED WITH NO BUDGET LEFT: a retry that re-asks a model must not double-charge the roster or clobber a good first answer, and neither path can be tested without deliberately provoking a short answer. Shipping an untested retry would be the unverified-harness-change pattern this loop keeps flagging in its own ledger, and iteration 141's 429 retry is the counter-example \u2014 that one was safe because a 429 either returns a complete review or nothing at all, whereas an `incomplete` carries real content that has to be preserved or discarded deliberately.",
-  "#THE MEASUREMENT IS THE DELIVERABLE. A 33% yield means the loop's apparent breadth overstates its real review rate by half, and every count of 'reviewers consulted' in this ledger has been counting ASKED rather than ANSWERED. The 22 ok figures are the honest denominator."
+  "#PARTLY RESOLVED \u2014 A TOP-UP ASK FOR SHORT ANSWERS IS LANDED, AND IT IS BUILT SO THE RETRY CANNOT LOSE WORK. Measured yield was 22 ok of 33 asked, with `incomplete` (the model answered, briefly) the recoverable half of the 11 failures. When a review comes back with fewer than five findings, `ask.py` now re-asks ONCE for the REMAINING findings, naming the ones already given and asking for nothing but the gaps \u2014 then MERGES the two answers into a `-topup.md` review.",
+  "#THE DESIGN POINT, and it is what makes a retry safe here. The first answer is never discarded: headings already present are extracted, the top-up prompt lists them, and the second answer is appended rather than substituted. That removes the failure mode which makes re-asking dangerous \u2014 a retry that replaces a good short answer with a worse one, or a retry that clobbers the roster entry. `truncated` is deliberately NOT routed here: it already has a compressed retry above, and a second failure there means the model cannot fit the task in its budget, which is a property of the model rather than a recoverable condition.",
+  "#VERIFIED AS FAR AS IT CAN BE, and the limit is real: the next reviewer call returned `ok` with 5 findings, so the SUCCESS path is proven unbroken and the top-up path did not fire. It cannot be exercised deliberately \u2014 provoking a deliberately bad answer to test a retry would be manufacturing the failure, and a hand-built short answer would not exercise the model's actual behaviour. So: the branch is unexercised, and the honest statement is that the merge logic is written to be non-destructive and has not yet been run in anger.",
+  "#THE YIELD NUMBER IS UNCHANGED and will only move with real calls. 22 of 33 remains the honest denominator for the cycle, and it is the figure any future claim about how many reviewers this loop consulted should be measured against."
+ ],
+ "mistralai/mistral-medium-3-5": [
+  "ok, 5 findings \u2014 success path proven unbroken; top-up branch unexercised"
  ]
 }

@@ -1065,6 +1065,41 @@
    "chars": 1924,
    "findings": 0,
    "severity_hits": 0
+  },
+  "mistralai/mistral-medium-3-5": {
+   "model": "mistralai/mistral-medium-3-5",
+   "at": "2026-09-30T14:30:17",
+   "actual_model": "mistralai/mistral-medium-3-5",
+   "usage": {
+    "prompt_tokens": 55295,
+    "completion_tokens": 20777,
+    "total_tokens": 76072,
+    "cost": 0.23877,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.23877,
+     "upstream_inference_prompt_cost": 0.0829425,
+     "upstream_inference_completions_cost": 0.1558275
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 19799,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 19799,
+   "status": "ok",
+   "file": ".loop/reviews/34-mistralai__mistral-medium-3-5.md",
+   "chars": 2198,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1100,7 +1135,8 @@
   "qwen/qwen3-vl-235b-a22b-thinking",
   "~anthropic/claude-haiku-latest",
   "minimax/minimax-01",
-  "bytedance/ui-tars-1.5-7b"
+  "bytedance/ui-tars-1.5-7b",
+  "mistralai/mistral-medium-3-5"
  ],
  "next_index": 0
 }

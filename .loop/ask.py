@@ -303,6 +303,7 @@ def slug(mid):
     return mid.replace("/", "__").replace(":", "_")
 
 
+MORE_RETRIES = 1            # one top-up ask for the findings a short answer missed
 RATE_LIMIT_RETRIES = 3
 RATE_LIMIT_BACKOFF = 20
 
@@ -472,9 +473,51 @@ def main():
             open(path, "w", encoding="utf-8").write(header + text)
             f5 = len(re.findall(r"(?:#{2,4}\s*\d+[.)]\s)|(?:^\s*\*+\s*(?:\*\*)?Finding\s+\d+)", text, re.M | re.I))
             s5 = text.count("**Severity:**")
-            rec.update(status="ok" if (f5 >= 5 and s5 >= 5) else "incomplete",
-                       file=path, chars=len(text), findings=f5, severity_hits=s5)
-            print(f"    {rec['status']} -> {path}  ({f5} findings, {s5} severities, {time.time()-t0:.0f}s)")
+
+            # A SHORT answer is retryable; a TRUNCATED one already has its own
+            # compressed retry above and a second failure means the model cannot
+            # fit the task. Measured over the cycle: 11 of 33 calls were not a
+            # review, and the recoverable half of those were `incomplete` — the
+            # model answered, just with fewer than five findings.
+            #
+            # The second ask is for the REMAINING findings only, and its headings
+            # are MERGED with the first answer's. The first answer is never
+            # discarded, so a retry cannot lose work — the failure mode that makes
+            # re-asking dangerous is precisely the one this avoids.
+            if f5 < 5 and s5 < 5 and MORE_RETRIES > 0:
+                have = {m.lower() for m in re.findall(r"^#{2,4}\s*\d+[.)]\s*(.+)$", text, re.M)}
+                print(f"    incomplete ({f5} findings) — asking for the remaining ones "
+                      f"({MORE_RETRIES} left)", flush=True)
+                resp3 = call(
+                    model,
+                    SYSTEM,
+                    prompt()
+                    + f"\n\n# Review packet\n\n{b}\n\n"
+                    + "Your previous answer listed "
+                    + f"{len(have)} finding(s): " + "; ".join(sorted(have)) + ".\n"
+                    + f"List ONLY the additional findings you did not include, up to "
+                    + f"{5 - len(have)} more, in the same format. If there are none, say so.\n"
+                    + "Do not repeat a finding you have already given.",
+                    png,
+                )
+                text2 = text.rstrip() + "\n\n---\n\n" + resp3
+                path = f"{REVIEWS}/{n:02d}-{slug(model)}-topup.md"
+                open(path, "w", encoding="utf-8").write(
+                    f"# Review {n} - {model} (top-up)\n"
+                    f"_asked {rec['at']} - served by {resp3.get('model')} - "
+                    f"top-up for {f5} finding(s)_\n\n{text2}")
+                f5 = len(re.findall(r"(?:#{2,4}\s*\d+[.)]\s)|(?:^\s*\*+\s*(?:\*\*)?Finding\s+\d+)", text2, re.M | re.I))
+                s5 = text2.count("**Severity:**")
+                rec["topup"] = path
+                rec["topup_chars"] = len(text2)
+                rec.update(status="ok" if (f5 >= 5 and s5 >= 5) else "incomplete",
+                           file=path, chars=len(text2), findings=f5, severity_hits=s5)
+                print(f"    {rec['status']} (after top-up) -> {path}  "
+                      f"({f5} findings, {s5} severities)")
+            else:
+                rec.update(status="ok" if (f5 >= 5 and s5 >= 5) else "incomplete",
+                           file=path, chars=len(text), findings=f5, severity_hits=s5)
+                print(f"    {rec['status']} -> {path}  ({f5} findings, {s5} severities, {time.time()-t0:.0f}s)")
 
     except urllib.error.HTTPError as e:
         body = e.read()[:400].decode("utf-8", "replace")
