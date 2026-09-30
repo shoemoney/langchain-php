@@ -12,5 +12,12 @@
   "file": ".loop/advisory/glm-5v-turbo.md",
   "chars": 17160,
   "cost": 0.0432
+ },
+ "google/gemini-3.8-flash": {
+  "status": "ok",
+  "at": "2026-09-30T05:22:24.877850+00:00",
+  "file": ".loop/advisory/gemini-3-8-flash.md",
+  "chars": 7559,
+  "cost": 0
  }
 }

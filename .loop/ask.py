@@ -50,6 +50,12 @@ EVIDENCE RULES — this is where reviews most often go wrong:
   checked, and a reviewer will confirm the finding against it without noticing
   the quote was never in the source. One review did exactly this, claiming a
   duplicated docblock that does not exist in the file.
+* The SAME applies to the documentation. PORT_STATUS.md and HANDOFF.md are the
+  PROJECT'S OWN record of what was fixed and why. A row there is evidence that a
+  bug was found and dealt with — not that it is still open. One review read three
+  ledger rows and re-reported them as live defects, and one reported a corrupted
+  table row that does not exist. Quote the row and explain why the fix did not
+  hold, or leave it alone.
 * Evidence you cannot see in the packet is a guess. Leave the finding out.
 * **The presence of a line is not a defect.** Several reviews have quoted a
   line and asserted what it *causes* without tracing it. A fallback operator
