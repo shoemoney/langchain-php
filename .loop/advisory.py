@@ -45,7 +45,13 @@ ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 # safety classifiers, and the decision model (not a chat model).
 EXCLUDE = re.compile(
     r"(typesafe/jev|openrouter/(auto|free)|safety|guard|lyria|"
-    r"grok-.*multi-agent|^~)",
+    r"grok-.*multi-agent|^~|perceptron/perceptron-mk1.5)",
+    # perceptron/perceptron-mk1.5: every request returns HTTP 200 with
+    # "Upstream error from Perceptron: Generation failed." Verified across three
+    # shapes (text-only, text+image, system+user) and three max_tokens values,
+    # including a 400-token two-message request. The model accepts the payload
+    # and cannot generate, so no budget or trim makes it usable. Measured in
+    # iteration 158; an exclusion is the honest answer here, not a fix.
     re.I,
 )
 
