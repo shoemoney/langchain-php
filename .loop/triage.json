@@ -937,5 +937,19 @@
   "#ELEMENTS 4 (error-handling), 6 (test-strategy) and 8 (dead-code, verdict 'unsure') were NOT audited this iteration \u2014 the budget went to the composition element because it targets the single open defect the loop has spent five iterations on. Recorded as unexamined rather than folded into the 4/8 count.",
   "#THE LEDGER IS DOING ITS JOB, and that is worth one line: this advisory quoted an audit entry written four iterations ago and built a correct recommendation on it. That is the opposite of the iteration-60 failure, where a stale entry made a model recommend a FIXED defect \u2014 the difference being that this entry carries its measured A/B and its reverted-attempt history, so a reader cannot mistake it for an open recommendation it no longer supports.",
   "agrees on the stepConfig remedy from my measured A/B; plan agreed, execution still to verify"
+ ],
+ "~openai/gpt-luna-latest": [
+  "#3 'Adding a duplicate tag can stop it propagating' \u2014 REJECTED on upstream evidence. The behaviour is REAL and I confirmed it by execution first:",
+  "#     addTags(['x'], inherit=true)   ->  tags=['x']  inheritable=['x']",
+  "#     addTags(['x'], inherit=false)  ->  tags=['x']  inheritable=[]      <- 'x' stops propagating",
+  "#`addTags()` calls `removeTags()` first, which strips the tag from BOTH lists; the non-inheriting re-add then restores it only to `tags`. So a non-inheriting re-add deletes an already-inheritable tag from the inheritance set and children stop receiving it. That is exactly what the finding claims.",
+  "#And upstream does the identical thing (langchain-core/src/callbacks/manager.ts:1261-1274):",
+  "#     addTags(tags, inherit = true) { this.removeTags(tags); // Remove duplicates",
+  "#       this.tags.push(...tags); if (inherit) { this.inheritableTags.push(...tags); } }",
+  "#     removeTags(tags) { this.tags = this.tags.filter(t => !tags.includes(t));",
+  "#       this.inheritableTags = this.inheritableTags.filter(t => !tags.includes(t)); }",
+  "#Same removal-from-both, same conditional re-add. The quirk is upstream's, and the port's own comment already cites upstream's `// Remove duplicates`. Ninth rejection of this family, and the sharpest version yet: the reviewer's evidence quotes BOTH methods accurately AND the behaviour reproduces exactly \u2014 everything is right except the implicit assumption that upstream does something else.",
+  "#1 'Start-hook tags and metadata are discarded' and #2 'Custom-event overrides are ignored' \u2014 DEFERRED unverified. Both are in the same family I have deferred before (start hooks passing `$this->tags` where the parameter is expected; handleCustomEvent dispatching manager tags rather than the call-time ones). Both are plausible, both are cheap to probe, and neither was executed this iteration. #5 'Tool-start JSON encoding can violate the string contract' likewise.",
+  "#3 REJECTED: reproduces exactly, and upstream manager.ts:1261-1274 is identical"
  ]
 }

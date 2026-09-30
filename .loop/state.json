@@ -253,6 +253,41 @@
    "chars": 3609,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~openai/gpt-luna-latest": {
+   "model": "~openai/gpt-luna-latest",
+   "at": "2026-09-30T09:01:19",
+   "actual_model": "openai/gpt-6-luna",
+   "usage": {
+    "prompt_tokens": 45567,
+    "completion_tokens": 5647,
+    "total_tokens": 51214,
+    "cost": 0.0085193,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 45564,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0085193,
+     "upstream_inference_prompt_cost": 0.0056958,
+     "upstream_inference_completions_cost": 0.0028235
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 5084,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 5084,
+   "status": "ok",
+   "file": ".loop/reviews/09-~openai__gpt-luna-latest.md",
+   "chars": 2546,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -263,7 +298,8 @@
   "amazon/nova-2-lite-v1",
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "unbiased/pareto",
-  "~anthropic/claude-opus-latest"
+  "~anthropic/claude-opus-latest",
+  "~openai/gpt-luna-latest"
  ],
  "next_index": 0
 }
