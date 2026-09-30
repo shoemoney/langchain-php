@@ -98,15 +98,26 @@ def inventory():
         target = rel.replace("/", ".")
         # A test lives at tests/Unit/<ns-path>/XTest.php while its source lives
         # at src/<Vendor>/<ns-path>/X.php, so the test path is a SUFFIX of the
-        # src namespace, never equal to it. Longest suffix wins so
-        # "LanguageModels.Chat" is not credited to "LanguageModels".
-        candidates = [
-            (len(k), k) for k in inv
-            if k == target or k.endswith("." + target) or target.startswith(k + ".")
-        ]
-        if candidates:
-            inv[max(candidates)[1]]["test_files"] += 1
-        else:
+        # src namespace, never equal to it.
+        #
+        # EVERY match is credited, not just the longest. Longest-suffix alone
+        # was demonstrably wrong: tests/Unit/Checkpoint/ matched
+        # `LangGraph.Pregel.Checkpoint` (21 chars) over `LangGraph.Checkpoint`
+        # (20), so the brief reported 11 and 0 respectively — claiming a
+        # namespace with eleven test files had none.
+        #
+        # That direction of error is the expensive one. Under-reporting coverage
+        # does not merely misstate a number, it invites reviewers to report
+        # already-fixed gaps: one advisory pass this iteration claimed
+        # `LangGraph\Errors` had zero tests, when the brief it was reading said
+        # one. Over-attributing is the safe direction, because it cannot
+        # manufacture a finding.
+        matched = False
+        for k in list(inv):
+            if k == target or k.endswith("." + target) or target.startswith(k + "."):
+                inv[k]["test_files"] += 1
+                matched = True
+        if not matched:
             inv.setdefault(target, {"src": 0, "lines": 0, "test_files": 0})["test_files"] += 1
     return {k: v for k, v in sorted(inv.items()) if k not in (".", "")}
 

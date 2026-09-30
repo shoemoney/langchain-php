@@ -19,5 +19,12 @@
   "file": ".loop/advisory/gemini-3-8-flash.md",
   "chars": 7559,
   "cost": 0
+ },
+ "amazon/nova-pro-v1": {
+  "status": "ok",
+  "at": "2026-09-30T06:15:37.606870+00:00",
+  "file": ".loop/advisory/nova-pro-v1.md",
+  "chars": 5974,
+  "cost": 0.0149
  }
 }

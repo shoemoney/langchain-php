@@ -50,6 +50,13 @@ EVIDENCE RULES — this is where reviews most often go wrong:
   checked, and a reviewer will confirm the finding against it without noticing
   the quote was never in the source. One review did exactly this, claiming a
   duplicated docblock that does not exist in the file.
+* A CLASS docblock plus a METHOD docblock is normal PHP, not a defect. Three
+  separate reviewers reported `RunnableInterface::batch()` as having two
+  conflicting docblocks; it has exactly one, and the confusion is that the
+  class-level docblock mentions batch() while the method-level docblock
+  discusses upstream's batchOptions. Before reporting a "duplicate docblock",
+  count the `/**` markers in the CONTIGUOUS block immediately above the
+  signature — a docblock further up the file is the class's, not the method's.
 * The SAME applies to the documentation. PORT_STATUS.md and HANDOFF.md are the
   PROJECT'S OWN record of what was fixed and why. A row there is evidence that a
   bug was found and dealt with — not that it is still open. One review read three
