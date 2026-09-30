@@ -1382,5 +1382,18 @@
   "#WHAT FOLLOWS FOR THE 400s, and it is a small concrete change rather than a mechanism: the harness already retries 429 with backoff, and a model that fails intermittently will be caught by the same treatment applied to a second retryable status. The honest sequence is to observe one 400 from an otherwise-healthy model, confirm it is transient, and THEN extend the retry - not to add it on the strength of one observation, which is the mistake this loop made with the context budget in iterations 156-157.",
   "#THE PROBE CHANGE STANDS on its own merit even though it did not catch reka: reproducing all three components is closer to the real request than approximating two of them, and the same probe will classify a genuinely too-small model that the two-component version would have passed. It is a better question asked more faithfully, not a fix for this particular model.",
   "SCOPE SETTLED: 3-component probe still passes reka-edge -> failure is INTERMITTENT, unsamplable by a probe"
+ ],
+ "kimi-buff-162": [
+  "#ACCEPTED (ONE HALF) AND REJECTED (THE OTHER) - THE UPSTREAM READ SPLIT THE FINDING IN TWO, AND THAT SPLIT IS THE RESULT. kimi's evidence pointed at `getBufferString()`: the match covers human/ai/system/tool/chat with `default => throw`, and ROLE_FUNCTION hits the throw. Measured: human -> \"Human: hi\"; function -> InvalidArgumentException \"Got unsupported message type: function\"; chat -> InvalidArgumentException \"Got unsupported message type: user\".",
+  "#THE CHAT HALF IS A REAL DIVERGENCE AND IS FIXED. Upstream gives ChatMessage the type \"generic\" and reads the role off the INSTANCE (`role = (m as ChatMessage).role`, messages/utils.ts:390-391). This port sets `type` to the ROLE, so matching on `type` against ROLE_CHAT never fired and EVERY chat message threw - a role like \"user\" simply is not the constant \"chat\". The role arm is now reached by matching on the CLASS and using the role. After: user -> \"user: c\", assistant -> \"assistant: a\", matching upstream's `role = (m as ChatMessage).role`.",
+  "#THE FUNCTION HALF IS FAITHFUL AND WAS NOT CHANGED. Upstream has no \"function\" arm at all and throws for one, so a FunctionMessage throwing here is the port behaving correctly. The finding bundled a real defect with a correct behaviour, and \"fix the bundle\" would have introduced a divergence in the name of honouring it.",
+  "#MUTATION-VERIFIED: restoring the type-keyed match makes the regression ERROR (RED) and the fix returns OK (GREEN). The regression asserts BOTH halves - a chat message renders by role, and a function message still throws - so it cannot be satisfied by making every type render, which is the over-correction this shape invites.",
+  "#THE ROOT CAUSE IS A MODELLING MISMATCH THAT MAKES A SIMILAR BUG INEVITABLE, and it is worth naming beyond this method. Upstream's ChatMessage has type \"generic\" and carries the role in a separate field; this port OVERWRITES `type` with the role, so every `match` keyed on `type` silently loses the chat arm. This is the same class as the value/identity conflation in the `data`/`type` fix from an earlier release: two fields collapsed into one, correct in isolation, wrong wherever both are read. The general repair - giving ChatMessage a distinct type constant and keeping the role separate - is larger than this fix and is recorded rather than attempted."
+ ],
+ "perplexity/sonar-162": [
+  "review ok, 5 findings, untriaged"
+ ],
+ "kimi-k3-162": [
+  "getBufferString: ChatMessage half FIXED+mutation-verified; FunctionMessage half REJECTED (upstream throws too)"
  ]
 }

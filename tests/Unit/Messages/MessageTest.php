@@ -455,4 +455,30 @@ final class MessageTest extends TestCase
         $this->assertSame('result', $msg->text());
         $this->assertSame('c1', $msg->toolCallId);
     }
+
+    /**
+     * `getBufferString()` must render a ChatMessage by its ROLE, not throw.
+     *
+     * Upstream gives ChatMessage the type "generic" and reads the role off the
+     * instance (`role = (m as ChatMessage).role`, messages/utils.ts:390-391). This
+     * port sets `type` to the ROLE, so matching on `type` against ROLE_CHAT never
+     * fired and every chat message threw "Got unsupported message type: user".
+     *
+     * A FunctionMessage still throws, and that is FAITHFUL — upstream has no
+     * "function" arm either — so the second case pins that we did NOT over-correct
+     * by making every type render.
+     */
+    public function testBufferStringRendersChatMessagesByRoleAndStillRefusesFunction(): void
+    {
+        $chat = new \LangChain\Messages\ChatMessage(['role' => 'user', 'content' => 'c']);
+        self::assertSame('user: c', \LangChain\Messages\MessageUtils::getBufferString([$chat]));
+
+        $assistant = new \LangChain\Messages\ChatMessage(['role' => 'assistant', 'content' => 'a']);
+        self::assertSame('assistant: a', \LangChain\Messages\MessageUtils::getBufferString([$assistant]));
+
+        $this->expectException(\InvalidArgumentException::class);
+        \LangChain\Messages\MessageUtils::getBufferString([
+            new \LangChain\Messages\FunctionMessage('fn', 'r'),
+        ]);
+    }
 }

@@ -1205,6 +1205,41 @@
    "chars": 2503,
    "findings": 5,
    "severity_hits": 5
+  },
+  "perplexity/sonar": {
+   "model": "perplexity/sonar",
+   "at": "2026-09-30T16:02:21",
+   "actual_model": "perplexity/sonar",
+   "usage": {
+    "prompt_tokens": 45669,
+    "completion_tokens": 604,
+    "total_tokens": 46273,
+    "cost": 0.05127,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.05127,
+     "upstream_inference_prompt_cost": 0.045669,
+     "upstream_inference_completions_cost": 0.005601
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/38-perplexity__sonar.md",
+   "chars": 2809,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1244,7 +1279,8 @@
   "mistralai/mistral-medium-3-5",
   "openai/gpt-chat-latest",
   "fireworks/ember-1",
-  "z-ai/glm-4.6v"
+  "z-ai/glm-4.6v",
+  "perplexity/sonar"
  ],
  "next_index": 0
 }

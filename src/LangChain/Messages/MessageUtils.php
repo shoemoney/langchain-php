@@ -157,14 +157,25 @@ final class MessageUtils
     {
         $lines = [];
         foreach ($messages as $m) {
-            $role = match ($m->type) {
-                BaseMessage::ROLE_HUMAN => $humanPrefix,
-                BaseMessage::ROLE_AI => $aiPrefix,
-                BaseMessage::ROLE_SYSTEM => 'System',
-                BaseMessage::ROLE_TOOL => 'Tool',
-                BaseMessage::ROLE_CHAT => $m->name ?? 'Chat',
-                default => throw new \InvalidArgumentException("Got unsupported message type: {$m->type}"),
-            };
+            // A ChatMessage is matched BY CLASS, not by its `type`. Upstream gives
+            // ChatMessage the type "generic" and reads the role off the instance
+            // (`role = (m as ChatMessage).role`, utils.ts:390-391); this port sets
+            // `type` to the ROLE instead, so matching on `type` against ROLE_CHAT
+            // never fired and every chat message threw "Got unsupported message
+            // type: user" — measured, and the role arm is now reached through the
+            // class instead.
+            //
+            // A FunctionMessage still throws, and that is FAITHFUL: upstream has no
+            // "function" arm either and throws for one.
+            $role = $m instanceof ChatMessage
+                ? $m->name ?? $m->type
+                : match ($m->type) {
+                    BaseMessage::ROLE_HUMAN => $humanPrefix,
+                    BaseMessage::ROLE_AI => $aiPrefix,
+                    BaseMessage::ROLE_SYSTEM => 'System',
+                    BaseMessage::ROLE_TOOL => 'Tool',
+                    default => throw new \InvalidArgumentException("Got unsupported message type: {$m->type}"),
+                };
 
             $nameStr = ($m->name ?? '') !== '' ? "{$m->name}, " : '';
 
