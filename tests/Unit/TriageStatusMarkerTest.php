@@ -29,7 +29,18 @@ use PHPUnit\Framework\TestCase;
  */
 final class TriageStatusMarkerTest extends TestCase
 {
-    private const MARKERS = ['#RESOLVED', '#OPEN', '#CLOSED'];
+    /**
+     * `#RETRACTED` was added in iteration 118 after the guard fired on a TRUE
+     * marker: an entry whose finding was itself disproved had been labelled
+     * `#RETRACTED`, which is an accurate status and was not in the vocabulary.
+     *
+     * The alternative was to relabel a retracted finding as `#CLOSED`, which is
+     * the same vocabulary error in the other direction — a marker chosen to
+     * satisfy a check rather than to describe the work. A guard that forces
+     * accurate words out of its own vocabulary will be met, eventually, by
+     * choosing a word the guard prefers over the word that is true.
+     */
+    private const MARKERS = ['#RESOLVED', '#OPEN', '#CLOSED', '#RETRACTED'];
 
     public function testEveryAuditEntryDeclaresItsStatusFirst(): void
     {
