@@ -104,12 +104,48 @@
    "chars": 2585,
    "findings": 5,
    "severity_hits": 5
+  },
+  "stepfun/step-3.7-flash": {
+   "model": "stepfun/step-3.7-flash",
+   "at": "2026-09-30T07:48:07",
+   "actual_model": "stepfun/step-3.7-flash",
+   "usage": {
+    "prompt_tokens": 39016,
+    "completion_tokens": 24000,
+    "total_tokens": 63016,
+    "cost": 0.02832256,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.02832256,
+     "upstream_inference_prompt_cost": 0.00624256,
+     "upstream_inference_completions_cost": 0.02208
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 23977,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "length",
+   "reasoning_tokens": 23977,
+   "status": "ok",
+   "file": ".loop/reviews/04-stepfun__step-3.7-flash.md",
+   "chars": 27588,
+   "findings": 6,
+   "compressed": true
   }
  },
  "order": [
   "~z-ai/glm-flash-latest",
   "google/gemini-3.8-flash",
-  "google/gemma-4-31b-it"
+  "google/gemma-4-31b-it",
+  "stepfun/step-3.7-flash"
  ],
  "next_index": 0
 }
