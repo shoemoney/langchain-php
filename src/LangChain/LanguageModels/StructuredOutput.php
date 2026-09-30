@@ -94,7 +94,33 @@ final class StructuredOutput
             // the tracer never sees the pipeline name and the run shows up
             // unnamed. A snake_case key that is quietly accepted and quietly
             // ignored is worse than one that is rejected.
-            $result = $result->bind([], ['runName' => $runName]);
+            // Upstream is `runName ? result.withConfig({ runName }) : result`
+            // (chat_models/structured_output.ts:114) — so the CONFIG slot, not
+            // the kwargs slot.
+            //
+            // `RunnableBinding::mergeConfig()` ends with
+            //   $merged->options = $this->kwargs + (...);
+            // so anything in the kwargs slot becomes an OPTION and `runName` is
+            // read from `$this->config`. Measured through mergeConfig:
+            //
+            //   bind([], ['runName' => 'x'])  -> runName=NULL, options={"runName":"x"}
+            //   bind(['runName' => 'x'], [])  -> runName='x',   options=[]
+            //
+            // This call previously used `run_name` in the kwargs slot, which was
+            // wrong twice: the key was snake_case, and the slot was the kwargs
+            // one. Correcting only the key changed nothing observable, because a
+            // correctly-spelled key in the kwargs slot is still just an option.
+            //
+            // KNOWN RESIDUAL GAP, and it is NOT here: even bound this way the
+            // name does not reach `Run::name()`, which reads `$extra['__name']`
+            // written only by `BaseTracer.php:282` from the `$runName` argument
+            // of `handleChatModelStart`. Bound directly on the model with no pipe
+            // in the way, `Run::name()` still falls back to the component id. So
+            // the propagation from a bound config into the traced run is broken
+            // somewhere in `RunnableBinding`/`BaseChatModel`, and the loss is
+            // silent because `name()` falls back to the serialized id rather
+            // than reporting nothing. Tracked, not fixed here.
+            $result = $result->bind(['runName' => $runName], []);
         }
 
         return $result;
