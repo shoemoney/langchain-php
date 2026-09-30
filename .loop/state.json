@@ -1963,6 +1963,41 @@
    "chars": 4248,
    "findings": 0,
    "severity_hits": 0
+  },
+  "prism-ml/ternary-bonsai-2-27b": {
+   "model": "prism-ml/ternary-bonsai-2-27b",
+   "at": "2026-09-29T22:48:09",
+   "actual_model": "prism-ml/ternary-bonsai-2-27b",
+   "usage": {
+    "prompt_tokens": 36762,
+    "completion_tokens": 14215,
+    "total_tokens": 50977,
+    "cost": 0.00986465,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.00986465,
+     "upstream_inference_prompt_cost": 0.00275715,
+     "upstream_inference_completions_cost": 0.0071075
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 14205,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 14205,
+   "status": "incomplete",
+   "file": ".loop/reviews/63-prism-ml__ternary-bonsai-2-27b.md",
+   "chars": 48036,
+   "findings": 0,
+   "severity_hits": 0
   }
  },
  "order": [
@@ -2084,7 +2119,8 @@
   "google/gemini-3.5-flash",
   "google/gemma-4-26b-a4b-it:free",
   "qwen/qwen3.7-flash",
-  "bytedance-seed/seed-1.6-flash"
+  "bytedance-seed/seed-1.6-flash",
+  "prism-ml/ternary-bonsai-2-27b"
  ],
  "next_index": 0
 }
