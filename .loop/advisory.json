@@ -26,5 +26,12 @@
   "file": ".loop/advisory/nova-pro-v1.md",
   "chars": 5974,
   "cost": 0.0149
+ },
+ "openai/o4-mini": {
+  "status": "ok",
+  "at": "2026-09-30T08:06:20.678072+00:00",
+  "file": ".loop/advisory/o4-mini.md",
+  "chars": 5828,
+  "cost": 0.0352
  }
 }

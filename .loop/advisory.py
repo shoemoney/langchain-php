@@ -186,7 +186,26 @@ A faithful PHP port of LangChain JS / LangGraph JS. Composer PSR-4, PHP >= 8.2 f
 ## 1. Suite
 {test_digest()}
 
-## 2. Namespace inventory (src files / lines / test files)
+## 2. Namespace inventory
+
+**How to read the third column.** It counts test files whose path sits in
+that namespace — it does NOT count how much the namespace is *used*.
+Those are very different numbers and conflating them produces a confident
+wrong answer:
+
+* `LangChain\\Utils\\Testing` shows 0 test files because it is
+  test-support code that the tests USE. Measured: `RunCollectorCallbackHandler`
+  is referenced by 10 files, `FakeHttpClient` by 9, `StructuredToolSpec` by 3.
+  A 0 here is expected and means nothing.
+* A value namespace showing 0 test files IS a real signal. Measured:
+  `LLMResult` is referenced by 11 files, `ChatGeneration` by 10,
+  `ChatGenerationChunk` by 8.
+
+Judge coverage by whether a namespace's classes are referenced and its
+branches exercised — not by this column. An advisory has already reported a
+heavily referenced namespace as unreferenced on this number alone.
+
+(src files / lines / test files)
 """ + "\n".join(
         f"  {ns:<44} {v['src']:>3} src {v['lines']:>6} lines {v['test_files']:>2} test files"
         for ns, v in top
