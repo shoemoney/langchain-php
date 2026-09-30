@@ -2,7 +2,8 @@
 """
 Append a triage note SAFELY. The one sanctioned way to write triage.json.
 
-    python3 .loop/triage_add.py "audit/some-key" "#OPEN - what is true" "more detail..." 
+    python3 .loop/triage_add.py "audit/some-key" "#OPEN - what is true" "more detail..."
+    printf '%s\n' "#OPEN - note text" "second note" | python3 .loop/triage_add.py --stdin audit/some-key
 
 Why this exists, in a number rather than a resolution: hand-written triage writes in
 this loop produced a status-marker failure EIGHT times — `.append(a, b)` instead of
@@ -34,11 +35,21 @@ def _has_marker(note: str) -> bool:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 3:
-        print(__doc__)
-        return 2
-    key = argv[1]
-    notes = [a for a in argv[2:]]
+    if len(argv) >= 2 and argv[1] == "--stdin":
+        # Read the notes from STDIN, one per line. Passing text as shell ARGV is
+        # not safe: backticks inside a double-quoted shell string are executed as
+        # command substitution, which destroyed the content THREE times in two
+        # iterations even with the marker mechanism in place. The mechanism
+        # protected the JSON but the SHELL had already mangled the text before
+        # the script saw it, so the guarantee has to cover the whole path.
+        key = argv[2]
+        notes = [ln.rstrip("\n") for ln in sys.stdin.read().split("\n") if ln.strip()]
+    else:
+        if len(argv) < 3:
+            print(__doc__)
+            return 2
+        key = argv[1]
+        notes = list(argv[2:])
 
     with open(TRIAGE, encoding="utf-8") as fh:
         triage = json.load(fh)
