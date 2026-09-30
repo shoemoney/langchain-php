@@ -103,11 +103,8 @@ final class StructuredOutput
             // so anything in the kwargs slot becomes an OPTION and `runName` is
             // read from `$this->config`. Measured through mergeConfig:
             //
-            //   bind([], ['runName' => 'x'])  -> runName=NULL, options={"runName":"x"}
-            //   bind(['runName' => 'x'], [])  -> runName='x',   options=[]
-            // (Measured through bind() itself; see the note at the call site
-            //  below, which had this pair the other way round for several
-            //  iterations while the shipped call used the wrong slot.)
+            //   bind(['runName' => 'x'], [])  -> runName=NULL, options={"runName":"x"}
+            //   bind([], ['runName' => 'x'])  -> runName='x',   options=[]
             //
             // This call previously used `run_name` in the kwargs slot, which was
             // wrong twice: the key was snake_case, and the slot was the kwargs

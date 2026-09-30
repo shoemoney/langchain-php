@@ -849,6 +849,41 @@
    "status": "truncated",
    "chars": 94840,
    "file": ".loop/reviews/26-minimax__minimax-m3.md"
+  },
+  "~openai/gpt-sol-latest": {
+   "model": "~openai/gpt-sol-latest",
+   "at": "2026-09-30T12:45:51",
+   "actual_model": "openai/gpt-6.1-sol",
+   "usage": {
+    "prompt_tokens": 45299,
+    "completion_tokens": 821,
+    "total_tokens": 46120,
+    "cost": 0.121456,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 45296,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.121456,
+     "upstream_inference_prompt_cost": 0.113246,
+     "upstream_inference_completions_cost": 0.00821
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 175,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 175,
+   "status": "ok",
+   "file": ".loop/reviews/27-~openai__gpt-sol-latest.md",
+   "chars": 2902,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -877,7 +912,8 @@
   "~openai/gpt-terra-latest",
   "dots-studio/dots-3-note-preview:free",
   "~anthropic/claude-fable-latest",
-  "minimax/minimax-m3"
+  "minimax/minimax-m3",
+  "~openai/gpt-sol-latest"
  ],
  "next_index": 0
 }
