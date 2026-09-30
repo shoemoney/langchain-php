@@ -575,6 +575,41 @@
    "chars": 3789,
    "findings": 4,
    "severity_hits": 4
+  },
+  "anthropic/claude-fable-5.1": {
+   "model": "anthropic/claude-fable-5.1",
+   "at": "2026-09-30T11:03:30",
+   "actual_model": "anthropic/claude-fable-5.1",
+   "usage": {
+    "prompt_tokens": 61781,
+    "completion_tokens": 6995,
+    "total_tokens": 68776,
+    "cost": 0.96756,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.96756,
+     "upstream_inference_prompt_cost": 0.61781,
+     "upstream_inference_completions_cost": 0.34975
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 5188,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 5188,
+   "status": "ok",
+   "file": ".loop/reviews/19-anthropic__claude-fable-5.1.md",
+   "chars": 4457,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -595,7 +630,8 @@
   "anthropic/claude-opus-5.5",
   "~anthropic/claude-sonnet-latest",
   "openai/gpt-4o-2024-11-20",
-  "z-ai/glm-4.5v"
+  "z-ai/glm-4.5v",
+  "anthropic/claude-fable-5.1"
  ],
  "next_index": 0
 }
