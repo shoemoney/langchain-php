@@ -273,13 +273,17 @@
   "The one concrete behavioural claim inside it (a conditional edge returning null, or naming a target that does not exist) was probed rather than dismissed: a null path terminates the branch cleanly with the accumulated state, and an unknown TARGET is accepted (the branch simply takes no route). Neither crashes. An unknown edge SOURCE is rejected \u2014 and earlier than upstream, at edge-registration (StateGraph.php:184/218) rather than at compile() (graph.ts:609), so the same guarantee is enforced more eagerly."
  ],
  "moonshotai/kimi-k3": [
-  "First review of the LANGGRAPH ENGINE. One accepted, four rejected \u2014 and the accepted one was a docblock, not the code a reviewer believed was broken.",
-  "#1 mapCommand drops all but the first prior resume \u2014 REJECTED on fidelity, after reading the IMPLEMENTATION (not the test, which has no prior writes and cannot distinguish). io.ts:104-110 maps the pending RESUME writes and applies .slice(0, 1), keeping index 0; the port's array_slice($existing, 0, 1) is that line. ACCEPTED IN PART: the method's docblock claimed resume values ACCUMULATE, which is what made the faithful code read as silent data loss. Corrected.",
-  "#2 tautological array_keys($resume) === array_keys($resume) \u2014 ACCEPTED. True for every input, guarding nothing, and sitting beside the hash check it appeared to protect. Removed; the two remaining conditions are exactly upstream's Object.keys(resume).length && .every(isXXH3). The hash check is now pinned by a test that fails when it is removed.",
-  "#3 transform() docblock describes the wrong upstream method / #4 duplicated @param on batch() / #5 comparePathSegments diverges from JS mixed comparison (reviewer marked it an inference) \u2014 REJECTED: prose nits with no reachable behaviour, and an inference the reviewer itself declined to stand behind.",
-  "Note: my first two test runs of #2 failed on my own mistakes (wrong namespace, then wrapping named args in an array for a positional constructor), and a third failed because I asserted the resume was truncated to the MOST RECENT rather than the FIRST. The port was right each time.",
-  "ok, 5 findings, untriaged - budget went to fable #2",
-  "ok, 5 findings, still untriaged"
+  "#1 'convertToChunk() turns Function and Chat messages into AIMessageChunk' \u2014 ACCEPTED, and the scope is LARGER than the finding states. Measured: FunctionMessage -> AIMessageChunk, ChatMessage -> AIMessageChunk, HumanMessage -> HumanMessageChunk (correct).",
+  "#Upstream is explicit (langchain-core/src/messages/utils.ts:545-551):",
+  "#     } else if (type === \"function\")            { return new FunctionMessageChunk({...message}); }",
+  "#     } else if (ChatMessage.isInstance(message))  { return new ChatMessageChunk({...message}); }",
+  "#     } else { throw new Error(\"Unknown message type.\"); }",
+  "#The port's `match` maps ROLE_HUMAN and ROLE_SYSTEM correctly and sends EVERYTHING ELSE to `default => new AIMessageChunk($base)`. So it is wrong twice: FunctionMessage and ChatMessage are mis-mapped, and the `throw new Error(\"Unknown message type.\")` fallback is absent entirely \u2014 an unknown type is silently relabelled as an assistant turn rather than refused.",
+  "#THE REAL GAP IS MISSING CLASSES, NOT A MISSING MATCH ARM. `src/LangChain/Messages/` contains SystemMessageChunk, HumanMessageChunk, AIMessageChunk and ToolMessageChunk \u2014 there is NO FunctionMessageChunk.php and NO ChatMessageChunk.php. Upstream ships both. So this is not a one-line fix: it needs two new classes modelled on the existing chunk classes, plus the throw, and every one of those is a new file that must land in the PSR-4 tree.",
+  "#NOT FIXED, and the reason is scope rather than diagnosis: two new message classes plus a fallback contract is a real change, and this iteration has no budget to add files, register them, guard them and mutation-verify all four steps. Recorded with the exact scope so the next iteration inherits a diagnosis and a file list rather than a question.",
+  "#2 'convertToChunk() encodes empty tool-call args as \"[]\", not \"{}\"' \u2014 NOT YET VERIFIED and I am recording that honestly rather than borrowing #1's confirmation. My probe built the AIMessage with an args shape the port did not read, so `args` came back null and the question was not reached. This is the empty-object-encoding family the project treats as a named hard rule, so it deserves a real probe, not a first attempt.",
+  "#3 getBufferString() fatals on a FunctionMessage, #4 BaseMessage constructor mangles non-list content, #5 updateId(null) changes the serialized shape \u2014 DEFERRED unverified.",
+  "#1 ACCEPTED: convertToChunk mis-maps Function/Chat AND the throw is absent; two chunk classes missing"
  ],
  "mistralai/mistral-small-2603": [
   "The last review of the 53-model roster. One accepted, four rejected.",
@@ -712,7 +716,8 @@
   "#4 Constructor PHPDoc advertises the wrong templateFormat type \u2014 accepted as a real docs defect only in principle; it is a PHPDoc type error, cheap and low-risk, but I did not read the annotation against the property this iteration so it is not confirmed and NOT landed.",
   "#5 RunnableInterface::batch() has two adjacent method docblocks \u2014 REJECTED, and this is now the TENTH independent sighting of the same phantom. Contiguous re-inspection has repeatedly shown exactly ONE batch docblock. Nine prior reviewers reported it; a tenth does not make it true, it makes it a known hallucination attractor. Logging it as an attractor rather than re-deriving it a tenth time.",
   "#NET for the iteration: five findings, none accepted, and that is the correct outcome rather than a disappointing one. The value was elsewhere \u2014 resolving the advisory-prompt question from iteration 48 by verifying against brief(), the object the caller actually sends, and correcting two commits that had asserted verifications I watched fail.",
-  "0/5 accepted: 1 deferred unverified, 3 unverified, 1 phantom (10th sighting)"
+  "0/5 accepted: 1 deferred unverified, 3 unverified, 1 phantom (10th sighting)",
+  "ok, 5 findings, untriaged - budget went to kimi #1"
  ],
  "audit/image-prompt-mutation": [
   "#RESOLVED \u2014 SETTLED \u2014 fidelity divergence confirmed, DEFECT refuted by probe (3 calls, plus the retained-instance case).",

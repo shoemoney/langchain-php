@@ -713,6 +713,41 @@
    "chars": 3851,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~openai/gpt-terra-latest": {
+   "model": "~openai/gpt-terra-latest",
+   "at": "2026-09-30T11:48:51",
+   "actual_model": "openai/gpt-5.6-terra",
+   "usage": {
+    "prompt_tokens": 40465,
+    "completion_tokens": 2175,
+    "total_tokens": 42640,
+    "cost": 0.127261,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 40462,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.127261,
+     "upstream_inference_prompt_cost": 0.101161,
+     "upstream_inference_completions_cost": 0.0261
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1552,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1552,
+   "status": "ok",
+   "file": ".loop/reviews/23-~openai__gpt-terra-latest.md",
+   "chars": 2929,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -737,7 +772,8 @@
   "anthropic/claude-fable-5.1",
   "nex-agi/nex-n2.5-mini",
   "sakana/fugu-max",
-  "moonshotai/kimi-k3"
+  "moonshotai/kimi-k3",
+  "~openai/gpt-terra-latest"
  ],
  "next_index": 0
 }
