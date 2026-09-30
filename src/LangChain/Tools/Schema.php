@@ -506,7 +506,21 @@ final class Schema
                 || (is_float($value) && is_finite($value) && $value === floor($value)),
             'boolean' => is_bool($value),
             'null' => $value === null,
-            default => true,
+            // Every JSON Schema type is handled above, so this arm is reached
+            // ONLY by a type this validator does not know — a typo (`strng`,
+            // `objct`), or a vendor extension this port does not implement.
+            //
+            // It used to return true, which meant an unrecognised type accepted
+            // EVERY input. Measured: a schema of `{"type":"strng"}` validated
+            // `"a" => 42`, `[]`, and `null` without a murmur. That is the
+            // fail-open direction: the schema LOOKS declared, the caller
+            // believes a constraint applies, and nothing enforces it.
+            //
+            // Upstream parses with zod, where an unknown type is a parse error
+            // rather than a silent pass, so rejecting is also the faithful
+            // translation. A value the validator cannot check is not a value it
+            // can call valid.
+            default => false,
         };
     }
 

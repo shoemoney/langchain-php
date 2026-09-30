@@ -2550,6 +2550,80 @@
    "chars": 5949,
    "findings": 5,
    "severity_hits": 5
+  },
+  "google/gemma-4-31b-it:free": {
+   "model": "google/gemma-4-31b-it:free",
+   "at": "2026-09-30T02:41:20",
+   "status": "http_429",
+   "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-31b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Google AI Studio\",\"is_byok\":false,\"provider_error_code\":\"429\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":"
+  },
+  "openai/gpt-5.1-codex-mini": {
+   "model": "openai/gpt-5.1-codex-mini",
+   "at": "2026-09-30T02:41:26",
+   "actual_model": "openai/gpt-5.1-codex-mini",
+   "usage": {
+    "prompt_tokens": 33653,
+    "completion_tokens": 24000,
+    "total_tokens": 57653,
+    "cost": 0.05641325,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.05641325,
+     "upstream_inference_prompt_cost": 0.00841325,
+     "upstream_inference_completions_cost": 0.048
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 24000,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "length",
+   "reasoning_tokens": 24000,
+   "status": "truncated",
+   "chars": 64343,
+   "file": ".loop/reviews/84-openai__gpt-5.1-codex-mini.md"
+  },
+  "google/gemini-3.7-flash": {
+   "model": "google/gemini-3.7-flash",
+   "at": "2026-09-30T02:54:23",
+   "actual_model": "google/gemini-3.7-flash",
+   "usage": {
+    "prompt_tokens": 35473,
+    "completion_tokens": 693,
+    "total_tokens": 36166,
+    "cost": 0.0292035,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0292035,
+     "upstream_inference_prompt_cost": 0.02660475,
+     "upstream_inference_completions_cost": 0.00259875
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/85-google__gemini-3.7-flash.md",
+   "chars": 2869,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2694,7 +2768,10 @@
   "qwen/qwen3.8-27b:free",
   "google/gemini-3.5-flash-lite",
   "google/gemini-3.1-flash-lite",
-  "qwen/qwen3.8-omni-flash"
+  "qwen/qwen3.8-omni-flash",
+  "google/gemma-4-31b-it:free",
+  "openai/gpt-5.1-codex-mini",
+  "google/gemini-3.7-flash"
  ],
  "next_index": 0
 }
