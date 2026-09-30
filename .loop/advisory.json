@@ -239,5 +239,12 @@
  "nex-agi/nex-n2.5-mini": {
   "status": "empty",
   "at": "2026-09-30T20:55:28.444938+00:00"
+ },
+ "bytedance/ui-tars-1.5-7b": {
+  "status": "ok",
+  "at": "2026-09-30T20:58:48.656981+00:00",
+  "file": ".loop/advisory/ui-tars-1-5-7b.md",
+  "chars": 6864,
+  "cost": 0.0014
  }
 }

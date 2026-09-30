@@ -468,6 +468,10 @@ def healthy(model: str) -> bool:
     # then returned http_400 on a real brief inside its own 16,384-token window, so
     # "can it generate" is not the question selection actually needs to ask.
     ok = True
+    png_probe = None
+    arch = LOOP / "arch.png"
+    if arch.exists():
+        png_probe = base64.b64encode(arch.read_bytes()).decode()
     try:
         r = call(model, "You answer with one word.", "Reply with exactly: OK", None, max_tokens=16)
         text = (r.get("choices") or [{}])[0].get("message", {}).get("content") or ""
@@ -481,11 +485,17 @@ def healthy(model: str) -> bool:
         # tokens only - which is the axis that fails.
         filler = ("The quick brown fox jumps over the lazy dog. " * 260)[:12000]
         try:
+            # All THREE components of a real advisory, not two: the brief-sized
+            # text, the arch PNG, and a system prompt of the real SYSTEM's size.
+            # reka-edge passed the previous two-component probe and still returned
+            # http_400 on a real call, so the missing piece had to be either the
+            # image or the system prompt, and there is no way to know which
+            # without sending both.
             r = call(
                 model,
-                "You answer with one word.",
+                SYSTEM[:PROMPT_TOKENS * 4],
                 filler + "\n\nReply with exactly: OK",
-                None,
+                png_probe,
                 max_tokens=16,
             )
             text = (r.get("choices") or [{}])[0].get("message", {}).get("content") or ""
