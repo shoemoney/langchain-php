@@ -96,17 +96,6 @@
   "price": "0.00000042"
  },
  {
-  "id": "bytedance-seed/seed-1.6-flash",
-  "name": "ByteDance Seed: Seed 1.6 Flash",
-  "in": [
-   "image",
-   "text",
-   "video"
-  ],
-  "ctx": 262144,
-  "price": "0.000000075"
- },
- {
   "id": "bytedance-seed/seed-2-1-turbo",
   "name": "ByteDance Seed: Seed 2.1 Turbo",
   "in": [
@@ -116,28 +105,6 @@
   ],
   "ctx": 262144,
   "price": "0.0000005"
- },
- {
-  "id": "bytedance-seed/seed-2.0-lite",
-  "name": "ByteDance Seed: Seed-2.0-Lite",
-  "in": [
-   "text",
-   "image",
-   "video"
-  ],
-  "ctx": 262144,
-  "price": "0.00000025"
- },
- {
-  "id": "bytedance-seed/seed-2.0-mini",
-  "name": "ByteDance Seed: Seed-2.0-Mini",
-  "in": [
-   "text",
-   "image",
-   "video"
-  ],
-  "ctx": 262144,
-  "price": "0.0000001"
  },
  {
   "id": "bytedance/ui-tars-1.5-7b",
@@ -158,16 +125,6 @@
   ],
   "ctx": 192000,
   "price": "0.0000003"
- },
- {
-  "id": "deepseek/deepseek-v4-flash-vision-exp",
-  "name": "DeepSeek: DeepSeek V4 Flash Vision Exp",
-  "in": [
-   "text",
-   "image"
-  ],
-  "ctx": 1048576,
-  "price": "0.0000002156"
  },
  {
   "id": "deepseek/deepseek-v4.1-flash",
@@ -198,123 +155,6 @@
   ],
   "ctx": 1048576,
   "price": "0.000003"
- },
- {
-  "id": "google/gemini-3-flash-preview",
-  "name": "Google: Gemini 3 Flash Preview",
-  "in": [
-   "text",
-   "image",
-   "file",
-   "audio",
-   "video"
-  ],
-  "ctx": 1048576,
-  "price": "0.0000005"
- },
- {
-  "id": "google/gemini-3.1-flash-lite",
-  "name": "Google: Gemini 3.1 Flash Lite",
-  "in": [
-   "text",
-   "image",
-   "video",
-   "file",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0.00000025"
- },
- {
-  "id": "google/gemini-3.1-flash-lite-preview",
-  "name": "Google: Gemini 3.1 Flash Lite Preview",
-  "in": [
-   "text",
-   "image",
-   "video",
-   "file",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0.00000025"
- },
- {
-  "id": "google/gemini-3.1-pro-preview",
-  "name": "Google: Gemini 3.1 Pro Preview",
-  "in": [
-   "audio",
-   "file",
-   "image",
-   "text",
-   "video"
-  ],
-  "ctx": 1048576,
-  "price": "0.000002"
- },
- {
-  "id": "google/gemini-3.1-pro-preview-customtools",
-  "name": "Google: Gemini 3.1 Pro Preview Custom Tools",
-  "in": [
-   "text",
-   "audio",
-   "image",
-   "video",
-   "file"
-  ],
-  "ctx": 1048576,
-  "price": "0.000002"
- },
- {
-  "id": "google/gemini-3.5-flash",
-  "name": "Google: Gemini 3.5 Flash",
-  "in": [
-   "text",
-   "image",
-   "video",
-   "file",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0.0000015"
- },
- {
-  "id": "google/gemini-3.5-flash-lite",
-  "name": "Google: Gemini 3.5 Flash Lite",
-  "in": [
-   "text",
-   "image",
-   "video",
-   "file",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0.0000003"
- },
- {
-  "id": "google/gemini-3.6-flash",
-  "name": "Google: Gemini 3.6 Flash",
-  "in": [
-   "text",
-   "image",
-   "video",
-   "file",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0.00000075"
- },
- {
-  "id": "google/gemini-3.7-flash",
-  "name": "Google: Gemini 3.7 Flash",
-  "in": [
-   "text",
-   "image",
-   "video",
-   "file",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0.00000075"
  },
  {
   "id": "google/gemini-3.8-flash",
@@ -372,6 +212,16 @@
   ],
   "ctx": 262144,
   "price": "0.000000021"
+ },
+ {
+  "id": "meta-llama/llama-4-maverick",
+  "name": "Meta: Llama 4 Maverick",
+  "in": [
+   "text",
+   "image"
+  ],
+  "ctx": 1048576,
+  "price": "0.0000001875"
  },
  {
   "id": "meta/muse-glimmer-30b",
@@ -512,14 +362,26 @@
   "price": "0"
  },
  {
-  "id": "openai/gpt-5.1-codex-mini",
-  "name": "OpenAI: GPT-5.1-Codex-Mini",
+  "id": "openai/gpt-4o-2024-11-20",
+  "name": "OpenAI: GPT-4o (2024-11-20)",
   "in": [
+   "text",
    "image",
-   "text"
+   "file"
   ],
-  "ctx": 400000,
-  "price": "0.00000025"
+  "ctx": 128000,
+  "price": "0.0000025"
+ },
+ {
+  "id": "openai/gpt-4o-mini-2024-07-18",
+  "name": "OpenAI: GPT-4o-mini (2024-07-18)",
+  "in": [
+   "text",
+   "image",
+   "file"
+  ],
+  "ctx": 128000,
+  "price": "0.00000015"
  },
  {
   "id": "openai/gpt-6.1-sol-pro",
@@ -542,17 +404,6 @@
   ],
   "ctx": 400000,
   "price": "0.000005"
- },
- {
-  "id": "openai/o4-mini",
-  "name": "OpenAI: o4 Mini",
-  "in": [
-   "image",
-   "text",
-   "file"
-  ],
-  "ctx": 200000,
-  "price": "0.0000011"
  },
  {
   "id": "openai/o4-mini-high",
@@ -578,6 +429,46 @@
   "price": "0.00000015"
  },
  {
+  "id": "perplexity/sonar",
+  "name": "Perplexity: Sonar",
+  "in": [
+   "text",
+   "image"
+  ],
+  "ctx": 127072,
+  "price": "0.000001"
+ },
+ {
+  "id": "perplexity/sonar-pro",
+  "name": "Perplexity: Sonar Pro",
+  "in": [
+   "text",
+   "image"
+  ],
+  "ctx": 200000,
+  "price": "0.000003"
+ },
+ {
+  "id": "perplexity/sonar-pro-search",
+  "name": "Perplexity: Sonar Pro Search",
+  "in": [
+   "text",
+   "image"
+  ],
+  "ctx": 200000,
+  "price": "0.000003"
+ },
+ {
+  "id": "perplexity/sonar-reasoning-pro",
+  "name": "Perplexity: Sonar Reasoning Pro",
+  "in": [
+   "text",
+   "image"
+  ],
+  "ctx": 128000,
+  "price": "0.000002"
+ },
+ {
   "id": "prism-ml/ternary-bonsai-2-27b",
   "name": "PrismML: Ternary Bonsai 2 27B",
   "in": [
@@ -598,39 +489,6 @@
   "price": "0.0000004"
  },
  {
-  "id": "qwen/qwen3.5-flash-02-23",
-  "name": "Qwen: Qwen3.5-Flash",
-  "in": [
-   "text",
-   "image",
-   "video"
-  ],
-  "ctx": 1000000,
-  "price": "0.000000065"
- },
- {
-  "id": "qwen/qwen3.6-flash",
-  "name": "Qwen: Qwen3.6 Flash",
-  "in": [
-   "text",
-   "image",
-   "video"
-  ],
-  "ctx": 1000000,
-  "price": "0.0000001875"
- },
- {
-  "id": "qwen/qwen3.7-flash",
-  "name": "Qwen: Qwen3.7 Flash",
-  "in": [
-   "text",
-   "image",
-   "video"
-  ],
-  "ctx": 1000000,
-  "price": "0.00000003"
- },
- {
   "id": "qwen/qwen3.8-27b:free",
   "name": "Qwen: Qwen3.8 27B (free)",
   "in": [
@@ -640,29 +498,6 @@
   ],
   "ctx": 262144,
   "price": "0"
- },
- {
-  "id": "qwen/qwen3.8-flash",
-  "name": "Qwen: Qwen3.8 Flash",
-  "in": [
-   "text",
-   "image",
-   "video"
-  ],
-  "ctx": 1000000,
-  "price": "0.00000015"
- },
- {
-  "id": "qwen/qwen3.8-omni-flash",
-  "name": "Qwen: Qwen3.8 Omni Flash",
-  "in": [
-   "text",
-   "image",
-   "audio",
-   "video"
-  ],
-  "ctx": 1000000,
-  "price": "0.00000015"
  },
  {
   "id": "rekaai/reka-edge",
@@ -752,18 +587,6 @@
   "price": "0.000001"
  },
  {
-  "id": "xiaomi/mimo-v2.6-flash",
-  "name": "Xiaomi: MiMo-V2.6-Flash",
-  "in": [
-   "text",
-   "image",
-   "video",
-   "audio"
-  ],
-  "ctx": 1048576,
-  "price": "0.00000014"
- },
- {
   "id": "xiaomi/mimo-v2.6-pro-ultraspeed",
   "name": "Xiaomi: MiMo-V2.6-Pro-UltraSpeed",
   "in": [
@@ -797,17 +620,6 @@
   "price": "0.0000003"
  },
  {
-  "id": "z-ai/glm-5.3-flash",
-  "name": "Z.ai: GLM 5.3 Flash",
-  "in": [
-   "text",
-   "image",
-   "video"
-  ],
-  "ctx": 1048576,
-  "price": "0.00000015"
- },
- {
   "id": "z-ai/glm-5.3-flashx",
   "name": "Z.ai: GLM 5.3 FlashX",
   "in": [
@@ -828,5 +640,173 @@
   ],
   "ctx": 202752,
   "price": "0.0000012"
+ },
+ {
+  "id": "~anthropic/claude-fable-latest",
+  "name": "Anthropic: Claude Fable Latest",
+  "in": [
+   "text",
+   "image",
+   "file"
+  ],
+  "ctx": 1000000,
+  "price": "0.00001"
+ },
+ {
+  "id": "~anthropic/claude-haiku-latest",
+  "name": "Anthropic: Claude Haiku Latest",
+  "in": [
+   "text",
+   "image",
+   "file"
+  ],
+  "ctx": 200000,
+  "price": "0.000001"
+ },
+ {
+  "id": "~anthropic/claude-opus-latest",
+  "name": "Anthropic: Claude Opus Latest",
+  "in": [
+   "text",
+   "image",
+   "file"
+  ],
+  "ctx": 1000000,
+  "price": "0.000004"
+ },
+ {
+  "id": "~anthropic/claude-sonnet-latest",
+  "name": "Anthropic: Claude Sonnet Latest",
+  "in": [
+   "text",
+   "image",
+   "file"
+  ],
+  "ctx": 1000000,
+  "price": "0.000002"
+ },
+ {
+  "id": "~deepseek/deepseek-flash-latest",
+  "name": "DeepSeek: DeepSeek Flash Latest",
+  "in": [
+   "text",
+   "image"
+  ],
+  "ctx": 1048576,
+  "price": "0.00000002"
+ },
+ {
+  "id": "~google/gemini-flash-latest",
+  "name": "Google: Gemini Flash Latest",
+  "in": [
+   "text",
+   "image",
+   "video",
+   "file",
+   "audio"
+  ],
+  "ctx": 1048576,
+  "price": "0.00000075"
+ },
+ {
+  "id": "~google/gemini-pro-latest",
+  "name": "Google: Gemini Pro Latest",
+  "in": [
+   "audio",
+   "file",
+   "image",
+   "text",
+   "video"
+  ],
+  "ctx": 1048576,
+  "price": "0.000002"
+ },
+ {
+  "id": "~moonshotai/kimi-latest",
+  "name": "MoonshotAI: Kimi Latest",
+  "in": [
+   "text",
+   "image",
+   "video"
+  ],
+  "ctx": 1048576,
+  "price": "0.0000003654"
+ },
+ {
+  "id": "~openai/gpt-astra-latest",
+  "name": "OpenAI: GPT Astra Latest",
+  "in": [
+   "file",
+   "image",
+   "text"
+  ],
+  "ctx": 1050000,
+  "price": "0.00001"
+ },
+ {
+  "id": "~openai/gpt-luna-latest",
+  "name": "OpenAI: GPT Luna Latest",
+  "in": [
+   "file",
+   "image",
+   "text"
+  ],
+  "ctx": 1050000,
+  "price": "0.0000001"
+ },
+ {
+  "id": "~openai/gpt-mini-latest",
+  "name": "OpenAI: GPT Mini Latest",
+  "in": [
+   "file",
+   "image",
+   "text"
+  ],
+  "ctx": 400000,
+  "price": "0.00000075"
+ },
+ {
+  "id": "~openai/gpt-sol-latest",
+  "name": "OpenAI: GPT Sol Latest",
+  "in": [
+   "file",
+   "image",
+   "text"
+  ],
+  "ctx": 1050000,
+  "price": "0.000002"
+ },
+ {
+  "id": "~openai/gpt-terra-latest",
+  "name": "OpenAI: GPT Terra Latest",
+  "in": [
+   "file",
+   "image",
+   "text"
+  ],
+  "ctx": 1050000,
+  "price": "0.000002"
+ },
+ {
+  "id": "~x-ai/grok-latest",
+  "name": "xAI: Grok Latest",
+  "in": [
+   "text",
+   "image",
+   "file"
+  ],
+  "ctx": 500000,
+  "price": "0.000002"
+ },
+ {
+  "id": "~z-ai/glm-flash-latest",
+  "name": "Z.ai: GLM Flash Latest",
+  "in": [
+   "text",
+   "image",
+   "video"
+  ],
+  "ctx": 1048576,
+  "price": "0.00000002"
  }
 ]

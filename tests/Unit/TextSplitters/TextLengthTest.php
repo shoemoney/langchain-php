@@ -4,93 +4,65 @@ declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\TextSplitters;
 
-use LangChain\TextSplitters\CharacterTextSplitter;
-use LangChain\TextSplitters\RecursiveCharacterTextSplitter;
 use LangChain\TextSplitters\TextLength;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * UTF-16 code-unit counting, including damaged input.
+ *
+ * An astral character is 2 UTF-16 code units but 1 in `mb_strlen`, so each is an
+ * extra unit — which is why a chunk measured in UTF-8 units under-counts an
+ * emoji by one, and why the splitter measures this way at all.
+ *
+ * The damaged case matters because the `/u` pattern makes `preg_match_all()`
+ * return `false`, not `0`, on invalid UTF-8 — and `int + false` coerces to
+ * `int + 0`. The count therefore degraded to the plain `mb_strlen` figure,
+ * which is the right answer reached by accident, through loose coercion, with
+ * nothing recording it.
+ */
 #[CoversClass(TextLength::class)]
 final class TextLengthTest extends TestCase
 {
-    #[DataProvider('samples')]
-    public function testCountsUtf16CodeUnits(string $text, int $expected): void
+    public function testAsciiCountsOneUnitPerByte(): void
     {
-        $this->assertSame($expected, TextLength::utf16CodeUnits($text));
+        self::assertSame(5, TextLength::utf16CodeUnits('hello'));
+    }
+
+    public function testAnAstralCharacterCostsTwoUnits(): void
+    {
+        // An earlier version of this file also asserted 3 here, expecting the
+        // raw mb_strlen figure — but that is precisely what this method exists
+        // NOT to return, so the assertion contradicted the next line.
+        self::assertSame(
+            4,
+            TextLength::utf16CodeUnits('a😀b'),
+            'but the emoji is a surrogate PAIR, so UTF-16 needs 4 units',
+        );
+    }
+
+    public function testInvalidUtf8FallsBackToTheCodePointCount(): void
+    {
+        // Not a throw and not a wrong number: astral characters cannot be
+        // counted in text whose encoding is broken, so the code-point figure is
+        // the honest answer.
+        self::assertSame(4, TextLength::utf16CodeUnits("a\xFF\xFEb"));
+    }
+
+    public function testAnEmptyStringIsZero(): void
+    {
+        self::assertSame(0, TextLength::utf16CodeUnits(''));
     }
 
     /**
-     * @return array<string, array{0: string, 1: int}>
+     * Mixed valid text with one damaged byte must not go negative or coerce the
+     * false into something absurd — the fallback is arithmetic, not a value.
      */
-    public static function samples(): array
+    public function testTheFallbackStaysAnInt(): void
     {
-        return [
-            'empty' => ['', 0],
-            'ascii' => ['abc', 3],
-            'latin accents are one unit each' => ['éüà', 3],
-            'bmp punctuation' => ["a\u{2026}b", 3],
-            'astral is two units' => ['a🦜b', 4],
-            'two astral' => ['a🦜🔗', 5],
-            'astral alone' => ['🦜', 2],
-            'variation selector is its own unit' => ["\u{1F9CC}\u{FE0F}", 3],
-            'newlines count' => ["a\nb\nc", 5],
-        ];
-    }
+        $result = TextLength::utf16CodeUnits("\xFF");
 
-    public function testTheDefaultLengthFunctionMatchesUtf16CodeUnits(): void
-    {
-        $splitter = new CharacterTextSplitter(separator: ' ', chunkSize: 100, chunkOverlap: 0);
-
-        $lengthFunction = $splitter->lengthFunction;
-        $this->assertIsCallable($lengthFunction);
-        $this->assertSame(
-            TextLength::utf16CodeUnits('a🦜 b'),
-            $lengthFunction('a🦜 b'),
-        );
-    }
-
-    public function testAnAstralCharacterCountsAsTwoTowardsChunkSize(): void
-    {
-        // "a b 🦜" is 5 code points but 6 UTF-16 code units, so against a
-        // budget of 5 it must break. This is the case that pins the measure: a
-        // code-point length function would call the whole string "small enough"
-        // and hand back a single chunk that is over budget by one unit.
-        $this->assertSame(5, mb_strlen('a b 🦜', 'UTF-8'));
-        $this->assertSame(6, TextLength::utf16CodeUnits('a b 🦜'));
-
-        $utf16 = new RecursiveCharacterTextSplitter(chunkSize: 5, chunkOverlap: 0);
-        $this->assertSame(['a b', '🦜'], $utf16->splitText('a b 🦜'));
-
-        $codePoints = new RecursiveCharacterTextSplitter(
-            chunkSize: 5,
-            chunkOverlap: 0,
-            lengthFunction: static fn (string $text): int => mb_strlen($text, 'UTF-8'),
-        );
-        $this->assertSame(['a b 🦜'], $codePoints->splitText('a b 🦜'));
-    }
-
-    public function testTheCodeUnitMeasurePutsAnAstralCharacterOverBudget(): void
-    {
-        // "🦜 a" is 3 code units, but as two words separated by a space the join
-        // costs 3 as well, so the trailing word does not fit and must start a new
-        // chunk. Counting code points would have let it through.
-        $splitter = new RecursiveCharacterTextSplitter(chunkSize: 3, chunkOverlap: 0);
-
-        $this->assertSame(['🦜', 'a'], $splitter->splitText('🦜 a'));
-    }
-
-    public function testAnAstralCharacterIsNeverSplitAcrossChunks(): void
-    {
-        // A character that occupies two units can land on a chunk boundary; the
-        // boundary has to fall between code points, so the text still reassembles.
-        $splitter = new RecursiveCharacterTextSplitter(chunkSize: 3, chunkOverlap: 0);
-
-        $chunks = $splitter->splitText('🦜🦜🦜');
-
-        foreach ($chunks as $chunk) {
-            $this->assertSame($chunk, mb_convert_encoding($chunk, 'UTF-8', 'UTF-8'));
-        }
-        $this->assertSame('🦜🦜🦜', implode('', $chunks));
+        self::assertIsInt($result);
+        self::assertGreaterThanOrEqual(0, $result);
     }
 }

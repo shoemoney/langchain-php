@@ -2659,6 +2659,41 @@
    "chars": 2282,
    "findings": 5,
    "severity_hits": 5
+  },
+  "perplexity/sonar": {
+   "model": "perplexity/sonar",
+   "at": "2026-09-30T03:15:53",
+   "actual_model": "perplexity/sonar",
+   "usage": {
+    "prompt_tokens": 33982,
+    "completion_tokens": 656,
+    "total_tokens": 34638,
+    "cost": 0.03964,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.03964,
+     "upstream_inference_prompt_cost": 0.033982,
+     "upstream_inference_completions_cost": 0.005658
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/87-perplexity__sonar.md",
+   "chars": 2893,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2807,7 +2842,8 @@
   "google/gemma-4-31b-it:free",
   "openai/gpt-5.1-codex-mini",
   "google/gemini-3.7-flash",
-  "bytedance-seed/seed-2.0-mini"
+  "bytedance-seed/seed-2.0-mini",
+  "perplexity/sonar"
  ],
  "next_index": 0
 }

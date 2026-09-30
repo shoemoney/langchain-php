@@ -929,7 +929,7 @@
    "video"
   ],
   "ctx": 262144,
-  "price": "0.0000000765"
+  "price": "0.00000009"
  },
  {
   "id": "google/gemma-4-26b-a4b-it:free",
@@ -1301,7 +1301,7 @@
    "image"
   ],
   "ctx": 262144,
-  "price": "0.0000006562"
+  "price": "0.0000006712"
  },
  {
   "id": "moonshotai/kimi-k3",
@@ -3181,7 +3181,7 @@
    "video"
   ],
   "ctx": 1048576,
-  "price": "0.0000004"
+  "price": "0.0000003654"
  },
  {
   "id": "~openai/gpt-astra-latest",
