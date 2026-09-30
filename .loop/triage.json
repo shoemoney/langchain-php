@@ -429,6 +429,7 @@
   "0 findings in 1078s \u2014 descriptive prose, no Severity/Evidence/Fix. Skipped."
  ],
  "audit/tracing-callbacks": [
+  "#OPEN \u2014 STILL OPEN \u2014 the runName/callback-tagging thread is documented and unfinished; treat anything under it as unresolved.",
   "#negative callback handler failures are RECORDED, not swallowed. BaseRunManager::dispatch (line 126) and CallbackManager::dispatch (line 605) both catch Throwable, and the two things that could make that a silent-success defect were checked by execution. First: the record works \u2014 a quiet handler that throws produced handlerErrors() == ['Error in handler \u2026BaseCallbackHandler@anonymous\u2026, handleLLMStart: handler exploded']. Retrievable, so the failure is not lost. Second: one bad handler does not starve the good ones \u2014 with a throwing handler registered FIRST, the second handler still received the event. Third: raiseError handlers propagate, confirmed with a RuntimeException escaping handleLLMStart. The design also deliberately avoids E_USER_WARNING, which would fail a strict test runner over a handler that was only decorating the run. No defect.",
   "#negative Run::toArray() has no production caller, and that is correct rather than dead code. grep finds it called only by itself (line 142, recursing into child_runs) and by tests. PORT_STATUS documents LangChainTracer as 'Override persistRun() to ship runs somewhere real' \u2014 the serialiser's consumer is deliberately the user, so having no internal caller is the design. The degenerate case was checked anyway: an empty Run toArray() yields all 20 keys with parent_run_id null, start_time 0, end_time null, inputs/outputs [], and json_encode succeeds. There is no Run::fromArray, so there is no round-trip to break; that is the absence of a deserialiser, not a broken one.",
   "#harness prism-ml/ternary-bonsai-2-27b spent 1078 seconds and returned descriptive prose with zero findings \u2014 no Severity, no Evidence, no suggested fix. That is the third non-review in two iterations after bytedance-seed/seed-1.6-flash (14s, zero findings) and before it two 429/404 failures. 6 of 53 reviewers have now failed to return a usable review, and one cost 18 minutes. Noted rather than acted on: the user asked for breadth across all vision-capable models, so pruning is a scope decision, not mine. Worth flagging that the cost is asymmetric \u2014 a dud costs a full iteration's wall clock and contributes nothing, so the sweep will get slower as the remaining models are smaller."
@@ -672,6 +673,7 @@
   "#record C: 'The record is exceptionally honest... The only contradiction was a stale ledger row (fixed in the Perplexity iteration), which was caught and corrected.' The advisory independently noticed the stale-row class and observed it being fixed \u2014 including in the iteration it ran alongside."
  ],
  "audit/anthropic-stream-aggregation": [
+  "#RESOLVED \u2014 LANDED \u2014 empty streams now throw on every path (iterations 47, 61, 62, 63), mutation-verified four times over.",
   "#LANDED third attempt, and the reason the first two failed is now fully known. There were TWO fixture defects stacked behind the silent-empty branch, and each one alone was enough to hide it. (1) The recorder emitted a bare content_block_delta with no content_block_start \u2014 a malformed event, correctly discarded. (2) The recorder's filter tested the FIRST LINE for `data:`, which OpenAI SSE satisfies and Anthropic SSE does not: Anthropic leads with `event: message_start`, so EVERY Anthropic event was dropped and the rows named \"streaming\" streamed nothing at all. Compounding it, the test body did `foreach (... as $ignored) {}` \u2014 it called stream() and discarded the result, so it could never have failed. Three independent blind spots, and the suite was green through all of them.",
   "#The empty-response change itself is unchanged and now lands with a real regression: BaseChatModel::stream() throws RuntimeException('Received empty response from chat model call.') where it previously called handleLLMEnd with an empty result and returned, so one condition answered cleanly from stream() and threw from invoke(). Upstream throws on both paths (chat_models.ts:750 sawEvent, :825 aggregated undefined). The throw precedes `$ended` so the existing catch records it through handleLLMError rather than ending the run cleanly.",
   "#MUTATION-VERIFIED, and the first attempt at verification FAILED HONESTLY, which is the part worth keeping. Asserting only the streamed text left the empty-response change untested \u2014 reverting it kept the matrix green, because a stream that yields content satisfies that assertion whether or not the empty case throws. The surviving mutation was the signal: the matrix could not supply this regression at all. The real test is testAStreamThatProducesNothingThrows, fed an empty-but-well-formed stream, with its provider DERIVED from the same sources() the matrix uses so every tool route is covered and cannot drift.",
@@ -683,6 +685,7 @@
   "#note this iteration's budget went entirely to settling a question rather than consuming a new one. Last iteration's empty-response fix went red on two OptionPathMatrixTest rows and I recorded two readings: a broken fixture, or a broken client. Driving the client with a realistic Anthropic SSE sequence \u2014 message_start, content_block_start, text_delta, content_block_stop, message_delta, message_stop \u2014 produced chunk 1: \"Hello\". The path folds correctly, so the FIXTURE is what is broken, and the silent-empty branch was hiding it. That is the benign reading, and now the empty-response change is known to be legitimate: the next step is to repair the fixture, THEN land it, in that order."
  ],
  "audit/anthropic-stream-aggregation-2": [
+  "#RESOLVED \u2014 SUPERSEDED by audit/anthropic-stream-aggregation; kept for the intermediate reverts.",
   "fixture repaired; change still blocked, reverted again"
  ],
  "advisory/openai/gpt-4o-2024-11-20": [
@@ -697,6 +700,7 @@
   "4/8 rejected; the empty-stream claim was the defect fixed last iteration"
  ],
  "audit/advisory-past-tense-warning": [
+  "#RESOLVED \u2014 DONE \u2014 the warning is in brief() and measurably changed model behaviour (iteration 51).",
   "#THE FIX WORKS. Verified against the right object this time: `brief()` \u2014 the exact string passed as the user message at advisory.py's call site (`b = brief()` then `call(model, SYSTEM, prompt() + chr(10)*2 + b, png)`). assert 'PAST-TENSE TRAP' in brief() is TRUE, brief() is 42,983 chars, and the surrounding text is the rule itself. The warning reaches the model.",
   "#THE TWO COMMITS THAT FOLLOWED IT WERE BOTH WRONG, and the way they were wrong is the point. I asserted SYSTEM (failed), asserted ELEMENTS (failed), then concluded the edit was DEAD CODE and shipped that claim too \u2014 three confident statements, none of which had been checked against the object that matters. The actual structure is `brief()` returning an f-string concatenation whose locals hold the text, so a `dir(module)` scan cannot see it: my scan's negative result was real, and I read it as proof of absence when it was only proof that I had looked in the wrong place.",
   "#THE GENERAL RULE, and it is the same one the warning itself states: a verification aimed at the wrong object returns a confident negative, and 'the check FAILED' and 'the thing is broken' are different claims. Three assertions failed against three different wrong targets and I escalated each failure into a conclusion about the CODE rather than about the TARGET. The harness lesson I set out to install got installed correctly and then defeated me three times in the same session, which is the strongest available evidence that the rule is worth writing down at all.",
@@ -711,6 +715,7 @@
   "0/5 accepted: 1 deferred unverified, 3 unverified, 1 phantom (10th sighting)"
  ],
  "audit/image-prompt-mutation": [
+  "#RESOLVED \u2014 SETTLED \u2014 fidelity divergence confirmed, DEFECT refuted by probe (3 calls, plus the retained-instance case).",
   "#ACCEPTED on fidelity, then REFUTED by execution \u2014 recorded in that order because both halves matter. Fidelity first: upstream `_StringImageMessagePromptTemplate.format()` (chat.ts:613) builds a LOCAL `const content: MessageContent = []`, accumulates into it, and ends with `return this.createMessage(content)`, which returns `new MsgClass({ content })` (chat.ts createMessage). It never assigns to `this.prompt`. PHP's `parseImagePrompts()` ends `$message->content = $blocks; return $message;` \u2014 it mutates its parameter and returns the same object. So the PHP text genuinely differs from upstream and the reviewer's reading of the code was correct.",
   "#Then the probe refuted the DEFECT. Two calls through the public API with different values:",
   "#   call 1 -> https://example.com/first.png",
@@ -789,6 +794,7 @@
   "#4 REJECTED: upstream base.ts:171-179 is byte-identical, incl. 'invent success'"
  ],
  "audit/advisory-stale-verdicts": [
+  "#RESOLVED \u2014 PARTLY ACTIVE \u2014 banners and status-first selection shipped (87); the residual is that models can still ignore them (90), which is why this guard now exists.",
   "#A NEW SHAPE OF THE PAST-TENSE TRAP, found by deepseek-v4.1-flash's advisory whose single highest-leverage recommendation was to fix RunnableSequence::stream() \u2014 a defect fixed and mutation-verified FIVE ITERATIONS EARLIER. The brief was not lying: it faithfully reproduced my own triage ledger, whose `audit/sequence-stream-divergence` entry still ended with 'fix deferred'. The entry was never closed when iteration 55 landed the fix, so the model read a resolved defect as an open one and correctly, obediently, recommended it.",
   "#THE GAP IS STRUCTURAL, NOT A PROMPT WORDING PROBLEM. Audit keys are append-only in practice: I open one when a question is deferred and close it only if I remember, and across 60 iterations I did not. Every unresolved-looking audit entry is a standing invitation to recommend work that is already done. The past-tense warning I added two iterations ago covers prose that describes a fix in the past tense; this is a stale VERDICT, which reads as present and cannot be caught by wording.",
   "#THE FIX IS TO STOP TRUSTING THE LEDGER'S STATUS. The advisory brief now says outright that prior findings and audit verdicts may be STALE, that a recommendation must be re-checked against the live source before it is offered, and that a resolved item appearing as top priority is a defect in the brief rather than a finding about the code. Closing the entry fixes THIS instance; the instruction fixes the class."
@@ -817,10 +823,12 @@
   "#2 'Surrogate state leaks between JSON strings' \u2014 CONFIRMED and FIXED this iteration, closing out every finding from gpt-astra-latest that had execution evidence. The closing-quote branch returned immediately, discarding any pending high surrogate, so the parser was lossy AND quiet: `{\"a\":\"x\\ud800y\",\"b\":\"z\"}` returned `{\"a\":\"xy\",\"b\":\"z\"}` \u2014 three characters became two and nothing reported it. For a parser that is the worst possible failure mode, and a better one than throwing. Fixed to append U+FFFD, which was ALREADY this method's documented policy for an unpaired surrogate; only this path skipped it. Upstream never hits it because `String.fromCharCode` yields the lone surrogate and a JS string holds code units natively. MUTATION-VERIFIED: restore the bare return -> 2 failures (RED), restore the fix -> OK (GREEN). The third case asserts a VALID pair (\ud834\udd1e) is untouched, so a fix that appended U+FFFD unconditionally would fail rather than quietly break every emoji."
  ],
  "audit/falsy-escape-fffd": [
+  "#RESOLVED \u2014 LANDED \u2014 encodeCodePoint() with `=== false`; \\u0030 and \\u0000 both decode correctly, mutation-verified.",
   "#FIXED, and this is the project's own signature bug class arriving in its purest possible form. `mb_chr($code, 'UTF-8') ?: \"\\u{FFFD}\"` looks like a safe fallback and is not, because `\"0\"` is FALSY in PHP. `mb_chr(0x30)` returns the one-character string `\"0\"`, the `?:` reads that as failure, and U+FFFD comes out instead. Measured before the fix: `{\"a\": \"x\\u0030y\"}` -> `{\"a\":\"x\\ufffdy\"}`. The escape for the digit ZERO decoded to a replacement character \u2014 the falsy-vs-absent mistake with the literal digit zero as its subject, which is almost too neat. `\\u0000` was the same trap one layer down and now decodes to NUL. The same shape guarded the astral reassembly, so a supplementary-plane character could have been replaced too. mb_chr returns `string|false`, so all three sites now go through `encodeCodePoint()` with `=== false`. MUTATION-VERIFIED: restore the `?:` fallback -> 1 failure (RED), restore the fix -> OK (GREEN).",
   "FIXED: '0' is falsy, so ?: turned mb_chr(0x30) into U+FFFD"
  ],
  "audit/surrogate-lossy-quiet": [
+  "#RESOLVED \u2014 LANDED \u2014 an unpaired high surrogate becomes U+FFFD rather than vanishing, mutation-verified.",
   "FIXED: lone surrogate was silently deleted; now U+FFFD"
  ],
  "advisory/ministral-8b-2512": [
@@ -841,6 +849,7 @@
   "#4 still deferred: probe failed 3x on guessed APIs; new unverified lead on chunkSize"
  ],
  "audit/character-splitter-default-chunksize": [
+  "#RESOLVED \u2014 RETRACTED \u2014 no such defect; the default separator is a blank line, not empty (68).",
   "#RETRACTED. Iteration 67 recorded this as a CONFIRMED MAJOR defect \u2014 'the default CharacterTextSplitter ignores chunkSize and returns the entire input as ONE chunk' \u2014 with a reproduction. The defect does not exist. The reproduction was an artefact of my own truncated output.",
   "#WHAT ACTUALLY HAPPENED. CharacterTextSplitter's default separator is NOT empty. It is `public string $separator = \"\\n\\n\"` \u2014 a blank line. My probe printed it with var_export, which rendered the value across TWO LINES, and my `tail -N` cut the output so I read a bare `'` and concluded 'empty separator'. I then built the whole finding on that misreading: I assumed `splitOnSeparator()` was taking its empty-separator branch, ruled it out, and blamed `mergeSplits()`.",
   "#THE BEHAVIOUR IS CORRECT AND FAITHFUL. Re-measured with the separator printed honestly:",
@@ -877,6 +886,7 @@
   "http_429, no review; settled nova-lite #1 as a REPEAT after probe"
  ],
  "audit/runname-bind-slot-regression": [
+  "#RESOLVED \u2014 LANDED \u2014 regression written and mutation-verified; it also exposed the sequence clobber (79).",
   "#REGRESSION WRITTEN AND MUTATION-VERIFIED \u2014 the thing iteration 78 shipped without. Reverting the bind call to the kwargs slot produces a failure (RED); restoring the config slot returns OK (GREEN).",
   "#AND IT IMMEDIATELY FOUND SOMETHING ELSE, which is why writing it was worth the iteration rather than deferring again. The first version asserted the name arrives as the step's runName and FAILED. Measured:",
   "#     runName = \"seq:step:1\"",
@@ -921,6 +931,7 @@
   "LANDED: step tag relocated to config->tags, runName preserved, mutation-verified"
  ],
  "audit/bind-slot-wrapper-trap": [
+  "#RESOLVED \u2014 LANDED \u2014 my own iteration-78 fix was reverted; the ledger row and the wrapper-based measurement are corrected.",
   "#I BROKE IT IN ITERATION 78 AND AM REVERTING MY OWN FIX. Measured through the WRAPPER the code actually calls:",
   "#     bind(kwargs={'runName':'x'}, config=[])              ->  runName=NULL, options={'runName':'x'}   WRONG",
   "#     bind(kwargs=[],           config={'runName':'x'})    ->  runName='x',  options=[]              CORRECT",
@@ -983,6 +994,7 @@
   "iteration-87 staleness fix FAILED; real cause was my own fix comment describing the bug"
  ],
  "audit/fix-comment-past-tense": [
+  "#RESOLVED \u2014 PARTLY ACTIVE \u2014 the audited comments are fenced; the durable guard is TriageStatusMarkerTest plus the current-behaviour-first rule.",
   "#AUDIT OF MY OWN CODE, prompted by iteration 90's discovery that a fix comment describing a fixed bug is read as present tense by reviewers. Scanned src/ for fix comments narrating a defect in the present-adjacent voice: 12 matches across 8 files, and MOST ARE BENIGN \u2014 'a value previously produced by dumpsTyped()', 'kwargs used to build the serialized payload', 'used to decide whether two channels are equal'. The word 'previously'/'used to' alone is not the signal; what matters is whether the sentence describes a DEFECT that a reader would go and check.",
   "#THREE GENUINELY CARRY THE TRAP, and one is now fenced: `RunnableBinding.php:64` read 'They used to be stored and never read, which made `->bind([\"temperature\" => 0])` a silent no-op on every runnable in the SDK' \u2014 a confident, specific, measurement-grade narrative of a live defect, sitting directly above a reader deciding whether kwargs work. It is now fenced under a HISTORY banner that opens by saying it does not describe the behaviour above.",
   "#STILL QUEUED, found by the same sweep and not yet touched: `BaseChatModel.php:573` ('This docblock used to say the opposite \u2014 that the base returns an empty [array]...'), which is the comment I wrote in iteration 77 and the same trap I fixed there in the TEXT while leaving the narrative of the old claim intact; and `RunnableInterface.php:97` ('which this docblock used to claim, and neither of which is true'). Both describe corrected defects in enough detail to be mistaken for present behaviour.",
@@ -994,6 +1006,7 @@
   "#THE THIRD OCCURRENCE OF MY OWN SCRIPT BUG, and the note about it is now embarrassing rather than useful. I wrote `t[key].append(a, b)` instead of `.extend([a, b])` in iterations 77, 79 and 92, and twice recorded a generalisation about verifying that triage writes land \u2014 while the actual bug was one operator, in the same place, three times. Writing a lesson about a mistake and then making the mistake is worse than never having noticed it. The rule is narrower and duller: these scripts are hand-written Python executed by a shell, and `append` takes ONE argument; when in doubt write the loop."
  ],
  "audit/underscore-parameter-convention": [
+  "#OPEN \u2014 STANDING OBSERVATION, not a defect \u2014 upstream's `_param` prefix marks a deliberately unused parameter. Verified on two sites; reusable as a rule.",
   "#CONFIRMED ON A SECOND, INDEPENDENT SITE \u2014 which is what turns an observation into a convention worth reusing. Upstream `handleCustomEvent` (manager.ts:258-276) declares its parameters `_tags?: string[]` and `_metadata?: Record<string, any>` and passes `this.tags` / `this.metadata` to the handler. The PHP does the same: `handleCustomEvent(..., array $tags = [], array $metadata = [])` dispatches `$this->tags, $this->metadata`.",
   "#So gpt-luna-latest's #2 'custom-event overrides are ignored' is REJECTED, on the same evidence that rejected its sibling #1 one iteration earlier. Two independent sites, same shape, same underscore prefix in upstream, same pass-through in the port \u2014 and the underscore is upstream's own annotation that the parameter is deliberately unused.",
   "#THE CONVENTION IS NOW EVIDENCE, NOT A HEURISTIC, and it is the cheapest tool in this loop. Where upstream declares a parameter with a leading underscore, the port ignoring a same-named parameter is FAITHFUL BY CONVENTION, decidable from the signature alone without opening the body and without running anything. I have now verified that twice, on two different methods in the same file. Before this, ruling out this entire finding family cost a full probe each time; now it costs one grep.",
