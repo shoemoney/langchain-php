@@ -315,8 +315,17 @@ class ChatOpenAI extends BaseChatModel
             // send THAT to the provider: a tool the model cannot read, with no
             // error anywhere. The conversion is a no-op for an
             // already-provider-shaped array, so this cannot double-wrap.
+            // BOTH arms need converting, not just the per-call one. `bindTools()`
+            // converts when it stores, so bound tools arrive pre-converted — but
+            // tools handed to the CONSTRUCTOR land in `kwargs` raw. Proved by
+            // asserting on the request body: the constructor path sent
+            //   [{"lc":1,"type":"constructor","id":["langchain","tools",
+            //     "DynamicStructuredTool"],"kwargs":[]}]
+            // i.e. a serialised PHP object with the tool's name, description and
+            // schema all absent. Converting again is idempotent for an already
+            // -shaped array, so both arms can go through the same call.
             'tools' => $this->convertTools($this->pick($options, 'tools'))
-                ?? $bound['tools']
+                ?? $this->convertTools($bound['tools'] ?? null)
                 ?? null,
             // The bound value goes through the same formatter as the per-call
             // one. Upstream has no such split — it passes everything through
@@ -488,7 +497,17 @@ class ChatOpenAI extends BaseChatModel
         $next->supportsStrictToolCalling = $strict === null ? null : (bool) $strict;
 
         foreach ($kwargs as $key => $value) {
-            if ($key === 'tools') {
+            // `strict` is excluded, like `tools`. Its decision is already stored
+            // in `$next->supportsStrictToolCalling` (set just above, from the
+            // very same `$kwargs['strict']`), and nothing in `invocationParams()`
+            // ever reads a `kwargs['strict']` key. Carrying a second copy of a
+            // flag that changes nothing is how a caller comes to believe
+            // re-binding `strict` per call does something.
+            //
+            // `ChatAnthropic` is the opposite case and does need its copy: it
+            // reads `$this->kwargs['strict']` on a LATER bind so a chained bind
+            // inherits the decision. There it is load-bearing; here it is not.
+            if ($key === 'tools' || $key === 'strict') {
                 continue;
             }
             $next->kwargs[$key] = $value;
@@ -640,7 +659,21 @@ class ChatOpenAI extends BaseChatModel
                 // one, which is a downgrade, not a normalisation.
                 throw $e;
             } catch (\LangChain\Utils\Http\HttpException $e) {
-                if ($attempt++ >= $this->maxRetries) {
+                // Only a transport-level failure or a server-side status is
+                // worth another round trip. A 4xx is the provider telling us the
+                // request itself is wrong, and it will be wrong identically next
+                // time.
+                //
+                // This catch retried EVERY `HttpException`, while
+                // `postStream()` in this same class already filtered on
+                // `status === 0 || 429 || >= 500`. Proved by counting requests
+                // through a transport that raises a 400: EAGER made 4 requests
+                // at `maxRetries=3`, STREAM made 1. So the same failure was four
+                // times the latency and rate-limit cost on one path and not the
+                // other — and the class docblock promised a 4xx is not retried.
+                $retryable = $e->status === 0 || $e->status === 429 || $e->status >= 500;
+
+                if (!$retryable || $attempt++ >= $this->maxRetries) {
                     // Converted like every other failure here. A raw
                     // `HttpException` escaping this method while a provider
                     // error, a rate limit and a 400 all raise

@@ -326,6 +326,20 @@ final class MessageInputs
             return '';
         }
 
-        return \LangChain\LanguageModels\Chat\OpenAI\Utils\Completions::encode($content);
+        // `Completions::encode()` does not exist — that class uses `Js::encode`
+        // internally and never exposed such a method — so this line named a
+        // function that would fatal if it were ever reached.
+        //
+        // It is NOT reachable today, and that is the trap. `BaseMessage::$content`
+        // coerces to string, so the two branches above cover every value a real
+        // message can hold: forcing `42` through the property by reflection still
+        // stored `'42'`. So the suite was green and the landmine sat under a
+        // branch nothing could reach.
+        //
+        // Widening `$content`'s type, or a subclass that bypasses the
+        // constructor, is exactly when this would fire — on the Anthropic path,
+        // at send time, as a fatal. `Js::encode` is what the OpenAI client uses
+        // for the same job, so this is also the consistent choice.
+        return \LangChain\Utils\Js::encode($content);
     }
 }

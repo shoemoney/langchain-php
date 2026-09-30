@@ -29,6 +29,17 @@ ROOT = Path(__file__).resolve().parent.parent
 JUNIT = ROOT / "build" / "sync-docs-junit.xml"
 
 
+def failing_tests(junit: Path) -> set[str]:
+    """The names of every test that failed or errored in a junit log."""
+    root = ET.parse(junit).getroot()
+    suite = root.find("testsuite") if root.tag == "testsuites" else root
+    names: set[str] = set()
+    for case in suite.iter("testcase"):
+        if case.find("failure") is not None or case.find("error") is not None:
+            names.add((case.get("class") or "") + "::" + (case.get("name") or ""))
+    return names
+
+
 def measure() -> tuple[str, str]:
     """The FULL suite — bare `phpunit`, the same command `composer test` and
     the CI unit+integration steps run. Not `--testsuite unit`: that omits the
@@ -38,19 +49,53 @@ def measure() -> tuple[str, str]:
         ["./vendor/bin/phpunit", "--log-junit", str(JUNIT)],
         cwd=ROOT, capture_output=True, text=True,
     )
-    if not JUNIT.exists():
-        sys.exit("phpunit wrote no junit log; refusing to guess\n" + proc.stdout[-600:])
+    # Order matters. A suite that cannot even LOAD must be rejected BEFORE
+    # anything parses the log: PHPUnit aborts while collecting and leaves an
+    # EMPTY junit file, so `ET.parse` raises a bare ParseError, and a suite that
+    # loads but crashes mid-run can write a junit whose counts describe however
+    # far it got. Both would otherwise be recorded as truth.
+    #
+    # Verified: a parse error in one test file previously produced a traceback
+    # from ET.parse, and an earlier version recorded the truncated counts.
+    fatal_markers = (
+        "Fatal error", "Parse error", "Cannot declare class",
+        'No tests executed', 'Cannot open file',
+    )
+    output = (proc.stdout or "") + (proc.stderr or "")
+    hit = [m for m in fatal_markers if m in output]
+    if hit:
+        sys.exit(
+            f"refusing: phpunit did not complete cleanly ({', '.join(hit)}); its counts describe "
+            f"however far it got, not the suite.\n" + output[-600:]
+        )
+
+    if not JUNIT.exists() or JUNIT.stat().st_size == 0:
+        sys.exit("phpunit wrote no usable junit log; refusing to guess\n" + output[-600:])
 
     root = ET.parse(JUNIT).getroot()
     suite = root.find("testsuite") if root.tag == "testsuites" else root
     tests, assertions = suite.get("tests"), suite.get("assertions")
     failures, errors = suite.get("failures"), suite.get("errors")
 
+    # Bootstrap: the guard that enforces these numbers is itself a test, so a
+    # stale count makes the suite red, and refusing to sync on a red suite makes
+    # the script unable to ever fix it. Deadlock. So the ONE tolerated failure is
+    # DocsMatchRealityTest — the check that exists to say "these numbers are
+    # wrong", which is precisely what this script is about to correct. Any OTHER
+    # failure means the counts would be recording a broken run, and that is
+    # refused.
+    stale_docs_only = failing_tests(JUNIT)
+    tolerated = {"DocsMatchRealityTest"}
+    offending = [t for t in stale_docs_only if not any(k in t for k in tolerated)]
+
     if failures != "0" or errors != "0":
-        sys.exit(
-            f"refusing to record a failing run as the truth: failures={failures} errors={errors}\n"
-            + proc.stdout[-600:]
-        )
+        if not offending:
+            print(f"  (bootstrapping: the only failures are {sorted(stale_docs_only)}, which this script fixes)")
+        else:
+            sys.exit(
+                f"refusing to record a failing run as the truth. Unrelated failures: {sorted(offending)}\n"
+                + proc.stdout[-600:]
+            )
     if not (tests and tests.isdigit() and assertions and assertions.isdigit()):
         sys.exit(f"junit log gave no usable counts: tests={tests!r} assertions={assertions!r}")
 

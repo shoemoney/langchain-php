@@ -101,7 +101,17 @@ class ChatAnthropic extends BaseChatModel
     /** @var list<string>|null */
     public ?array $stopSequences = null;
 
-    /** @var list<array<string, mixed>> */
+    /**
+     * Extra headers to send, as a name => value map.
+     *
+     * Not a list of single-entry arrays, which is what this used to declare.
+     * `headers()` unions it with `['x-api-key' => ..., ...]`, and a union of a
+     * list with a map is just the list — so a caller who followed the declared
+     * type and passed `[['X-Foo' => 'bar']]` got an array-valued "header" that
+     * Guzzle rejects at request time, far from the constructor that took it.
+     *
+     * @var array<string, string|string[]>
+     */
     public array $defaultHeaders = [];
 
     public bool $streamUsage = true;
@@ -201,7 +211,14 @@ class ChatAnthropic extends BaseChatModel
             'stop_sequences' => $this->pick($options, 'stopSequences', 'stop_sequences')
                 ?? $bound['stopSequences']
                 ?? $this->stopSequences,
-            'tools' => $this->pick($options, 'tools') ?? $bound['tools'] ?? null,
+            // Converted on BOTH arms. `bindTools()` converts on the way in, but
+            // per-call tools and constructor tools arrive raw — and the request
+            // body proved it: Anthropic was sent the serialised PHP object
+            // `{"lc":1,"type":"constructor",...,"kwargs":[]}` with no `name`,
+            // `description` or `input_schema` at all. `convertTool()` passes an
+            // already-shaped array through unchanged, so this is safe for both.
+            'tools' => self::convertTools($this->pick($options, 'tools'))
+                ?? self::convertTools($bound['tools'] ?? null),
             // Formatted through the same path as a per-call choice, so the
             // "must name an offered tool" guard below cannot be stepped around
             // by binding the choice instead of passing it as an option.
@@ -299,6 +316,32 @@ class ChatAnthropic extends BaseChatModel
     }
 
     /**
+     * Convert caller-supplied tools, whatever shape they arrive in.
+     *
+     * One implementation, used by `bindTools()` and by `invocationParams()`, so
+     * the two cannot drift. A tool that is already a shaped array passes
+     * through `MessageInputs::convertTool()` unchanged, which is what makes it
+     * safe for the bound path to call this too.
+     *
+     * @param list<mixed>|null $tools
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private static function convertTools(?array $tools, ?bool $strict = null): ?array
+    {
+        if ($tools === null || $tools === []) {
+            return null;
+        }
+
+        $out = [];
+        foreach (array_values($tools) as $tool) {
+            $out[] = MessageInputs::convertTool($tool, $strict);
+        }
+
+        return $out;
+    }
+
+    /**
      * Offer tools to the model.
      *
      * Returns a new instance rather than mutating `$this`; see
@@ -313,12 +356,7 @@ class ChatAnthropic extends BaseChatModel
         $next = clone $this;
 
         $strict = $kwargs['strict'] ?? $this->kwargs['strict'] ?? null;
-        $converted = [];
-        foreach (array_values($tools) as $tool) {
-            $converted[] = MessageInputs::convertTool($tool, $strict === null ? null : (bool) $strict);
-        }
-
-        $next->kwargs['tools'] = $converted;
+        $next->kwargs['tools'] = self::convertTools($tools, $strict === null ? null : (bool) $strict);
 
         // Remember the decision so a later bind on this instance inherits it,
         // matching the OpenAI client. Upstream's `bindTools` passes `strict`
@@ -576,7 +614,12 @@ class ChatAnthropic extends BaseChatModel
                 // message with a generic one, which is a downgrade.
                 throw $e;
             } catch (HttpException $e) {
-                if ($attempt++ >= $this->maxRetries) {
+                // Only a transport-level failure or a server-side status is
+                // worth another round trip; a 4xx will be wrong identically
+                // next time. See the same fix in ChatOpenAI::post().
+                $retryable = $e->status === 0 || $e->status === 429 || $e->status >= 500;
+
+                if (!$retryable || $attempt++ >= $this->maxRetries) {
                     // Converted like every other failure here, with the original
                     // attached. A raw `HttpException` escaping while a provider
                     // error, a rate limit and a 400 all raise
