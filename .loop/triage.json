@@ -277,7 +277,8 @@
  ],
  "bytedance/ui-tars-1.5-7b": [
   "Returned one finding (status: incomplete), and it is a pure maintainability request \u2014 'refactor compile() into smaller functions, add tests, document it better' \u2014 which this project's own rule excludes as ungradable.",
-  "The one concrete behavioural claim inside it (a conditional edge returning null, or naming a target that does not exist) was probed rather than dismissed: a null path terminates the branch cleanly with the accumulated state, and an unknown TARGET is accepted (the branch simply takes no route). Neither crashes. An unknown edge SOURCE is rejected \u2014 and earlier than upstream, at edge-registration (StateGraph.php:184/218) rather than at compile() (graph.ts:609), so the same guarantee is enforced more eagerly."
+  "The one concrete behavioural claim inside it (a conditional edge returning null, or naming a target that does not exist) was probed rather than dismissed: a null path terminates the branch cleanly with the accumulated state, and an unknown TARGET is accepted (the branch simply takes no route). Neither crashes. An unknown edge SOURCE is rejected \u2014 and earlier than upstream, at edge-registration (StateGraph.php:184/218) rather than at compile() (graph.ts:609), so the same guarantee is enforced more eagerly.",
+  "NOT A REVIEW: incomplete, 0 findings"
  ],
  "moonshotai/kimi-k3": [
   "#1 'convertToChunk() turns Function and Chat messages into AIMessageChunk' \u2014 ACCEPTED, and the scope is LARGER than the finding states. Measured: FunctionMessage -> AIMessageChunk, ChatMessage -> AIMessageChunk, HumanMessage -> HumanMessageChunk (correct).",
@@ -1267,5 +1268,19 @@
   "#A caveat worth stating so the credit is not overclaimed: a model tracing a journey is not a test of the journey. What is new is that the reviewer can SEE it, and a reviewer that can see a capability will say so; a reviewer that cannot will report its absence, correctly, from the same code. Nothing about the suite's coverage changed this iteration. What changed is whether the record shows it.",
   "#ELEMENTS 5, 6 AND 7 WERE NOT AUDITED \u2014 two 'needs work' and one that did not extract a clean verdict line.",
   "6/8 sound; it TRACES 'bind tools -> stream inside a checkpointed StateGraph' and cites my mutation iterations"
+ ],
+ "audit/review-yield-rate": [
+  "#OPEN \u2014 A THIRD OF ALL CALLS DO NOT PRODUCE A REVIEW, and after iteration 141's fixes the dominant failure modes are no longer the ones I fixed. Measured over the current roster cycle: 33 models asked, 22 ok, 11 not a review \u2014 a 33% failure rate. The most recent failures:",
+  "#    anthropic/claude-opus-5.5              incomplete   (returned no findings)",
+  "#    z-ai/glm-4.5v                          incomplete",
+  "#    bytedance/ui-tars-1.5-7b                incomplete",
+  "#    nex-agi/nex-n2.5-mini                    truncated    (reasoning cap)",
+  "#    dots-studio/dots-3-note-preview:free     truncated",
+  "#    minimax/minimax-m3                       truncated",
+  "#    rekaai/reka-edge                         http_400     (context)",
+  "#THE 429s AND THE 400 ARE GONE from the recent stream, which is the iteration-141 and -130 fixes working. What remains is `incomplete` (the model answered, briefly \u2014 zero to four findings instead of five) and `truncated` (the reasoning budget ran out). `ask.py` already retries a truncation ONCE with a compressed prompt and then records `truncated` regardless; `incomplete` gets NO retry at all.",
+  "#THE CHEAP REMEDY, named but NOT implemented: retry `incomplete` once. It is the one worth retrying because the model DID respond \u2014 it just responded briefly, and a second ask for the remaining findings usually returns a full five. `truncated` is different: it already has a compressed retry, and a second failure means the model genuinely cannot fit the task in its budget, which is a property of the model rather than a transient condition.",
+  "#WHY NOT IMPLEMENTED WITH NO BUDGET LEFT: a retry that re-asks a model must not double-charge the roster or clobber a good first answer, and neither path can be tested without deliberately provoking a short answer. Shipping an untested retry would be the unverified-harness-change pattern this loop keeps flagging in its own ledger, and iteration 141's 429 retry is the counter-example \u2014 that one was safe because a 429 either returns a complete review or nothing at all, whereas an `incomplete` carries real content that has to be preserved or discarded deliberately.",
+  "#THE MEASUREMENT IS THE DELIVERABLE. A 33% yield means the loop's apparent breadth overstates its real review rate by half, and every count of 'reviewers consulted' in this ledger has been counting ASKED rather than ANSWERED. The 22 ok figures are the honest denominator."
  ]
 }
