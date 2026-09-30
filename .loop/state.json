@@ -435,6 +435,41 @@
    "status": "truncated",
    "chars": 87815,
    "file": ".loop/reviews/14-inclusionai__ling-3.0-flash-vl.md"
+  },
+  "anthropic/claude-opus-5.5": {
+   "model": "anthropic/claude-opus-5.5",
+   "at": "2026-09-30T10:03:35",
+   "actual_model": "anthropic/claude-opus-5.5",
+   "usage": {
+    "prompt_tokens": 61254,
+    "completion_tokens": 2896,
+    "total_tokens": 64150,
+    "cost": 0.302936,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.302936,
+     "upstream_inference_prompt_cost": 0.245016,
+     "upstream_inference_completions_cost": 0.05792
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1499,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1499,
+   "status": "incomplete",
+   "file": ".loop/reviews/15-anthropic__claude-opus-5.5.md",
+   "chars": 3711,
+   "findings": 4,
+   "severity_hits": 4
   }
  },
  "order": [
@@ -451,7 +486,8 @@
   "prism-ml/ternary-bonsai-2-27b",
   "~moonshotai/kimi-latest",
   "openai/o4-mini-high",
-  "inclusionai/ling-3.0-flash-vl"
+  "inclusionai/ling-3.0-flash-vl",
+  "anthropic/claude-opus-5.5"
  ],
  "next_index": 0
 }

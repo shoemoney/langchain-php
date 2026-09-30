@@ -93,7 +93,8 @@
   "#2 non-text blocks overwrite each other \u2014 REJECTED, does not reproduce. Distinct block types land under distinct additional_kwargs keys (probe: ['thinking']), so nothing is overwritten.",
   "#3 multi-block content flattened to one string \u2014 ACCEPTED, real divergence from upstream. Fixed to match anthropicResponseToChatMessages exactly. Mutation-verified (4 failures on revert).",
   "#4 topK rejected only in the constructor \u2014 ACCEPTED, and it falsified a claim in PORT_STATUS that I wrote LAST iteration ('refused under both spellings'). The guard now sits where all three layers converge. Mutation-verified twice: removing the non-constructor checks gives 4 failures; removing the wire-spelling canonicalisation gives 2.",
-  "#5 streamed usage may double-count (reviewer flagged as inference) \u2014 REJECTED after checking upstream. Upstream's message_start contributes buildUsageMetadata(usage)=25+1 and message_delta hard-codes input_tokens:0 with output_tokens=data.usage.output_tokens=19; the fold yields 25/20. My port produces byte-identical contributions and the same 25/20. Faithful, not a double-count bug."
+  "#5 streamed usage may double-count (reviewer flagged as inference) \u2014 REJECTED after checking upstream. Upstream's message_start contributes buildUsageMetadata(usage)=25+1 and message_delta hard-codes input_tokens:0 with output_tokens=data.usage.output_tokens=19; the fold yields 25/20. My port produces byte-identical contributions and the same 25/20. Faithful, not a double-count bug.",
+  "NOT A REVIEW: status incomplete (4 findings) - not actioned"
  ],
  "openai/gpt-4o-2024-11-20": [
   "#1 inconsistent key normalisation across layers \u2014 REJECTED, fixed in the previous iteration. Re-probed: max_tokens/maxTokens/top_p/topP all resolve to 42 through ctor, bound and per-call. The reviewer saw a packet built before the fix landed.",
@@ -1015,10 +1016,11 @@
   "CONFIRMED twice: _tags/_metadata upstream = deliberately unused; #2 rejected"
  ],
  "~moonshotai/kimi-latest": [
-  "#3 'fromMessages() drops metadata and tags' \u2014 REJECTED ON READING, and the refutation cost one grep rather than a probe. `fromMessages(array $promptMessages, array $extra = [])` USES `$extra` twice: it is passed to `coerceMessagePromptTemplateLike($promptMessage, $extra)`, and read as `$extra['validateTemplate'] ?? null` and `$extra['templateFormat'] ?? null`. Nothing is dropped.",
-  "#The second half of the finding is the more substantive error: `$extra` is not a metadata/tags bag in the first place. It maps to upstream's `_StringImageMessagePromptTemplateOptions { templateFormat?: Format }` \u2014 the template-format selector \u2014 so \"drops metadata and tags\" names fields this parameter never claimed to carry. A finding that invents a contract for a parameter in order to report it as broken is the mirror image of the fidelity misreads, and no less wrong.",
-  "##4 'PromptTemplate::fromTemplate() ignores metadata/tags/partial options inconsistently' \u2014 DEFERRED unverified, and named alongside #3 because both assert the same shape of missing options bag. If #4 is the same invention it will fall the same way, but I have not read `PromptTemplate::fromTemplate()`'s options handling this iteration and will not decide it by analogy.",
-  "#3 REJECTED: $extra IS used and maps to templateFormat, not metadata/tags"
+  "#4 'PromptTemplate::fromTemplate() ignores metadata/tags/partial options inconsistently' \u2014 REJECTED ON READING, and it is the SAME invented-contract error as its batch-mate #3, which iteration 95 rejected. Declared open last iteration precisely because 'it will probably fall the same way' is not a verdict, so this iteration read the method instead of reasoning by analogy.",
+  "#The method reads SIX options and the finding names one it does not touch: `templateFormat` (line 130), `validateTemplate` (136), `outputParser` (137), `partialVariables` (138) and `additionalContentFields` (139), all forwarded to the constructor. So the claim that it 'ignores partial options' is FALSE on the code as written \u2014 partialVariables is handled explicitly.",
+  "#The metadata/tags half is the #3 error again: neither is an option of this method, so reporting them as dropped attributes names fields the signature never claimed. Two findings in one review, one mechanism \u2014 and the reviewer's phrasing 'inconsistently' suggests it read a list of upstream fields rather than this port's options bag.",
+  "#THE PATTERN IS NOW WORTH A RULE FOR THE REVIEW PROMPT, which is the durable output of these two: a reviewer that finds an options bag will tend to enumerate every field it knows from upstream and report the ones it cannot see being passed, whether or not they belong to the signature. 'It does not pass X' is only a finding when X is a parameter of the method being examined. Both #3 and #4 fail that test, and neither survived contact with the signature.",
+  "#4 REJECTED on reading: partialVariables IS handled; metadata/tags are not its options"
  ],
  "inclusionai/ling-3.0-flash-vl": [
   "NOT A REVIEW: TRUNCATED twice at the 24k reasoning cap"
