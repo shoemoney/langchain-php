@@ -182,12 +182,16 @@
   "#5 mergeConfig undocumented \u2014 REJECTED, and it is the second reviewer this session to claim a doc is missing when it is extensive. mergeConfig carries a 21-line docblock directly above it stating the precedence rule and why `$a + $b` keeps the left operand."
  ],
  "google/gemma-4-31b-it": [
-  "Rescued on the second pass. All five probed this round; none survived.",
-  "#1 bare JSON fences with preambles are ignored \u2014 REJECTED on a probe: a bare ```json fence, a fence with a prose preamble, a fence with no language tag, and plain JSON all parse. Only prose followed by UNFENCED json throws, which matches upstream (it needs a fence or bare JSON).",
-  "#3 newlines in multi-line strings are deleted \u2014 REJECTED, and it is correct JSON semantics: a RAW newline inside a JSON string is invalid JSON and correctly throws; the escaped \\n form parses and round-trips. Nothing is deleted.",
-  "#5 falsy values are skipped in JSON-Patch diffs \u2014 REJECTED on a probe: false->replace, null->remove, 0->replace, ''->replace. Every one is the correct RFC 6902 operation; none is skipped.",
-  "#4 truncated escapes lose the backslash \u2014 REJECTED: upstream emits `u${hex}` for a short escape too (json.ts:88), so the backslash loss is upstream's own behaviour. The POSITION advance on that path WAS a real bug and was fixed this round.",
-  "#2 surrogate pairs \u2014 DEFERRED permanently as the port's documented divergence (a lone surrogate has no valid UTF-8 encoding; a complete astral character round-trips correctly)."
+  "#1 'Bare Fences with Preambles Fail' \u2014 REJECTED on upstream evidence. langchain-core/src/output_parsers/structured.ts:111-115:",
+  "#     const json =",
+  "#       trimmedText.match(/^```(?:json)?\\s*([\\s\\S]*?)```/)?.[1] ||",
+  "#       // second case: if back ticks with `json` appear anywhere in the text",
+  "#       trimmedText.match(/```json\\s*([\\s\\S]*?)```/)?.[1] ||",
+  "#Upstream's own first case requires the bare fence at position 0, and its only anywhere-match demands the literal `json` after the fence. So a BARE fence behind a preamble fails upstream exactly as it fails here. The port's two regexes are the same two regexes in the same order, and its docblock even says 'JavaScript's || treats an empty capture as absent, and so does the empty-string check here'. Eighth rejection of the family.",
+  "#4 'Empty JSON Fences are Ignored' \u2014 REJECTED on the same upstream lines, and the port's comment anticipates it precisely: upstream's `?.[1] ||` treats an empty capture as falsy and falls through to the next alternative, which is precisely what the port's explicit `$m[1] !== ''` guard reproduces. Faithful, and documented as such.",
+  "#5 'Literal Token Boundary Failure' \u2014 A REPEAT of a defect FIXED in iteration 61. The reversed `str_starts_with` argument order that made every complete JSON containing `true`, `false` or `null` throw was corrected there, mutation-verified, and guarded by five cases. The model could not have known. Recorded as settled rather than re-derived, and it is the second repeat of a settled finding in two iterations \u2014 which is itself worth watching, because a reviewer working from the current source should be able to see `true` parsing.",
+  "#2 'Quadratic Complexity in Partial Parsing' and #3 'Quadratic Complexity in Cumulative Streaming' \u2014 DEFERRED unverified. These are performance claims, and the standing rule is that a number I did not measure is not a number I may write down. Confirming quadratic behaviour needs a scaling probe across input sizes, and I did not run one. A defensible finding, but not one I will accept on assertion \u2014 and note that upstream's own partial parser is character-indexed too, so any resulting divergence would need upstream's complexity established first.",
+  "#1/#4 REJECTED (upstream structured.ts:111-115 identical); #5 a settled repeat; #2/#3 deferred"
  ],
  "qwen/qwen3-vl-235b-a22b-thinking": [
   "First review of the OUTPUT PARSER layer \u2014 a packet-rotation change made it visible. All five probed; none reproduced.",

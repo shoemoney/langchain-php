@@ -69,11 +69,47 @@
    "chars": 3151,
    "findings": 5,
    "severity_hits": 5
+  },
+  "google/gemma-4-31b-it": {
+   "model": "google/gemma-4-31b-it",
+   "at": "2026-09-30T07:38:41",
+   "actual_model": "google/gemma-4-31b-it",
+   "usage": {
+    "prompt_tokens": 37326,
+    "completion_tokens": 16350,
+    "total_tokens": 53676,
+    "cost": 0.0092916,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0092916,
+     "upstream_inference_prompt_cost": 0.0037326,
+     "upstream_inference_completions_cost": 0.005559
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 15719,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 15719,
+   "status": "ok",
+   "file": ".loop/reviews/03-google__gemma-4-31b-it.md",
+   "chars": 2585,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
   "~z-ai/glm-flash-latest",
-  "google/gemini-3.8-flash"
+  "google/gemini-3.8-flash",
+  "google/gemma-4-31b-it"
  ],
  "next_index": 0
 }
