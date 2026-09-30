@@ -83,7 +83,16 @@ class PassthroughSpy extends Runnable
 
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
-        $this->seen[] = $config?->runName;
+        // Records the CARRIER, not the destination: the step tag is a label and
+        // now travels in `config->tags`, matching where the code puts it. The
+        // previous spy recorded `runName`, which is precisely the field the fix
+        // stopped writing to — a spy that watches the old carrier would have gone
+        // quietly blank instead of failing.
+        foreach ($config?->tags ?? [] as $t) {
+            if (is_string($t) && str_starts_with($t, 'seq:step:')) {
+                $this->seen[] = $t;
+            }
+        }
 
         return $input;
     }

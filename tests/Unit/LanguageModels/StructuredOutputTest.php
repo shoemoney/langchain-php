@@ -397,19 +397,22 @@ final class StructuredOutputTest extends TestCase
         //     the config slot.
         self::assertArrayNotHasKey('runName', $seen->options, 'the name must reach config, not options');
 
-        // (2) The name does NOT yet survive the sequence, and that is a SEPARATE
-        //     OPEN defect. `stepConfig()` calls `forChild('seq:step:N')`, which
-        //     assigns `run_name` and so destroys the name it annotates; upstream
-        //     puts the step tag in the child CALLBACKS (base.ts:1982-1985).
+        // (2) And the name SURVIVES the sequence. `stepConfig()` used to call
+        //     `forChild('seq:step:N')`, which ASSIGNS `run_name` and so destroyed
+        //     the name it annotated. The tag now travels in `config->tags` — a
+        //     label, and a documented divergence from upstream's child-callback
+        //     tagging (base.ts:1982-1985) that this port cannot yet reproduce —
+        //     and `forChild(null)` keeps the caller's name while still
+        //     establishing the parent/child run-id relationship.
         //
-        //     A fix for it WORKS — with the bind slot corrected, `forChild(null)`
-        //     yields runName='pull_person' — and it was reverted anyway, because
-        //     RunnableSequenceStepTagTest correctly guards the `seq:step:N` tag
-        //     and this port has no callback manager to RELOCATE it into. Deleting
-        //     the tag to stop the clobber trades real observability for a naming
-        //     bug. Asserted here so the day someone gives the tag a carrier, this
-        //     line fails and names the work.
-        self::assertSame('seq:step:1', $seen->runName, 'the step tag clobber is still open');
+        //     Two defects were STACKED and had to be fixed in order: while the
+        //     bind slot was also wrong there was no name to preserve, and a
+        //     preserved-but-absent name is indistinguishable from a clobbered one.
+        self::assertSame('pull_person', $seen->runName, 'the sequence must not clobber the name it was given');
+
+        // (3) And the step tag is still emitted, just in its new carrier — so
+        //     relocating it did not buy the fix by deleting the observability.
+        self::assertContains('seq:step:1', $seen->tags);
 
     }
 }

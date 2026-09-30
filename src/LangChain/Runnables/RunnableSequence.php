@@ -84,11 +84,43 @@ class RunnableSequence extends Runnable
      */
     private function stepConfig(?RunnableConfig $config, int $index): ?RunnableConfig
     {
-        $runName = 'seq:step:' . ($index + 1);
+        // The step tag is a LABEL and now lives in `tags`, not in `runName`.
+        //
+        // Upstream records it in the CHILD CALLBACK manager
+        // (langchain-core/src/runnables/base.ts:1982-1985):
+        //
+        //     patchConfig(config, { callbacks: runManager?.getChild(`seq:step:${i + 1}`) })
+        //
+        // This port does not thread a callback manager through sequences, so the
+        // closest available carrier is `config->tags`. That is a documented
+        // divergence — a tag is a label, not an identity — and it is recorded in
+        // PORT_STATUS under Known non-exact behaviours rather than presented as
+        // faithful.
+        //
+        // The previous code called `$config->forChild('seq:step:' . ($index + 1))`,
+        // and `forChild()` ASSIGNS `run_name` — so the sequence's step tagging
+        // DESTROYED the name it was annotating. Measured on an assembled
+        // structured-output pipeline named `pull_person`:
+        //
+        //     runName = "seq:step:1"   options = {"runName" => "pull_person"}
+        //
+        // silently, because `Run::name()` falls back to the component id and then
+        // the run type, so a run missing its name still shows a plausible one.
+        //
+        // `forChild(null)` keeps the caller's runName and still establishes the
+        // parent/child run-id relationship, which is what tracing a tree needs.
+        // Two defects were stacked here and had to be fixed in order: while the
+        // bind slot was also wrong there was no name to preserve, and a
+        // preserved-but-absent name is indistinguishable from a clobbered one.
+        $tag = 'seq:step:' . ($index + 1);
 
-        return $config === null
-            ? new RunnableConfig(runName: $runName)
-            : $config->forChild($runName);
+        if ($config === null) {
+            return (new RunnableConfig())->with(['tags' => [$tag]]);
+        }
+
+        return $config->forChild(null)->with([
+            'tags' => array_merge($config->tags, [$tag]),
+        ]);
     }
 
     /**
