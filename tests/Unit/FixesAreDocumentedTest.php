@@ -9,24 +9,28 @@ use PHPUnit\Framework\TestCase;
 /**
  * Every `fix:` commit must be traceable to a row in PORT_STATUS.md.
  *
- * Rows carry a `<!-- fix:HASH -->` marker naming the commit they document, and
- * this walks `git log` checking each one is present. The marker is what makes
- * the check exact.
+ * Rows carry a `<!-- fix:HASH -->` marker naming the commit they document.
  *
- * It was not exact at first. Two earlier versions matched the commit's
- * distinctive words against the ledger's prose and required most of them to
- * appear, which sounds strict and is not: removing the `fromConnString` row
- * still passed, because `config`, `checkpoint` and `pending` occur in dozens of
- * other rows. Both mutations survived both versions. Word-matching prose is the
- * wrong mechanism — a guard that always passes is worse than none, because it
- * reads as coverage while checking nothing.
+ * Getting this guard to actually GUARD took four attempts, and all four
+ * failures are the same mistake, which is worth stating plainly because it has
+ * now happened four times in this project:
  *
- * Why this exists at all: four consecutive iterations shipped real fixes whose
- * ledger rows never landed. Each PORT_STATUS edit sat in the same shell command
- * as a `git commit -m "..."` whose message contained BACKTICKS, and zsh performed
- * command substitution on them before the heredoc holding the edit was read. The
- * commit landed, the row did not, and CI stayed green. `DocsMatchRealityTest`
- * cannot see it — it verifies the ledger's counts, not whether a fix is recorded.
+ *   1. Matched the commit's distinctive WORDS against the ledger's prose.
+ *      Removing a row still passed — `config` and `checkpoint` occur in dozens
+ *      of other rows. Both mutations survived.
+ *   2. Required most of those words instead of one. Same result.
+ *   3. Switched to exact per-commit hash markers, which works — but queried
+ *      `git log main`. CI checks out a DETACHED HEAD with no local `main`
+ *      ref, so git printed `fatal: ambiguous argument 'main'`, the guard read
+ *      an empty log, found zero fix commits, and passed. CI reported green on a
+ *      test that had verified nothing, for an entire iteration.
+ *   4. This version: query `HEAD` (which exists however the tree was checked
+ *      out) and, crucially, FAIL when no history is visible.
+ *
+ * The lesson is not "add more assertions", it is: a guard must prove it can see
+ * what it is meant to see. An assertion satisfied by an EMPTY input is not a
+ * passing assertion, and the failure is silent in exactly the way that matters —
+ * the build is green while nothing was checked.
  */
 final class FixesAreDocumentedTest extends TestCase
 {
@@ -37,16 +41,34 @@ final class FixesAreDocumentedTest extends TestCase
         'the shell ate',  // the ledger repair itself
     ];
 
-    public function testEveryFixCommitHasALedgerRow(): void
+    /**
+     * @return list<array{0: string, 1: string}>
+     */
+    private static function fixCommits(): array
     {
         $root = dirname(__DIR__, 2);
-        $ledger = (string) file_get_contents($root . '/PORT_STATUS.md');
 
+        // HEAD, not `main`: a CI checkout is detached with no local branch, and
+        // `git log main` fails there outright.
         $log = (string) shell_exec(
-            'cd ' . escapeshellarg($root) . ' && git log --pretty=format:%h%x09%s main 2>/dev/null'
+            'cd ' . escapeshellarg($root) . ' && git log --pretty=format:%h%x09%s HEAD 2>&1'
         );
 
-        $missing = [];
+        // A guard that cannot see the history must FAIL, not pass. Anything else
+        // turns "no data" into "no problems", which is the whole bug this file
+        // exists to prevent.
+        self::assertNotSame(
+            '',
+            trim($log),
+            'git log produced nothing — this guard cannot verify anything, so it fails rather than passes vacuously',
+        );
+        self::assertStringNotContainsString(
+            'fatal:',
+            $log,
+            'git log failed. A CI checkout is detached, so this must query HEAD, not a branch name.',
+        );
+
+        $commits = [];
         foreach (explode("\n", $log) as $line) {
             $line = trim($line);
             if ($line === '' || !str_contains($line, "\t")) {
@@ -61,6 +83,28 @@ final class FixesAreDocumentedTest extends TestCase
                     continue 2;
                 }
             }
+            $commits[] = [$hash, $subject];
+        }
+
+        return $commits;
+    }
+
+    public function testTheGuardCanActuallySeeHistory(): void
+    {
+        // A shallow CI checkout legitimately shows one commit; the point is that
+        // it is ONE, not none.
+        self::assertNotEmpty(
+            self::fixCommits(),
+            'no fix: commits found — either the history is invisible (guard is blind) or every fix is ignored',
+        );
+    }
+
+    public function testEveryFixCommitHasALedgerRow(): void
+    {
+        $ledger = (string) file_get_contents(dirname(__DIR__, 2) . '/PORT_STATUS.md');
+
+        $missing = [];
+        foreach (self::fixCommits() as [$hash, $subject]) {
             if (!str_contains($ledger, '<!-- fix:' . $hash . ' -->')) {
                 $missing[] = sprintf('%s  %s', $hash, $subject);
             }
@@ -77,13 +121,12 @@ final class FixesAreDocumentedTest extends TestCase
 
     public function testTheLedgerActuallyCarriesMarkers(): void
     {
-        $root = dirname(__DIR__, 2);
-        $ledger = (string) file_get_contents($root . '/PORT_STATUS.md');
+        $ledger = (string) file_get_contents(dirname(__DIR__, 2) . '/PORT_STATUS.md');
 
         self::assertGreaterThan(
             5,
             preg_match_all('/<!-- fix:[0-9a-f]{7,40} -->/', $ledger, $m),
-            'the marker scheme is in use; a ledger with none means the check below is vacuous',
+            'the marker scheme is in use; a ledger with none means the checks above are vacuous',
         );
     }
 }

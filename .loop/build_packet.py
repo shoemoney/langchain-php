@@ -29,10 +29,32 @@ def metrics():
     loc = lambda files: int(sh(f"cat {' '.join(files)} | wc -l") or 0)
     suite = sh("composer test 2>&1 | tail -3")
     m = re.search(r"OK \((\d+) tests?, (\d+) assertions?\)", suite)
+
+    # The count comes from `--list-tests`, NOT from the OK line.
+    #
+    # The OK line is only present when the suite is GREEN, so parsing it meant a
+    # red suite reported `tests: 0` — and build_packet wrote that into the
+    # packet every reviewer reads. One iteration reviewed this repository as
+    # having no tests at all, because a doc-drift failure had left the suite red
+    # at the moment the packet was built. The count is a fact about the
+    # repository and must not depend on whether the suite currently passes.
+    listed = sh("./vendor/bin/phpunit --list-tests 2>/dev/null | grep -c '^ - '")
+    tests = int(listed) if listed.isdigit() else 0
+
+    if tests == 0:
+        # Not a warning: a packet claiming zero tests is worse than no packet,
+        # and silently proceeding is what produced the bad review.
+        raise SystemExit(
+            "refusing to build a packet: could not count the suite.\n"
+            "A packet that reports `tests: 0` was read by a reviewer as a "
+            "repository with no tests, which is how an entire review was framed "
+            "on a false premise.\nSuite tail was:\n" + suite[-600:]
+        )
+
     return {
         "src_files": len(src), "src_lines": loc(src),
         "test_files": len(tst), "test_lines": loc(tst),
-        "tests": int(m.group(1)) if m else 0,
+        "tests": tests,
         "assertions": int(m.group(2)) if m else 0,
         "suite_ok": bool(m),
     }
@@ -274,4 +296,10 @@ if __name__ == "__main__":
     png = build_diagram(m)
     json.dump(m, open(".loop/metrics.json", "w"), indent=1)
     print(f"packet: {n:,} chars   focus: {focus}   tests: {m['tests']}")
+    if not m['suite_ok']:
+        print(
+            "  WARNING: the suite is RED. The packet says so, and a reviewer may "
+            "misread a failing run as missing coverage. Fix the suite before "
+            "treating any review as authoritative."
+        )
     advance_focus()

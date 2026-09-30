@@ -1928,6 +1928,41 @@
    "chars": 3209,
    "findings": 5,
    "severity_hits": 5
+  },
+  "bytedance-seed/seed-1.6-flash": {
+   "model": "bytedance-seed/seed-1.6-flash",
+   "at": "2026-09-29T22:30:07",
+   "actual_model": "bytedance-seed/seed-1.6-flash",
+   "usage": {
+    "prompt_tokens": 30469,
+    "completion_tokens": 1684,
+    "total_tokens": 32153,
+    "cost": 0.002790375,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.002790375,
+     "upstream_inference_prompt_cost": 0.002285175,
+     "upstream_inference_completions_cost": 0.0005052
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 787,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 787,
+   "status": "incomplete",
+   "file": ".loop/reviews/62-bytedance-seed__seed-1.6-flash.md",
+   "chars": 4248,
+   "findings": 0,
+   "severity_hits": 0
   }
  },
  "order": [
@@ -2048,7 +2083,8 @@
   "openrouter/free",
   "google/gemini-3.5-flash",
   "google/gemma-4-26b-a4b-it:free",
-  "qwen/qwen3.7-flash"
+  "qwen/qwen3.7-flash",
+  "bytedance-seed/seed-1.6-flash"
  ],
  "next_index": 0
 }
