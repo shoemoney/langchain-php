@@ -434,4 +434,42 @@ final class StateGraphTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $graph->addConditionalEdges('nope', static fn ($s) => 'a');
     }
+
+    /**
+     * A duplicate condition name is refused, as upstream refuses it.
+     *
+     * Upstream (langgraph-core/src/graph/graph.ts:488-495) throws
+     * `Condition \`${name}\` already present for node \`${source}\`` rather than
+     * overwriting. The keyed-by-name storage was already faithful here; the GUARD
+     * was missing, so two conditional edges from one node with no `pathMap` both
+     * resolved to SELF and the second silently replaced the first — a branch a
+     * caller registered and saw accepted simply disappearing, with nothing thrown.
+     *
+     * Two assertions because the guard is easy to over-apply: a duplicate must
+     * throw, and DISTINCT names from the same source must both still register. A
+     * guard that refused everything would pass the first.
+     */
+    public function testADuplicateConditionalEdgeNameIsRefused(): void
+    {
+        $graph = (new StateGraph(self::listSchema()))
+            ->addNode('a', static fn (array $s): array => ['items' => []])
+            ->addNode('b', static fn (array $s): array => ['items' => []]);
+        $graph->addConditionalEdges('a', static fn ($s) => 'b');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('already present for node `a`');
+        $graph->addConditionalEdges('a', static fn ($s) => 'b');
+    }
+
+    public function testDistinctConditionalEdgeNamesFromOneNodeBothRegister(): void
+    {
+        $graph = (new StateGraph(self::listSchema()))
+            ->addNode('a', static fn (array $s): array => ['items' => []])
+            ->addNode('b', static fn (array $s): array => ['items' => []])
+            ->addNode('c', static fn (array $s): array => ['items' => []]);
+        $graph->addConditionalEdges('a', static fn ($s) => 'b', ['to_b' => 'b']);
+        $graph->addConditionalEdges('a', static fn ($s) => 'c', ['to_c' => 'c']);
+
+        $this->addToAssertionCount(1);
+    }
 }

@@ -1124,5 +1124,22 @@
   "#ELEMENT 5 (fidelity) IS ACTIONABLE AND ADOPTED. Its suggestion: 'Split the divergence table into three categories: impossible in PHP, intentionally omitted, and still unverified against upstream.' That is a THIRD category, and iteration 108 had just widened this same section from one kind to two after finding its preamble contradicted its own table. The third is the one that was missing.",
   "#WHY IT MATTERS MORE THAN TIDINESS. The rows in that table are settled: the upstream side was read and the PHP side is pinned by a test. Several findings in this ledger are instead 'confirmed and deferred' purely because the upstream file was unreachable from the checkout \u2014 the conditional-edges storage shape in iteration 102, the StateGraph graph source, the langgraph-js graph implementation. A table with no place to record that state will eventually list a guess beside a measurement and make the two look identical, which is precisely how iteration 60's stale-closed entry and iteration 118's false finding both got in. The preamble now names all three and says explicitly that a row you cannot categorise belongs in the triage ledger with its reason, not here.",
   "#THE OTHER SIX NEEDS-WORK ELEMENTS WERE NOT AUDITED. Element 1 (layering) is the known LangGraph -> LangChain fidelity misread, refuted on iteration 111 with the upstream package.json (`\"@langchain/core\": \"^1.1.44\"`); element 6 asks for semantic coverage in low-visibility namespaces, which is a direction rather than a defect. Neither is recorded as accepted or rejected because neither was examined this iteration, and a 7/8 count is a signal rather than a verdict."
+ ],
+ "audit/duplicate-conditional-edge": [
+  "#RESOLVED \u2014 LANDED AND MUTATION-VERIFIED IN ITERATION 120. This is the finding I DEFERRED in iteration 102 with the stated reason 'upstream's graph source is not reachable from this checkout'. That reason was wrong, and the method note is the point.",
+  "#I searched the WRONG PACKAGE. `grep -rl addConditionalEdges` across `langgraphjs/libs/` returns only a CHANGELOG, and I concluded upstream was absent. But `addConditionalEdges` does not exist upstream at all \u2014 the JS API is `addConditionalEdges` on a Graph whose implementation lives in **langgraph-core**, not `langgraph`. `langgraph-core/src/graph/graph.ts` was in the checkout the whole time. A search by METHOD NAME across a monorepo of many packages returns nothing when the method lives in a different package from the one you searched; the fix was to search by CONTENT (`branches[`) rather than by the name the reviewer had used.",
+  "#WHAT UPSTREAM SAYS (langgraph-core/src/graph/graph.ts:488-495):",
+  "#     if (this.branches[options.source] && this.branches[options.source][name]) {",
+  "#       throw new Error(`Condition \\`${name}\\` already present for node \\`${source}\\``);",
+  "#     }",
+  "#     this.branches[options.source] ??= {};",
+  "#     this.branches[options.source][name] = new Branch(options);",
+  "#THE ANSWER IS NOT THE ONE I EXPECTED, which is why the deferral was worth finishing rather than abandoning. The keyed-by-name storage I suspected of being the bug is FAITHFUL \u2014 upstream keys by name too. What the port was missing is the DUPLICATE GUARD: two conditional edges from one node with no pathMap both resolve to SELF, and this port silently kept the second, so a branch a caller registered and saw accepted simply disappeared. Upstream refuses it, loudly, at REGISTRATION time \u2014 the only moment the caller can still act.",
+  "#MUTATION-VERIFIED: remove the guard -> 1 failure (RED); restore it -> OK (2 tests, 3 assertions) (GREEN). Two tests because a duplicate guard is trivial to over-apply: one asserts a duplicate throws, the other that DISTINCT names from the same source both still register. A guard that refused everything would pass the first.",
+  "#THE DEFERRAL WAS NOT WASTE, and I want that on the record because 'defer it' is often treated as the failure mode here. Deferring kept a half-right story out of the ledger for eighteen iterations, and finishing it produced the OPPOSITE verdict to the one I had queued. If I had 'resolved' it by reasoning from the port's code in iteration 102, I would have shipped a change to make branches index-keyed \u2014 a divergence introduced to fix a non-bug.",
+  "LANDED: upstream refuses duplicate condition names; port silently overwrote"
+ ],
+ "dots-studio/dots-3-note-preview_free": [
+  "NOT A REVIEW: TRUNCATED at the 24k reasoning cap"
  ]
 }

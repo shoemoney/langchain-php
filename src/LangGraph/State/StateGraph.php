@@ -226,6 +226,29 @@ class StateGraph
 
         $branchName = $pathMap === null ? Constants::SELF : (array_values($pathMap)[0] ?? Constants::SELF);
 
+        // Upstream REFUSES a duplicate condition name rather than overwriting it
+        // (langgraph-core/src/graph/graph.ts:488-495):
+        //
+        //     if (this.branches[source] && this.branches[source][name]) {
+        //       throw new Error(`Condition \`${name}\` already present for node \`${source}\``);
+        //     }
+        //     this.branches[source] ??= {};
+        //     this.branches[source][name] = new Branch(options);
+        //
+        // The keyed-by-name storage is the same; the guard is what was missing. Two
+        // conditional edges from one node with no pathMap both resolve to SELF, and
+        // this port silently kept the second — a branch a caller registered and
+        // could see accepted simply disappearing, with nothing thrown. Upstream makes
+        // it loud at REGISTRATION time, which is the only moment the caller can
+        // still do anything about it.
+        if (isset($this->branches[$start][$branchName])) {
+            throw new \InvalidArgumentException(sprintf(
+                'Condition `%s` already present for node `%s`',
+                $branchName,
+                $start,
+            ));
+        }
+
         $this->branches[$start][$branchName] = $path;
 
         return $this;
