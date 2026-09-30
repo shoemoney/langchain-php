@@ -34,10 +34,11 @@ final class AnthropicHeaderPrecedenceTest extends TestCase
             'apiKey' => 'sk-test',
             'defaultHeaders' => $defaultHeaders,
         ]);
-        $m = new \ReflectionMethod($model, 'headers');
-        $m->setAccessible(true);
-
-        return $m->invoke($model);
+        // No setAccessible(): it has been a no-op since PHP 8.1 and is
+        // deprecated as of 8.5, where calling it raises a deprecation — which
+        // turns a green run into 'OK, but there were issues!' and made the
+        // packet report the suite RED.
+        return (new \ReflectionMethod($model, 'headers'))->invoke($model);
     }
 
     public function testThePinnedVersionWins(): void

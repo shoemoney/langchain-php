@@ -73,6 +73,26 @@ abstract class BaseMessage extends Serializable
             // The v0 shape: a bare block list plus an output_version marker.
             $this->content = array_values($f['contentBlocks']);
             $this->response_metadata = ['output_version' => 'v1'] + $this->response_metadata;
+        } elseif (! $isBareContent && self::carriesIdentityButNoContent($f)) {
+            // A FIELD MAP with no content anywhere is not a message.
+            //
+            // `looksLikeFieldMap()` is satisfied by the key `type` alone, so
+            // `new HumanMessage(['type' => 'text', 'text' => 'hi'])` - a single
+            // content block - was read as a field map with no `content`, fell to
+            // the default, and produced an EMPTY message. Measured: content became
+            // `[]`, the text silently gone, no error anywhere.
+            //
+            // Upstream REFUSES this shape rather than emptying it: messages/utils.ts
+            // destructures a two-element TUPLE for an array, requires `role` for a
+            // field map, and otherwise reaches `_constructMessageFromParams`,
+            // which throws for a type it does not know. Producing an empty
+            // message is strictly worse than refusing the input.
+            throw new \InvalidArgumentException(
+                'Message fields must include content or contentBlocks; got keys: '
+                . implode(', ', array_keys($f))
+                . '. A single content block is BARE content, not a field map - '
+                . 'pass it as a list of one block instead.'
+            );
         } else {
             $this->content = [];
         }
@@ -101,6 +121,24 @@ abstract class BaseMessage extends Serializable
             return false;
         }
         foreach (['content', 'contentBlocks', 'id', 'name', 'additional_kwargs', 'response_metadata', 'type'] as $key) {
+            if (array_key_exists($key, $value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether these keys give a message an identity but never say what it says.
+     *
+     * Keys that can identify a message (`type`, `role`, `id`, `name`) with no
+     * `content` and no `contentBlocks`. A map with none of those is a bare block
+     * bag, which the bare-content path already handles, so it is not an error.
+     */
+    private static function carriesIdentityButNoContent(array $value): bool
+    {
+        foreach (['type', 'role', 'id', 'name'] as $key) {
             if (array_key_exists($key, $value)) {
                 return true;
             }

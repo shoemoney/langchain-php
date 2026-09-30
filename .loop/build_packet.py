@@ -27,8 +27,15 @@ def metrics():
     src = [l for l in sh("find src -name '*.php'").splitlines() if l]
     tst = [l for l in sh("find tests -name '*.php'").splitlines() if l]
     loc = lambda files: int(sh(f"cat {' '.join(files)} | wc -l") or 0)
-    suite = sh("composer test 2>&1 | tail -3")
+    suite = sh("composer test 2>&1 | tail -6")
+    # PHPUnit prints "OK (N tests, M assertions)" on a clean run, but replaces it
+    # with "OK, but there were issues!" when there are deprecations, notices or
+    # risky tests — and then prints "Tests: N, Assertions: M, Deprecations: D".
+    # Matching only the first form made a PASSING suite report RED, which is the
+    # worst possible direction for a signal reviewers are told to trust.
     m = re.search(r"OK \((\d+) tests?, (\d+) assertions?\)", suite)
+    if not m:
+        m = re.search(r"Tests: (\d+), Assertions: (\d+)(?!, Failures)", suite)
 
     # The count comes from `--list-tests`, NOT from the OK line.
     #
