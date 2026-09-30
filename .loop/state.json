@@ -610,6 +610,39 @@
    "chars": 4457,
    "findings": 5,
    "severity_hits": 5
+  },
+  "nex-agi/nex-n2.5-mini": {
+   "model": "nex-agi/nex-n2.5-mini",
+   "at": "2026-09-30T11:11:46",
+   "actual_model": "nex-agi/nex-n2.5-mini",
+   "usage": {
+    "prompt_tokens": 48031,
+    "completion_tokens": 24000,
+    "total_tokens": 72031,
+    "cost": 0.003600775,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.003600775,
+     "upstream_inference_prompt_cost": 0.001200775,
+     "upstream_inference_completions_cost": 0.0024
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 23790,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "length",
+   "reasoning_tokens": 23790,
+   "status": "truncated",
+   "chars": 94395,
+   "file": ".loop/reviews/20-nex-agi__nex-n2.5-mini.md"
   }
  },
  "order": [
@@ -631,7 +664,8 @@
   "~anthropic/claude-sonnet-latest",
   "openai/gpt-4o-2024-11-20",
   "z-ai/glm-4.5v",
-  "anthropic/claude-fable-5.1"
+  "anthropic/claude-fable-5.1",
+  "nex-agi/nex-n2.5-mini"
  ],
  "next_index": 0
 }

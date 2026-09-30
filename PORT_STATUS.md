@@ -107,12 +107,24 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 
 ## Known non-exact behaviours
 
-Places where PHP cannot reproduce JavaScript at all, or where this port makes a
-deliberate different choice. Each is pinned by a test so the boundary stays
-visible rather than being rediscovered as a surprise.
+Two kinds of divergence live in this one table, and the previous version of this
+heading claimed there was only one:
 
-Places where PHP genuinely cannot reproduce JavaScript, documented rather than
-papered over. Each is pinned by a test so the boundary stays visible.
+1. **PHP genuinely cannot reproduce JavaScript** — a surrogate is not a Unicode
+   scalar value, so mbstring refuses `mb_chr(0xD83D)` where a JS string holds the
+   lone surrogate natively.
+2. **The port makes a deliberate different choice** — `batch()`'s `$options` is
+   accepted and ignored, because `maxConcurrency` has no PHP equivalent, and that
+   is a decision rather than a limitation.
+
+An earlier revision opened this section with BOTH definitions stacked on top of each
+other, the second silently narrowing the first to "genuinely cannot reproduce". The
+table contradicted its own preamble, which is the docs-that-contradict-code class this
+project treats as a defect — and here the contradiction was internal, so no guard
+could see it: `DocsMatchRealityTest` checks counts, not framing.
+
+Each row below is pinned by a test, so the boundary stays visible rather than being
+rediscovered as a surprise.
 
 | Behaviour | Why | Where |
 |---|---|---|
