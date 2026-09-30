@@ -129,5 +129,12 @@
   "file": ".loop/advisory/ministral-14b-2512.md",
   "chars": 12372,
   "cost": 0.0031
+ },
+ "openai/gpt-chat-latest": {
+  "status": "ok",
+  "at": "2026-09-30T16:08:47.529448+00:00",
+  "file": ".loop/advisory/gpt-chat-latest.md",
+  "chars": 12569,
+  "cost": 0.1479
  }
 }
