@@ -126,11 +126,17 @@ class RunnableSequence extends Runnable
     }
 
     /**
-     * Stream from the first step that can stream, then feed the rest eagerly.
+     * Stream every step, in order, yielding each step's own chunks.
      *
-     * This mirrors the TS behaviour: only the *first* step streams, because
-     * once its output is a stream there is no way to synchronise a downstream
-     * step that expects a complete value.
+     * Each step is STREAMED — not invoked — and the previous step's
+     * default-channel chunk becomes the next step's input, which is what upstream
+     * does (langchain-core/src/runnables/base.ts:2109-2126).
+     *
+     * This docblock previously said "only the *first* step streams, then feed the
+     * rest eagerly", which described the code as it was BEFORE that rewrite: the
+     * body changed and this text did not, so it described a method this class no
+     * longer had. Leaving it was the same mistake as the fix comments elsewhere in
+     * this repo — a comment that keeps narrating behaviour the code no longer has.
      */
     public function stream(mixed $input, ?RunnableConfig $config = null): \Generator
     {

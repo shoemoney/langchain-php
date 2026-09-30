@@ -1135,6 +1135,41 @@
    "chars": 2788,
    "findings": 5,
    "severity_hits": 5
+  },
+  "fireworks/ember-1": {
+   "model": "fireworks/ember-1",
+   "at": "2026-09-30T14:59:37",
+   "actual_model": "fireworks/ember-1",
+   "usage": {
+    "prompt_tokens": 39051,
+    "completion_tokens": 2158,
+    "total_tokens": 41209,
+    "cost": 0.149523,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.149523,
+     "upstream_inference_prompt_cost": 0.117153,
+     "upstream_inference_completions_cost": 0.03237
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1209,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1209,
+   "status": "ok",
+   "file": ".loop/reviews/36-fireworks__ember-1.md",
+   "chars": 4047,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1172,7 +1207,8 @@
   "minimax/minimax-01",
   "bytedance/ui-tars-1.5-7b",
   "mistralai/mistral-medium-3-5",
-  "openai/gpt-chat-latest"
+  "openai/gpt-chat-latest",
+  "fireworks/ember-1"
  ],
  "next_index": 0
 }
