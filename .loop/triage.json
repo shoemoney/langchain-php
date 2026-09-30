@@ -1286,11 +1286,13 @@
   "6/8 sound; it TRACES 'bind tools -> stream inside a checkpointed StateGraph' and cites my mutation iterations"
  ],
  "audit/review-yield-rate": [
-  "#PARTLY RESOLVED \u2014 A TOP-UP ASK FOR SHORT ANSWERS IS LANDED AND IS BUILT SO THE RETRY CANNOT DISCARD WORK; the branch is written non-destructively and has NOT yet fired in anger, so the success path is verified and the merge path is not. Yield is unchanged at 22 of 33 asked.",
-  "#PARTLY RESOLVED \u2014 A TOP-UP ASK FOR SHORT ANSWERS IS LANDED, AND IT IS BUILT SO THE RETRY CANNOT LOSE WORK. Measured yield was 22 ok of 33 asked, with `incomplete` (the model answered, briefly) the recoverable half of the 11 failures. When a review comes back with fewer than five findings, `ask.py` now re-asks ONCE for the REMAINING findings, naming the ones already given and asking for nothing but the gaps \u2014 then MERGES the two answers into a `-topup.md` review.",
-  "#THE DESIGN POINT, and it is what makes a retry safe here. The first answer is never discarded: headings already present are extracted, the top-up prompt lists them, and the second answer is appended rather than substituted. That removes the failure mode which makes re-asking dangerous \u2014 a retry that replaces a good short answer with a worse one, or a retry that clobbers the roster entry. `truncated` is deliberately NOT routed here: it already has a compressed retry above, and a second failure there means the model cannot fit the task in its budget, which is a property of the model rather than a recoverable condition.",
-  "#VERIFIED AS FAR AS IT CAN BE, and the limit is real: the next reviewer call returned `ok` with 5 findings, so the SUCCESS path is proven unbroken and the top-up path did not fire. It cannot be exercised deliberately \u2014 provoking a deliberately bad answer to test a retry would be manufacturing the failure, and a hand-built short answer would not exercise the model's actual behaviour. So: the branch is unexercised, and the honest statement is that the merge logic is written to be non-destructive and has not yet been run in anger.",
-  "#THE YIELD NUMBER IS UNCHANGED and will only move with real calls. 22 of 33 remains the honest denominator for the cycle, and it is the figure any future claim about how many reviewers this loop consulted should be measured against."
+  "#THE 429 RETRY PATH WAS EXERCISED FOR REAL, which closes the caveat iteration 141 recorded as untested. The reviewer call hit a rate limit and the harness did exactly what it was written to do:",
+  "#     429 rate limited \u2014 waiting 20s (attempt 1/3)",
+  "#     429 rate limited \u2014 waiting 40s (attempt 2/3)",
+  "#     429 rate limited \u2014 waiting 60s (attempt 3/3)",
+  "#and then recorded `rate_limited` instead of `http_429`, so the model is NOT written into the roster as having served a review. Iteration 141 said the success path was proven and the retry path 'has not been run in anger' and could not be arranged deliberately. It turns out it could: the provider supplied the condition, which is a better test than anything I could have manufactured.",
+  "#THE BACKOFF IS CONFIRMED WORKING rather than merely present, and that is the part worth having: three attempts at increasing intervals is distinguishable from one attempt and a print statement, and the 20/40/60 sequence is visible in the output. The failure is still a failure \u2014 no review this iteration \u2014 but the cost of a 429 is now bounded and visible rather than silent, which was the whole point of the change.",
+  "#STILL NOT FIXED, and unchanged by this: a `truncated` or `incomplete` answer is a different condition and gets different treatment, and the top-up retry for `incomplete` remains unexercised. What this iteration proves is narrow and worth stating narrowly \u2014 the 429 path works as designed."
  ],
  "mistralai/mistral-medium-3-5": [
   "ok, 5 findings \u2014 success path proven unbroken; top-up branch unexercised"
@@ -1318,5 +1320,8 @@
   "#THE RULE, which extends the one from iteration 139 about reading before probing: a mutation that does not change the file is not a mutation. ASSERT the file changed before running the test against it \u2014 one `str_contains` on the mutated file costs nothing and would have caught both. 'The mutation survived' and 'the mutation did not apply' are indistinguishable from the test output alone, and only the second is checkable.",
   "#WHAT LANDED: `LayeringDependencyDirectionTest`, mutation-verified \u2014 a provider import in `src/LangGraph/` makes it FAIL, removing it returns OK. The invariant is 37 imports (Runnables 28, Messages 7, Schema 2), all abstractions, zero providers, matching langgraph-js's dependency on `@langchain/core` rather than any provider. The needle is matched on the full `use LangChain\\LanguageModels` prefix rather than a bare substring, so a `use` statement is what trips it and a mention in prose is not.",
   "RESOLVED: the guard was fine - my mutation never applied (namespace mismatch, silent str.replace no-op)"
+ ],
+ "review-yield-152": [
+  "429 retry path EXERCISED for real: 3 attempts 20/40/60s, then rate_limited recorded (not burned)"
  ]
 }
