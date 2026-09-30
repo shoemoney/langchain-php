@@ -39,6 +39,9 @@ jobs:
       - name: Unit tests
         run: ./vendor/bin/phpunit --testsuite unit
 
+      - name: Integration tests
+        run: ./vendor/bin/phpunit --testsuite integration
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
@@ -57,10 +60,14 @@ jobs:
       - run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Unit tests with coverage
-        run: ./vendor/bin/phpunit --testsuite unit --coverage-text
+        # `--coverage-clover` is what PRODUCES the artifact this job uploads.
+        # Without it the run only printed a text summary, clover.xml was never
+        # written, and the upload silently carried nothing — a job that looks
+        # like it reports coverage and reports none.
+        run: ./vendor/bin/phpunit --testsuite unit --coverage-text --coverage-clover clover.xml
 
       - uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: clover.xml
-          if-no-files-found: ignore
+          if-no-files-found: error
