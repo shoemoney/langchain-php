@@ -73,4 +73,34 @@ final class PartialJsonTruncationTest extends TestCase
             (new PartialJsonParser($document))->parse(),
         );
     }
+
+    /**
+     * A complete JSON document containing a literal must parse.
+     *
+     * `str_starts_with` is `($haystack, $needle)`, and the three literal branches
+     * passed the arguments the other way round, so the parser asked "does the
+     * literal `null` start with the rest of the buffer?" — never true. `true`,
+     * `false` and `null` therefore all fell through to the error path and
+     * COMPLETE, VALID JSON threw `Unexpected character`. A partial parser whose
+     * literals do not work is not a partial parser, and the suite missed it
+     * because every existing case here is about truncation and surrogate pairs,
+     * never about a literal token.
+     *
+     */
+    #[DataProvider('literalDocuments')]
+    public function testCompleteJsonContainingALiteralParses(string $json, mixed $expected): void
+    {
+        $this->assertSame($expected, (new PartialJsonParser($json))->parse());
+    }
+
+    public static function literalDocuments(): array
+    {
+        return [
+            'true' => ['{"a": true}', ['a' => true]],
+            'false' => ['{"a": false}', ['a' => false]],
+            'null' => ['{"a": null}', ['a' => null]],
+            'nested literals' => ['{"a": [true, false, null]}', ['a' => [true, false, null]]],
+            'literal before a string' => ['{"a": true, "b": "x"}', ['a' => true, 'b' => 'x']],
+        ];
+    }
 }

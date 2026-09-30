@@ -3219,6 +3219,41 @@
    "chars": 2707,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~openai/gpt-astra-latest": {
+   "model": "~openai/gpt-astra-latest",
+   "at": "2026-09-30T06:45:34",
+   "actual_model": "openai/gpt-6-astra",
+   "usage": {
+    "prompt_tokens": 35450,
+    "completion_tokens": 985,
+    "total_tokens": 36435,
+    "cost": 0.4923675,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 35447,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.4923675,
+     "upstream_inference_prompt_cost": 0.4431175,
+     "upstream_inference_completions_cost": 0.04925
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 224,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 224,
+   "status": "ok",
+   "file": ".loop/reviews/103-~openai__gpt-astra-latest.md",
+   "chars": 3354,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -3383,7 +3418,8 @@
   "~google/gemini-pro-latest",
   "~anthropic/claude-fable-latest",
   "perplexity/sonar-pro-search",
-  "~openai/gpt-mini-latest"
+  "~openai/gpt-mini-latest",
+  "~openai/gpt-astra-latest"
  ],
  "next_index": 0
 }

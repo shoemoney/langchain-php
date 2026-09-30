@@ -87,18 +87,24 @@ final class PartialJsonParser
             return $this->parseString();
         }
 
+        // Argument order matters and it was backwards: the PHP signature is
+        // str_starts_with($haystack, $needle), so this used to ask "does the
+        // literal 'null' start with the rest of the buffer?" — never true. Every
+        // literal therefore fell through to the error path, which meant COMPLETE
+        // and perfectly valid JSON containing `true`, `false` or `null` threw
+        // `Unexpected character`. This is not about partial input at all.
         $rest = mb_substr($this->buffer, $this->pos, 5, 'UTF-8');
-        if (str_starts_with('null', $rest)) {
+        if (str_starts_with($rest, 'null')) {
             $this->pos += min(4, $this->length - $this->pos);
 
             return null;
         }
-        if (str_starts_with('true', $rest)) {
+        if (str_starts_with($rest, 'true')) {
             $this->pos += min(4, $this->length - $this->pos);
 
             return true;
         }
-        if (str_starts_with('false', $rest)) {
+        if (str_starts_with($rest, 'false')) {
             $this->pos += min(5, $this->length - $this->pos);
 
             return false;

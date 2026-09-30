@@ -760,5 +760,20 @@
   "#THE INDIVIDUAL ELEMENT VERDICTS were not audited this iteration: no element's specific claim was probed against upstream, so none is accepted or rejected on its merits, and the 6/8 count is recorded as a signal rather than a verdict. Acting on a count without opening the claims is the same error as acting on a probe without opening upstream, which is how this loop shipped and then retracted a BLOCKER.",
   "#WHAT THIS ADVISORY WAS ACTUALLY WORTH: it exposed that audit entries in my own ledger are append-only in practice, so every one I forget to close becomes a standing invitation to recommend finished work. That is a defect in my bookkeeping, found by a model faithfully reading my bookkeeping, and it is worth more than any of its six verdicts.",
   "top recommendation was a FIXED defect; my ledger entry was stale and never closed"
+ ],
+ "~openai/gpt-astra-latest": [
+  "#1 'Boolean and null tokens fail before delimiters' \u2014 ACCEPTED and FIXED, and the reviewer's description UNDERSTATES it by a wide margin. They framed it as a partial-input edge case; the real consequence is that COMPLETE, VALID JSON containing `true`, `false` or `null` threw outright:",
+  "#     {\"a\": true}  ->  RuntimeException: Unexpected character 't' at position 6",
+  "#     {\"a\": null}  ->  RuntimeException: Unexpected character 'n' at position 6",
+  "#All three literal branches called str_starts_with with the ARGUMENTS REVERSED. PHP's signature is ($haystack, $needle); the code asked `str_starts_with('null', $rest)`, i.e. \"does the literal 'null' start with the rest of the buffer?\", which is never true. Every literal fell through to the error path. A partial parser whose literals do not work is not a partial parser.",
+  "#MUTATION-VERIFIED: restore the swapped arguments -> 4 errors across 5 cases (RED); restore the fix -> OK (5 assertions) (GREEN). Five cases, because `true`, `false`, `null`, a nested `[true, false, null]`, and a literal followed by a sibling string fail in different positions \u2014 the last is the one that proves the delimiter after a literal is consumed correctly rather than merely tolerated.",
+  "#5 'Unicode escape for \"0\" becomes a replacement character' \u2014 CONFIRMED BY PROBE, NOT YET FIXED. `{\"a\": \"x\\u0030y\"}` returns `{\"a\":\"x\\ufffdy\"}`: 0x30 is an ordinary BMP codepoint and must decode to '0'. Evidence quoted `parseUnicodeEscape()` returning `mb_chr($code, 'UTF-8') ?: \"\\u{FFFD}\"`, and mb_chr returns false for 0, so the `?:` fallback swallows a perfectly valid escape. This is real and is the next fix.",
+  "#2 'Surrogate state leaks between JSON strings' \u2014 CONFIRMED BY PROBE, NOT YET FIXED. `{\"a\":\"x\\ud800y\",\"b\":\"z\"}` returns `{\"a\":\"xy\",\"b\":\"z\"}` \u2014 the lone high surrogate is SILENTLY DELETED, so three characters become two and nothing reports it. The reviewer's reading of the early-return in parseString() is the right mechanism.",
+  "#3 'Large integers silently saturate during streaming' \u2014 REJECTED on execution. `(int) $numStr` does not saturate at PHP_INT_MAX: both paths agree exactly \u2014",
+  "#     json_decode       -> {\"a\":9223372036854775807}",
+  "#     PartialJsonParser -> {\"a\":9223372036854775807}",
+  "#The reviewer's evidence line was accurate but the conclusion does not follow; a value ABOVE PHP_INT_MAX would be needed to show anything, and json_decode turns those into floats, so the two would still agree on the common range. Rejected with a measurement rather than an argument.",
+  "#4 'Embedded backticks truncate fenced JSON' \u2014 DEFERRED unverified. The quoted regex `/^```(?:json)?\\s*([\\s\\S]*?)```/` is non-greedy and does look fragile against a backtick inside the payload, but nothing was executed and I am not recording a verdict I did not reach.",
+  "#1 ACCEPTED+FIXED (reversed str_starts_with args); #3 REJECTED on measurement; #2/#5 confirmed, queued"
  ]
 }
