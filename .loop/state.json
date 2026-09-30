@@ -919,6 +919,12 @@
    "chars": 3868,
    "findings": 5,
    "severity_hits": 5
+  },
+  "rekaai/reka-edge": {
+   "model": "rekaai/reka-edge",
+   "at": "2026-09-30T13:11:41",
+   "status": "http_400",
+   "error": "{\"error\":{\"message\":\"This endpoint's maximum context length is 16384 tokens. However, you requested about 31451 tokens (6006 of text input, 1445 of image input, 24000 in the output). Please reduce the length of either one, or use the context-compression plugin to compress your prompt automatically.\",\"code\":400,\"metadata\":{\"provider_name\":null}}}"
   }
  },
  "order": [
@@ -949,7 +955,8 @@
   "~anthropic/claude-fable-latest",
   "minimax/minimax-m3",
   "~openai/gpt-sol-latest",
-  "baidu/ernie-4.5-vl-424b-a47b"
+  "baidu/ernie-4.5-vl-424b-a47b",
+  "rekaai/reka-edge"
  ],
  "next_index": 0
 }
