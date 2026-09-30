@@ -69,12 +69,48 @@ final class PackagingAndCoverageTest extends TestCase
     {
         $yml = (string) file_get_contents(dirname(__DIR__, 2) . '/.github/workflows/ci.yml');
 
-        // The coverage step specifically, not the whole file — the `test` job
-        // runs the suites separately and must keep doing that.
+        // The whole COVERAGE job block. Scoping to a single `run:` line failed
+        // twice: the job's first step is `composer install`, and a fixed-width
+        // window around it swallowed the comment on the NEXT step, which
+        // mentions `--coverage-clover`, so the helper happily returned the
+        // composer line.
+        $block = self::coverageJobBlock($yml);
+
+        // The COMMA form specifically. `--testsuite unit --testsuite integration`
+        // names both suites and unions NEITHER: the second value replaces the
+        // first, so PHPUnit runs the integration suite ALONE and 2200 unit
+        // tests drop out of the coverage figure without an error. A guard that
+        // matched the two names separately was satisfied by a command that did
+        // not do what it said — the failing CI job is what caught that, not the
+        // test. Assert the FORM, not the vocabulary.
         self::assertMatchesRegularExpression(
-            '/--testsuite\s+unit\s+--testsuite\s+integration[^\n]*\n?[^\n]*--coverage-clover|--coverage-clover[^\n]*\n?[^\n]*--testsuite\s+unit\s+--testsuite\s+integration/',
-            $yml,
-            'the coverage job must measure the integration suite: the HTTP and SSE seams live there',
+            '/--testsuite\s+unit\s*,\s*integration/',
+            $block,
+            'the coverage job needs ONE comma-separated --testsuite, or `unit` is dropped from the '
+            . 'coverage figure entirely',
         );
+        // Comments are stripped first. The warning comment in ci.yml QUOTES the
+        // broken form on purpose, so without this the guard flags its own
+        // explanation — which is the false positive this project has now hit in
+        // three separate guards.
+        $code = (string) preg_replace('/^\s*#.*$/m', '', $block);
+
+        self::assertDoesNotMatchRegularExpression(
+            '/--testsuite\s+\S+\s+--testsuite\s/',
+            $code,
+            'a repeated --testsuite flag replaces the previous value instead of adding to it',
+        );
+    }
+
+    /** The coverage job's YAML, from its name to the next job at the same indent. */
+    private static function coverageJobBlock(string $yml): string
+    {
+        self::assertSame(
+            1,
+            preg_match('/^  coverage:\s*$.*?(?=^  [a-zA-Z]|\z)/ms', $yml, $m),
+            'the coverage job must exist in ci.yml',
+        );
+
+        return $m[0];
     }
 }

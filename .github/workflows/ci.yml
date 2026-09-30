@@ -85,8 +85,17 @@ jobs:
         # exactly where this port's release-blocking defects lived, and none of
         # it is reachable from `tests/Unit`. Measuring only the unit suite
         # reported a coverage figure that excluded the code most likely to break.
+        #
+        # ONE `--testsuite` with a COMMA-separated list. Passing the flag twice
+        # does not union the suites — the second value replaces the first, so a
+        # first attempt wrote `--testsuite unit --testsuite integration` and CI
+        # ran the integration suite ALONE (10 tests, 41 assertions), silently
+        # dropping 2200 unit tests from the coverage figure. Caught by watching
+        # the job fail with a suspiciously small test count, not by the guard
+        # below, which asserted on the STRING and was satisfied by a command that
+        # did not do what it said.
         run: >-
-          ./vendor/bin/phpunit --testsuite unit --testsuite integration
+          ./vendor/bin/phpunit --testsuite unit,integration
           --coverage-text --coverage-clover clover.xml
 
       - uses: actions/upload-artifact@v4
