@@ -367,6 +367,41 @@
    "chars": 3271,
    "findings": 5,
    "severity_hits": 5
+  },
+  "openai/o4-mini-high": {
+   "model": "openai/o4-mini-high",
+   "at": "2026-09-30T09:44:11",
+   "actual_model": "openai/o4-mini-high",
+   "usage": {
+    "prompt_tokens": 38862,
+    "completion_tokens": 13223,
+    "total_tokens": 52085,
+    "cost": 0.1009294,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.1009294,
+     "upstream_inference_prompt_cost": 0.0427482,
+     "upstream_inference_completions_cost": 0.0581812
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 12672,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 12672,
+   "status": "incomplete",
+   "file": ".loop/reviews/13-openai__o4-mini-high.md",
+   "chars": 1857,
+   "findings": 3,
+   "severity_hits": 3
   }
  },
  "order": [
@@ -381,7 +416,8 @@
   "~openai/gpt-luna-latest",
   "amazon/nova-pro-v1",
   "prism-ml/ternary-bonsai-2-27b",
-  "~moonshotai/kimi-latest"
+  "~moonshotai/kimi-latest",
+  "openai/o4-mini-high"
  ],
  "next_index": 0
 }

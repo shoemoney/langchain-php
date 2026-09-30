@@ -41,7 +41,8 @@
   "#1 port createReactAgent/ToolNode and #2 the Responses API \u2014 REJECTED as out of scope: both are known, documented, unported upstream subsystems, not defects. Already the tracked next step in PORT_STATUS.md.",
   "#3 toolCallToWire should reject an empty tool name \u2014 ACCEPTED-pending; matches upstream's `convertLangChainToolCallToOpenAI`.",
   "#4 forward RunnableConfig to RunnableLambda callbacks \u2014 ACCEPTED; matches upstream's `(input, config)` lambda signature and is a known documented divergence.",
-  "#5 accept the PHP-facing `stopSequences` key \u2014 ACCEPTED and fixed in this round."
+  "#5 accept the PHP-facing `stopSequences` key \u2014 ACCEPTED and fixed in this round.",
+  "NOT A REVIEW: status incomplete (3 findings) - not actioned"
  ],
  "openai/gpt-6-astra-pro": [
   "#1 Runnable::map() discards the receiver \u2014 ACCEPTED. Upstream has no `Runnable.map()` at all (grep: 0 occurrences in base.ts), so this was an invented convenience that silently returned an empty map. Removed; RunnableParallel::add() docblock corrected.",
@@ -998,5 +999,17 @@
   "#WHAT THE CONVENTION DOES NOT DECIDE, so I am not overstating it: it settles parameters upstream never uses. It says nothing about a parameter upstream DOES use, and nothing about a port method that takes a parameter upstream's method does not have at all. Those still need the body read and, where behaviour is claimed, execution.",
   "#MODEL: ~moonshotai/kimi-latest, ok, 5 findings, not yet triaged \u2014 this iteration's budget went to the deferred handleCustomEvent check, which had been deferred TWICE on reasoning that iteration 89 then disproved for the neighbouring method. Settling it was worth more than opening a new review.",
   "CONFIRMED twice: _tags/_metadata upstream = deliberately unused; #2 rejected"
+ ],
+ "~moonshotai/kimi-latest": [
+  "#2 'ChatMessage block content silently dropped in coercion' \u2014 REJECTED BY EXECUTION, and this iteration nearly filed it as a CONFIRMED MAJOR before the probe was corrected.",
+  "#My FIRST probe produced this: `ChatMessage(block content) -> \"user\"`. That reads exactly like a live defect \u2014 block content dropped, role string leaking into content. It was an artefact of guessing the constructor. `ChatMessage::__construct` takes a SINGLE `$fields` argument (`string|array`), not `(role, content)`, so `new ChatMessage(\"user\", $blocks)` bound \"user\" to `$fields`, which the constructor expands to `['role' => 'chat', 'content' => 'user']`. The probe was measuring my own call.",
+  "#With the constructor read and the call corrected:",
+  "#     ChatMessage(block content) -> [{\"type\":\"text\",\"text\":\"hello\"},{\"type\":\"image_url\",...}]   PRESERVED",
+  "#     ChatMessage(string content)  -> \"plain string\"                                                   PRESERVED",
+  "#Block content survives. The quoted line `is_string($templateData) ? $templateData : ''` sits at :360-362 in the `fromTemplate` path, not the `fromMessages` path this finding is about.",
+  "#THE FOURTH GUESSED CONSTRUCTOR IN THIS LOOP, after CharacterTextSplitter, TextSplitter, RunnableBinding and Document. Every one cost a failed probe, and this one nearly cost a false MAJOR in the ledger. The generalisation is not new and I am recording it because I keep failing it: READ THE SIGNATURE BEFORE THE PROBE, and when a probe returns something surprising, suspect the probe before the code \u2014 a finding that contradicts what the code plainly does should be re-probed with a verified call shape before it is written down.",
+  "#1 'parseImagePrompts() mutates the caller-owned message' \u2014 REJECTED AS A SETTLED REPEAT. Fidelity divergence from upstream confirmed (upstream builds a local content array and returns `new MsgClass({content})`; the port assigns `$message->content = $blocks`); the DEFECT was refuted by probe across three calls and then again across the retained-instance case. Fourth time it has been reported.",
+  "#3 'fromMessages() drops metadata and tags', #4 'fromTemplate() ignores metadata/tags/partial options' and #5 'Only four verified findings' \u2014 DEFERRED unverified. #5 is self-describing and was emitted as a numbered finding anyway, which is now a recurring review-quality pattern.",
+  "#2 REJECTED by execution; my probe nearly filed a false MAJOR on a guessed constructor"
  ]
 }
