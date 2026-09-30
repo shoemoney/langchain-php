@@ -1324,5 +1324,11 @@
  ],
  "review-yield-152": [
   "429 retry path EXERCISED for real: 3 attempts 20/40/60s, then rate_limited recorded (not burned)"
+ ],
+ "audit/triage-writer-mechanism": [
+  "#RESOLVED - THE RULE IS NOW A MECHANISM, NOT A RESOLUTION. `.loop/triage_add.py` is the one sanctioned way to write triage.json. It stamps a new `audit/` key with `#OPEN`, REFUSES to write when an existing `audit/` key's first note carries no marker, and re-checks after the write so a malformed note fails at the point of the mistake rather than at the next commit.",
+  "#Both guarantees were EXERCISED this iteration rather than asserted: seeding `audit/naked` with an unmarked first note produced `REFUSING TO WRITE: audit/naked has no status marker on its first note` and exit 1; a non-`audit/` key was accepted without a marker, as intended. The guard test stayed green throughout, so the mechanism and the guard agree rather than one compensating for the other.",
+  "#THE COUNT THAT JUSTIFIED IT: eight status-marker failures across this loop - four from `.append(a, b)` (77, 79, 92, 146) and three from `t[key] = [...]` replacing a list and wiping a stamped marker (130, 143, 152). I wrote the rule down after the fourth and broke it in the very next script, which is the clearest evidence in this log that a stated intention does not change behaviour. `TriageStatusMarkerTest` caught every instance, so the guard was always right and the WRITER was always the bug - which is the argument for fixing the writer rather than writing more guidance.",
+  "#AND A COMPOUND FAILURE WORTH LOGGING, because it happened while recording the fix for the previous failure. The first version of these notes was passed as a double-quoted SHELL string containing backticks, so the shell ran them as command substitution and mangled the text - the iteration-116 trap, recurring after 37 iterations. Backticks are the single most expensive character in this harness, and the rule is the same as the marker one: the mechanism has to own the quoting, because a rule about not typing backticks is a habit and habits have now been measured failing eight times and once more here."
  ]
 }
