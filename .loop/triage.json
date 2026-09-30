@@ -695,5 +695,21 @@
  ],
  "advisory/claude-haiku-4.5": [
   "6/8 sound; warning working; earlier pass likely TRUNCATED (5.8k vs 15.4k chars)"
+ ],
+ "~anthropic/claude-fable-latest": [
+  "#1 BLOCKER `RunnableSequence::stream()` forwards only the LAST chunk / a raw Generator downstream \u2014 ACCEPTED, CONFIRMED BY EXECUTION. This is the highest-severity finding this loop has produced. Three-step sequence, first step yields 'xa','xb','xc', probe records what each downstream step actually receives:",
+  "#   [0] Generator",
+  "#   [1] SINK<=Generator",
+  "#The second step ran ONCE and received a `Generator` object, not a chunk. `stream()` reported 2 chunks while the downstream steps never saw 'xa', 'xb' or 'xc'. The throw path made it unambiguous: a step type-hinting `string` fails with `TypeError: Argument #1 ($s) must be of type string, Generator given` from RunnableSequence.php:124. Upstream RunnableSequence.stream() transforms the input stream through each step PER CHUNK, so forwarding the generator itself \u2014 and collapsing three chunks into one downstream call \u2014 is a divergence, not a stylistic difference.",
+  "#NOT FIXED THIS ITERATION, deliberately, and the reason is budget rather than doubt. A faithful streaming rewrite of RunnableSequence means changing the iterator contract for every downstream step in the library, and landing that at the end of an iteration with minutes left is how a BLOCKER becomes a suite that is red for reasons unrelated to it. The finding is confirmed and pinned; the fix is iteration 53's first job. Recording a confirmed BLOCKER honestly is worth more than a rushed, unverified rewrite.",
+  "#2 'Only the first step streams' is a divergence presented as fidelity \u2014 ACCEPTED as a corollary of #1 and the ledger's wording: PORT_STATUS describes the behaviour without flagging it as a divergence, so the docs actively misstate it. Must be corrected to a Known non-exact row when #1 lands.",
+  "#3 `from()` emits 'Undefined array key 0' on a two-key map step \u2014 DEFERRED unverified. Plausible and specific, but this iteration's budget went entirely to proving the BLOCKER and I did not execute it. Not accepted on plausibility.",
+  "#4 stream() labels steps differently from invoke() \u2014 DEFERRED unverified, and it is the same off-by-one already on the ledger from an earlier iteration, so it is known-plausible rather than new. #5 RunnableBranch conditions never receive the config \u2014 DEFERRED unverified.",
+  "#THE RETAINED-INSTANCE PROBE, run first this iteration, is now CLOSED. The advisory correctly said iteration 50's probe never tested a caller handing back the SAME instance. Three calls with three values:",
+  "#   call first  -> https://example.com/first.png   OK",
+  "#   call second -> https://example.com/second.png  OK",
+  "#   call third  -> https://example.com/third.png   OK",
+  "#So the retained-instance edge case is refuted too, not merely the fresh-instance case. The image-prompt mutation is now probed at 3 calls and remains invisible in behaviour; the source still diverges from upstream's build-new-message path, and it stays unfixed on the same grounds as before \u2014 a fidelity improvement with no observable fix.",
+  "1 BLOCKER ACCEPTED by probe: stream() forwards a Generator, not chunks"
  ]
 }
