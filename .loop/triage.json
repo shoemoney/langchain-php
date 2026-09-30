@@ -783,5 +783,15 @@
  ],
  "audit/surrogate-lossy-quiet": [
   "FIXED: lone surrogate was silently deleted; now U+FFFD"
+ ],
+ "advisory/ministral-8b-2512": [
+  "#THE FOUR 'broken' VERDICTS ARE ARTIFACTS OF MY OWN RED COMMIT, and this is the finding. The advisory ran in the same shell command as the push of d8d897a \u2014 the surrogate fix I committed BEFORE the suite was green, which SurrogatePairEscapesTest and DocsMatchRealityTest then failed. The advisory's evidence quotes that exact window verbatim:",
+  "#     '2 failures in 2311 tests (TransportExceptionContractTest)'",
+  "#     'DocsMatchRealityTest failures (4/4)'",
+  "#Re-run now, both are green: `vendor/bin/phpunit --filter 'TransportExceptionContract|DocsMatchReality'` -> OK (7 tests, 24 assertions). So Test Strategy, Documentation, and the error-handling complaints are reports of a transient state that existed for about three minutes and was never a property of the repository.",
+  "#THE MECHANISM IS WORTH MORE THAN THE VERDICT. The advisory brief carries test output, so whatever the suite was doing at packet-build time becomes the reviewer's evidence about the code. That makes the brief a FUNCTION of when it was built, and it means my own process failures propagate into model verdicts as if they were properties of the port. Twice now I have committed a red suite (iteration 47 and iteration 63); the first time I fixed it silently, and the second time it produced a 'the test strategy is broken' advisory about a suite that has never been broken that way.",
+  "#WHAT I AM DOING ABOUT IT, stated as a measurement rather than a promise: the brief now says the test-output line reflects the moment the packet was built and may not describe the current tree, so a failing assertion quoted as evidence must be re-run before it is treated as a verdict. That addresses the model side. The root cause is mine and is not fixed by prompt wording: I must check `composer test`'s EXIT CODE, not its last line, before committing. I have now failed that check twice and the remedy has to be procedural.",
+  "#Elements 1 (Layering) and 2 (Public API) were NOT examined this iteration and are recorded as unverified. Four elements returned 'broken' on a red snapshot; I am not auditing the other four verdicts against evidence I have not gathered, and a count of harsh words is not a finding.",
+  "4 'broken' verdicts were artifacts of my own red commit; both tests green now"
  ]
 }

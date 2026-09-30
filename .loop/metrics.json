@@ -1,9 +1,9 @@
 {
  "src_files": 230,
- "src_lines": 34377,
+ "src_lines": 34395,
  "test_files": 106,
- "test_lines": 25229,
- "tests": 2308,
- "assertions": 6391,
+ "test_lines": 25277,
+ "tests": 2311,
+ "assertions": 6395,
  "suite_ok": true
 }

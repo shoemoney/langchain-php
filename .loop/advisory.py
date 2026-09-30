@@ -219,6 +219,18 @@ heavily referenced namespace as unreferenced on this number alone.
 {public_surface("Pregel", 30)}
 {public_surface("Schema", 25)}
 
+**THE TEST OUTPUT IN THIS BRIEF IS A SNAPSHOT, NOT A VERDICT.** The
+test-output line was captured when the packet was built and may not describe the
+tree in front of you. It has already been wrong: an advisory pass reported "2
+failures in 2311 tests" and "DocsMatchRealityTest failures (4/4)" and called Test
+Strategy, Documentation and Error Handling BROKEN — all four of which re-run green,
+because the failures belonged to a red commit that existed for three minutes.
+
+So: **a quoted failing assertion is a claim to re-run, not evidence.** Before you
+treat any failure as a property of this codebase, say that you re-ran it. If you
+did not run it, you do not know whether it still fails, and a verdict of "broken"
+built on an un-reproduced failure is worse than no verdict — it reads as a finding.
+
 **THE LEDGER CAN BE STALE — section 5 is a record, not the source of
 truth.** A prior finding or audit verdict listed here may have been FIXED since
 it was written, and a resolved item still reads exactly like an open one. It has
