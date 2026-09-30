@@ -671,5 +671,20 @@
   "#5 RunnableInterface::batch() has two adjacent method docblocks \u2014 REJECTED, and this is now the TENTH independent sighting of the same phantom. Contiguous re-inspection has repeatedly shown exactly ONE batch docblock. Nine prior reviewers reported it; a tenth does not make it true, it makes it a known hallucination attractor. Logging it as an attractor rather than re-deriving it a tenth time.",
   "#NET for the iteration: five findings, none accepted, and that is the correct outcome rather than a disappointing one. The value was elsewhere \u2014 resolving the advisory-prompt question from iteration 48 by verifying against brief(), the object the caller actually sends, and correcting two commits that had asserted verifications I watched fail.",
   "0/5 accepted: 1 deferred unverified, 3 unverified, 1 phantom (10th sighting)"
+ ],
+ "audit/image-prompt-mutation": [
+  "#ACCEPTED on fidelity, then REFUTED by execution \u2014 recorded in that order because both halves matter. Fidelity first: upstream `_StringImageMessagePromptTemplate.format()` (chat.ts:613) builds a LOCAL `const content: MessageContent = []`, accumulates into it, and ends with `return this.createMessage(content)`, which returns `new MsgClass({ content })` (chat.ts createMessage). It never assigns to `this.prompt`. PHP's `parseImagePrompts()` ends `$message->content = $blocks; return $message;` \u2014 it mutates its parameter and returns the same object. So the PHP text genuinely differs from upstream and the reviewer's reading of the code was correct.",
+  "#Then the probe refuted the DEFECT. Two calls through the public API with different values:",
+  "#   call 1 -> https://example.com/first.png",
+  "#   call 2 -> https://example.com/second.png",
+  "#   OK: each call renders its own value",
+  "#So the claimed consequence \u2014 'later calls with different values reuse the already-rendered URL' \u2014 does not occur, because formatMessages constructs fresh message instances per call and the mutation lands on a throwaway. The divergence is real in the source and INVISIBLE in behaviour.",
+  "#WHY IT STAYS UNFIXED, deliberately. The only way to observe the mutation is for a caller to retain a message and hand the SAME instance to parseImagePrompts, which no shipped path does. Changing it to clone would be a fidelity IMPROVEMENT (upstream builds new) but carries no observable fix, and it is not what the finding claimed. Left alone on purpose rather than refactored for tidiness.",
+  "#THE PROCESS WIN, and this is the third time this finding has come round: iteration 49 DEFERRED it for want of an executed repro, iteration 50 ran the repro, and the repro refuted it. Twice I had the code evidence in hand and nearly accepted on the mechanism alone \u2014 '$message->content = $blocks' really does mutate a caller-owned object, and that is a genuinely alarming line. It is alarming AND harmless, and only execution separated those. The deferral is what made this cheap; guessing would have shipped a refactor justified by a defect that does not exist.",
+  "fidelity divergence confirmed, DEFECT refuted by probe: 2 calls render 2 values"
+ ],
+ "~google/gemini-pro-latest": [
+  "#NOT A REAL REVIEW \u2014 status `incomplete` (3 findings, 154s, expected 5). Under the standing rule only status 'ok' is a review, so none of its findings are actioned and none are counted as corroboration. Recorded so the roster does not silently treat a truncated run as coverage. It is not marked as a model failure either: three findings and three severities means the model answered and stopped, which is truncation rather than an error response.",
+  "NOT A REVIEW: status incomplete (3/5 findings) - not actioned, not counted"
  ]
 }
