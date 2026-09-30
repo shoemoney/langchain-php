@@ -1578,5 +1578,22 @@
  ],
  "grok-overlap-guard": [
   "#3 REFUTED: upstream text_splitter.ts:6-7 public fields + :43-44 ctor-only throw, identical message. Batch closed 0/5"
+ ],
+ "schema-checksub-185": [
+  "#sonar-pro-search #4, \"Schema::checkSub() ignores Schema property nodes during validation\" \u2014 REFUTED BY THE PRE-REGISTERED TEST, and it is the cleanest possible application of 184's rule. I wrote the settling test down BEFORE running it: nest a `Schema::string()` INSTANCE as a property, validate a wrong-typed value, and the outcome is binary \u2014 fails validation means refuted, passes means a confirmed regression of the exact defect the hard rules name as a real release-breaker. Measured:",
+  "    wrong type (int)    -> REJECTED  ToolException: Received tool input did not match expected schema",
+  "    correct (string)    -> ACCEPTED  (no error)",
+  "    checkSub visibility: private",
+  "So a Schema instance nested as a property IS validated, in both directions, and the class the finding named exists but is PRIVATE \u2014 the reviewer described a private method's behaviour from outside the class, which is the same wrong-scope error as 173's ToolRuntime citation and is worth treating as its own category: A FINDING THAT NAMES A PRIVATE MEMBER IS TYPICALLY A GUESS ABOUT internals, because nothing in the public surface exposes it.",
+  "#THE PRE-REGISTRATION IS WHAT MADE THIS FREE, AND THIS IS THE FIRST TIME THE MECHANISM HAS BEEN APPLIED PROSPECTIVELY RATHER THAN IN DAMAGE CONTROL. 182 and 183 used it on a finding I had already half-believed, and it saved one iteration. Here it was applied to a finding chosen SPECIFICALLY because it was the most satisfying one in the batch \u2014 a MAJOR, in the exact defect family that has broken two real releases in this repo's history, phrased as a regression of an already-fixed bug. That combination is the highest-risk shape a finding can have: it is right about the family, right about the class, and the guard already in the suite makes it very likely to be wrong. Naming the disconfirming measurement in advance meant the result could only be read one way, and no amount of narrative could rescue it.",
+  "#WHAT THE BATCH ACTUALLY LOOKS LIKE, because two findings share a shape worth naming before anyone triages them. #1 \"StructuredTool cannot inject ToolRuntime\", #2 \"ToolRuntime does not expose the invocation config\" and #3 \"ToolRuntime::fromConfig() silently discards store and writer\" are three claims about ONE class, from a batch produced in TEN SECONDS, on a repo where ToolRuntime exists in 2339 green tests. Three findings concentrated on one small class, none of them quoting a call site, is the signature of a reviewer inferring an API from names rather than reading it \u2014 the same shape as 184's batch, where all five findings assumed a public surface was a defect. #3 in particular claims SILENT discarding, which is a strong behavioural claim about a `fromConfig` method, and it is checkable in one grep; that is the one to execute next, and it gets a pre-registered test like #4 just did.",
+  "#Reviewer slot 48 FAILED on RATE LIMITING after two backoffs: `429 rate limited - waiting 40s (attempt 2/3)` then `- waiting 60s (attempt 3/3)`, so the third attempt also did not get through. That is the retry path doing its job and still losing, which is different from the 173 truncation where the retry could not have helped: a 429 is external and time-dependent, and three attempts inside ~100 seconds is not enough headroom for a shared key. Worth recording as a policy input rather than a defect: when a slot burns on 429 three times, the next move is to stop retrying and spend the iteration on a deferred item instead, because a fourth attempt is a coin flip on someone else's quota window rather than a decision this loop controls.",
+  "#sonar #5, \"generator cleanup can throw after normal completion\" (MINOR), remains DEFERRED-UNVERIFIED and unexecuted. sonar #1, #2 and #3 are DEFERRED-UNVERIFIED pending the scope check described above, with #3 named as the next execution target."
+ ],
+ "probe-185": [
+  "sonar #4 REFUTED by pre-registered test: nested Schema instance IS validated (int rejected); checkSub is private"
+ ],
+ "reviewer-48": [
+  "FAILED after two 429 backoffs (40s/60s, attempt 3/3) - external quota, not retryable"
  ]
 }
