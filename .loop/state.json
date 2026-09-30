@@ -332,6 +332,41 @@
    "finish_reason": null,
    "reasoning_tokens": 0,
    "status": "empty"
+  },
+  "~moonshotai/kimi-latest": {
+   "model": "~moonshotai/kimi-latest",
+   "at": "2026-09-30T09:40:29",
+   "actual_model": "moonshotai/kimi-k3",
+   "usage": {
+    "prompt_tokens": 38844,
+    "completion_tokens": 1859,
+    "total_tokens": 40703,
+    "cost": 0.1443603,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 21,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.1443603,
+     "upstream_inference_prompt_cost": 0.1164753,
+     "upstream_inference_completions_cost": 0.027885
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1101,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1101,
+   "status": "ok",
+   "file": ".loop/reviews/12-~moonshotai__kimi-latest.md",
+   "chars": 3271,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -345,7 +380,8 @@
   "~anthropic/claude-opus-latest",
   "~openai/gpt-luna-latest",
   "amazon/nova-pro-v1",
-  "prism-ml/ternary-bonsai-2-27b"
+  "prism-ml/ternary-bonsai-2-27b",
+  "~moonshotai/kimi-latest"
  ],
  "next_index": 0
 }
