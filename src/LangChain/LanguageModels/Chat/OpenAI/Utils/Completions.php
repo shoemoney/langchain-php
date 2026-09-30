@@ -42,7 +42,7 @@ use LangChain\Utils\Js;
  * `output_version: v1` conversion path. So in practice an assistant message
  * here carries tool calls in `toolCalls` and prose in `content`, with no
  * reasoning block to echo. If a caller hand-builds such a content list, they
- * must filter it themselves.""
+ * must filter it themselves."
  */
 final class Completions
 {
