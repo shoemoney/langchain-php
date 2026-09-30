@@ -126,6 +126,19 @@ could see it: `DocsMatchRealityTest` checks counts, not framing.
 Each row below is pinned by a test, so the boundary stays visible rather than being
 rediscovered as a surprise.
 
+**A third category, added because the first two were not enough.** The rows here are
+IMPOSIBLE-IN-PHP or DELIBERATE-CHOICE divergences: things PHP cannot express, and
+things this port chose differently on purpose. Both are settled — the upstream side has
+been read and the PHP side is pinned by a test.
+
+A row that has NOT been compared against upstream does not belong in this table under
+either of those labels, because the honest label is a third one: **UNVERIFIED AGAINST
+UPSTREAM**. Several findings in this loop's ledger have been "confirmed and deferred"
+purely because the upstream file was unreachable from the checkout, and a table with no
+place to record that will eventually list a guess beside a measurement and make the two
+look identical. If you add a row here, be able to say which of the three it is; if you
+cannot, it belongs in the triage ledger with its reason, not here.
+
 | Behaviour | Why | Where |
 |---|---|---|
 | **`RunnableParallel` accepts any input, including a scalar** | Upstream's `RunnableMap.invoke` applies no type check — it hands the input to every branch. An earlier revision of this port rejected non-array inputs, which made `{raw: llm}` (the first step of every `includeRaw` structured-output pipeline) unusable with the string input that is the common case. The check is gone; the regression test is `RunnableTest::testParallelPassesScalarInputToEveryBranch`. | `Runnables\RunnableParallel::invoke()` |

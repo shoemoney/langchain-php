@@ -143,5 +143,12 @@
   "file": ".loop/advisory/nova-lite-v1.md",
   "chars": 4831,
   "cost": 0.0009
+ },
+ "perplexity/sonar": {
+  "status": "ok",
+  "at": "2026-09-30T17:08:18.961960+00:00",
+  "file": ".loop/advisory/sonar.md",
+  "chars": 12431,
+  "cost": 0.0182
  }
 }
