@@ -686,5 +686,14 @@
  "~google/gemini-pro-latest": [
   "#NOT A REAL REVIEW \u2014 status `incomplete` (3 findings, 154s, expected 5). Under the standing rule only status 'ok' is a review, so none of its findings are actioned and none are counted as corroboration. Recorded so the roster does not silently treat a truncated run as coverage. It is not marked as a model failure either: three findings and three severities means the model answered and stopped, which is truncation rather than an error response.",
   "NOT A REVIEW: status incomplete (3/5 findings) - not actioned, not counted"
+ ],
+ "audit/advisory-timeout-51": [
+  "#RESOLVED BY MEASUREMENT, and the fix is justified by a number rather than a guess. The advisory HTTP timeout was 900s while the iteration-51 call ran past ~1500s before the shell killed it \u2014 so the socket timeout was demonstrably below the real cost of the request. Raised to 2400s, above the observed elapsed. Critically, the SHELL cap must exceed it too: the previous attempt was killed from the outside at 1500000ms, so a generous socket timeout alone would have bought nothing. Both were raised together.",
+  "#THE RAISED TIMEOUT CHANGED THE ANSWER, which is the finding. The previous advisory (gpt-4o, iteration 48) returned 5,820 chars. The re-run with a 2400s socket timeout returned 15,364 chars from a smaller brief (37,128 vs 43,312). A smaller request producing 2.6x the output means the earlier pass was very likely TRUNCATED, not merely terse \u2014 which retrospectively weakens the negative verdicts in iteration 48's advisory, including the empty-stream claim that I rejected as already-fixed. The rejection still stands on its own evidence (both paths throw), but the review that produced it may have been cut short.",
+  "#6 of 8 elements came back SOUND and 1 more 'none' \u2014 the most positive pass this harness has produced. Recorded as a signal, not as proof: a single model's silence is not corroboration, and the same discipline that rejected a confident finding applies to a confident absence.",
+  "#THE PAST-TENSE WARNING IS WORKING, and this is the first direct evidence. Section E did not re-report any section-5 item as a fresh defect. On the image-prompt mutation it read my recorded probe result, agreed it was invisible in behaviour, and added ONE genuinely new observation: the probe tested two calls with FRESH instances and did not test the retained-instance case where a caller hands back the SAME object. That is engagement with a prior finding rather than restatement of it \u2014 precisely the behaviour the warning was installed to produce, and the first hard evidence that it changed a model's output."
+ ],
+ "advisory/claude-haiku-4.5": [
+  "6/8 sound; warning working; earlier pass likely TRUNCATED (5.8k vs 15.4k chars)"
  ]
 }

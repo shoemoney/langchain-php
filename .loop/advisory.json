@@ -72,5 +72,12 @@
   "file": ".loop/advisory/gpt-4o-2024-11-20.md",
   "chars": 5820,
   "cost": 0.0423
+ },
+ "anthropic/claude-haiku-4.5": {
+  "status": "ok",
+  "at": "2026-09-30T11:00:15.797946+00:00",
+  "file": ".loop/advisory/claude-haiku-4-5.md",
+  "chars": 15364,
+  "cost": 0.0322
  }
 }

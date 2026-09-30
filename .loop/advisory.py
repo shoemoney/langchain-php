@@ -339,7 +339,12 @@ def call(model, system, user_text, png_b64, max_tokens=32000):
             "X-Title": "langchain-php advisory review",
         },
     )
-    with urllib.request.urlopen(req, timeout=900) as r:
+    # 900 was measured to be too low: iteration 51's call ran past ~1500s before
+    # the shell killed it, so the socket timeout was below the real cost of this
+    # request. Raised to 2400s, which is above the observed elapsed. NOTE the
+    # shell cap must exceed this too — the 1500000ms default killed the previous
+    # attempt from the outside, so a generous socket timeout alone buys nothing.
+    with urllib.request.urlopen(req, timeout=2400) as r:
         return json.load(r)
 
 
