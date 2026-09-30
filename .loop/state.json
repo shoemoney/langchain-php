@@ -1275,6 +1275,41 @@
    "chars": 3899,
    "findings": 5,
    "severity_hits": 5
+  },
+  "mistralai/mistral-large-2512": {
+   "model": "mistralai/mistral-large-2512",
+   "at": "2026-09-30T16:37:00",
+   "actual_model": "mistralai/mistral-large-2512",
+   "usage": {
+    "prompt_tokens": 43727,
+    "completion_tokens": 899,
+    "total_tokens": 44626,
+    "cost": 0.023212,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.023212,
+     "upstream_inference_prompt_cost": 0.0218635,
+     "upstream_inference_completions_cost": 0.0013485
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/40-mistralai__mistral-large-2512.md",
+   "chars": 3456,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1316,7 +1351,8 @@
   "fireworks/ember-1",
   "z-ai/glm-4.6v",
   "perplexity/sonar",
-  "z-ai/glm-5.3-flashx"
+  "z-ai/glm-5.3-flashx",
+  "mistralai/mistral-large-2512"
  ],
  "next_index": 0
 }

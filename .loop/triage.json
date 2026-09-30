@@ -1424,5 +1424,14 @@
  ],
  "ledger-status-167": [
   "4 entries read as OPEN because the auto-stamp guessed; --status= added, 2 honest entries remain"
+ ],
+ "mistral-large-2512-168": [
+  "#3 `MessagesPlaceholder` rejects empty arrays, breaking first-turn conversations (BLOCKER) \u2014 REJECTED BY EXECUTION, and it is the most confident wrong claim this loop has received in a while. Measured: `new MessagesPlaceholder('history')` invoked with `['history' => []]` returns `[]`, and with one message returns that message. No exception, no rejection, and `[]` is exactly the correct rendering of no history \u2014 a first turn is the NORMAL case for this placeholder, not a broken one. A BLOCKER that says the primary use of a class is impossible should have been one `php -r` to refute, and a reviewer asserting it without running the obvious call is the vague-evidence pattern from 88 and 149 arriving with a severity attached.",
+  "#THE PREVIOUS REVIEW'S #1, `second conditional edge silently replaces the first`, is a REPEAT of iteration 120. The guard is present \u2014 `grep -c 'already present for node' src/LangGraph/State/StateGraph.php` returns 2 (the upstream-quoting comment and the throw). This is the same leak shape as glm-4.6v in 154, which read the FIX and reported the BUG because the fix comment led with the defect; the comment was restructured current-first in 155, so this sighting suggests the comment was no longer the source and the conclusion was reached from the branch NAME rather than the code. Two leaks in fifteen iterations after a nine-advisory clean run is not a trend yet, but the earlier entry stands: the fix is to carry the LANDING ITERATION beside the resolution.",
+  "#THAT REVIEW'S #5, PORT_STATUS contradicting itself on open defects, is REJECTED ON READING. Line 63's \"None outstanding\" is scoped to the two provider-client adversarial rounds it describes in the next sentence, and those rounds are complete. A heading scoped to a finished exercise is not a contradiction with open items elsewhere in the file, and the review quoted no pair of statements that disagree.",
+  "#1 PromptTemplate silently drops non-string partial variable values, #2 ChatPromptTemplate merges partials in the wrong order, #4 serialize() omits additionalContentFields when empty, #5 fromMessages() drops metadata/tags \u2014 DEFERRED unverified, none executed."
+ ],
+ "mistralai/mistral-large-2512": [
+  "#3 BLOCKER REJECTED by execution (empty array works); prior #1 a repeat of iter-120"
  ]
 }
