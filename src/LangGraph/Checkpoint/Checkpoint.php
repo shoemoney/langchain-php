@@ -44,8 +44,22 @@ class Checkpoint extends PregelCheckpoint
             'id' => $this->id,
             'ts' => $this->ts,
             'channel_values' => $this->channelValues,
-            'channel_versions' => $this->channelVersions,
-            'versions_seen' => $this->versionsSeen,
+            // These two, and the inner maps of `versions_seen`, are ALWAYS
+            // maps — every consumer reads them as `[$name] => ...`, never as a
+            // positional list. PHP has one array type, so a fresh checkpoint
+            // wrote `channel_versions: []` where the JavaScript side reads a
+            // map and finds an array, and a cross-runtime resume then compares
+            // the wrong shape.
+            //
+            // Forcing `{}` is safe HERE in a way it is not for
+            // `channel_values`, which genuinely can hold a list channel and
+            // where `{}` would corrupt a legitimately empty one. That is why
+            // `channel_values` is deliberately left alone above.
+            'channel_versions' => (object) $this->channelVersions,
+            'versions_seen' => (object) array_map(
+                static fn (mixed $inner): object => (object) (is_array($inner) ? $inner : []),
+                $this->versionsSeen,
+            ),
         ];
     }
 
@@ -60,14 +74,62 @@ class Checkpoint extends PregelCheckpoint
      */
     public static function fromArray(array $data): self
     {
+        // A record that is PRESENT but malformed is not an empty checkpoint.
+        // Defaulting it to one resumed the graph from blank state with no error
+        // at load time — the read-side twin of refusing an unserialisable write.
+        // A genuinely absent record (`$data === []`) is left alone: that is a
+        // saver asking about a thread with no checkpoints, and it still gets an
+        // empty checkpoint, exactly as upstream's `emptyCheckpoint()` does.
+        self::rejectCorrupt($data);
+
+        $v = $data['v'] ?? CheckpointConstants::CHECKPOINT_VERSION;
+        if (is_float($v) || (is_int($v) && $v > CheckpointConstants::CHECKPOINT_VERSION)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Unsupported checkpoint version %s; this build reads up to version %d.',
+                var_export($v, true),
+                CheckpointConstants::CHECKPOINT_VERSION,
+            ));
+        }
+
         return new self(
-            v: (int) ($data['v'] ?? CheckpointConstants::CHECKPOINT_VERSION),
+            v: (int) $v,
             id: (string) ($data['id'] ?? ''),
             ts: (string) ($data['ts'] ?? ''),
             channelValues: self::mapOf($data['channel_values'] ?? []),
             channelVersions: self::versionsOf($data['channel_versions'] ?? []),
             versionsSeen: self::versionsSeenOf($data['versions_seen'] ?? []),
         );
+    }
+
+    /**
+     * Refuse a record whose id or channel maps are the wrong type.
+     *
+     * Only fires when the key is PRESENT. A missing key is tolerated so an old
+     * format, or a hand-written fixture, still loads; a key holding a string
+     * where a map belongs is corruption, and loading it as an empty map is how
+     * a resume silently begins from nothing.
+     *
+     * @param array<string, mixed> $data
+     */
+    private static function rejectCorrupt(array $data): void
+    {
+        if (array_key_exists('id', $data) && !is_string($data['id'])) {
+            throw new \InvalidArgumentException(sprintf(
+                'Checkpoint id must be a string, got %s.',
+                get_debug_type($data['id']),
+            ));
+        }
+
+        foreach (['channel_values', 'channel_versions', 'versions_seen'] as $key) {
+            if (array_key_exists($key, $data) && !is_array($data[$key])) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Checkpoint %s must be a map, got %s — loading it as empty would resume the graph'
+                    . ' from blank state.',
+                    $key,
+                    get_debug_type($data[$key]),
+                ));
+            }
+        }
     }
 
     /** A copy of the same concrete class, so a subclass survives `copy()`. */

@@ -34,7 +34,16 @@ final class MessageMerge
     public const DEFAULT_MERGE_IGNORE_KEYS = ['index', 'created', 'timestamp'];
 
     /** Fields that adopt the incoming value instead of concatenating. */
-    private const REPLACE_KEYS = ['id', 'name', 'output_version', 'model_provider'];
+    /**
+     * Fields that identify a message rather than accumulate across it.
+     *
+     * Upstream declares exactly these as the named members of
+     * `ResponseMetadata` (`messages/metadata.ts:4-9`) alongside an open index
+     * signature — they are identity, not content. `model_name` was missing here,
+     * so three streamed OpenAI deltas folded into
+     * `model_name: "gpt-4ogpt-4ogpt-4o"`.
+     */
+    private const REPLACE_KEYS = ['id', 'name', 'output_version', 'model_provider', 'model_name'];
 
     private function __construct()
     {

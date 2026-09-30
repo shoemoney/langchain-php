@@ -179,6 +179,38 @@ final class JsonPlusEncoder
                 $out[$key] = $this->walk($item, $path, $cycles, $depth + 1, $id, (string) $key);
             }
 
+            // `get_object_vars()` called from here sees only PUBLIC properties.
+            // An object whose state is private, and which offers no
+            // serialisation contract this encoder can honour, therefore walks to
+            // an empty array and is stored as `{}` — the checkpoint resumes with
+            // that channel's state GONE, no error at write time, and nothing in
+            // the trace to say so.
+            //
+            // A silent loss here is the worst outcome available: the damage
+            // surfaces several graph runs later as an unrelated symptom.
+            // Refusing to write is honest — the caller learns their channel value
+            // is not serialisable while they can still fix it.
+            //
+            // `Serializable` is refused too. PHP's own contract would have this
+            // encoder call `serialize()`, and nothing here revives it back, so
+            // honouring half a contract is exactly the silent loss above.
+            if ($out === []) {
+                $names = array_map(
+                    static fn (\ReflectionProperty $p): string => $p->getName(),
+                    (new \ReflectionObject($value))->getProperties(),
+                );
+
+                if ($names !== []) {
+                    throw new \InvalidArgumentException(sprintf(
+                        'Refusing to serialise %s: it has non-public state (%s) and this encoder cannot'
+                        . ' revive it, so it would be stored as an empty object and the channel value lost'
+                        . ' silently on resume. Store an array, a JsonSerializable value, or a scalar.',
+                        $value::class,
+                        implode(', ', $names),
+                    ));
+                }
+            }
+
             return $out;
         }
 

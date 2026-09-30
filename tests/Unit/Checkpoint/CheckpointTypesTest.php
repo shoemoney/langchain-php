@@ -76,14 +76,23 @@ final class CheckpointTypesTest extends TestCase
             'ts' => $partial->ts,
         ]);
 
-        self::assertSame([
-            'v' => 4,
-            'id' => $partial->id,
-            'ts' => '2024-04-19T17:19:07.952Z',
-            'channel_values' => [],
-            'channel_versions' => [],
-            'versions_seen' => [],
-        ], $copied->toArray());
+        // Asserted through the JSON the caller actually stores, not the PHP
+        // array. `channel_versions` and `versions_seen` are always maps, so they
+        // serialise as `{}`; `channel_values` is genuinely ambiguous (a list
+        // channel can be empty) and stays `[]`.
+        $wire = json_decode((string) json_encode($copied->toArray()), true);
+
+        self::assertSame(4, $wire['v']);
+        self::assertSame($partial->id, $wire['id']);
+        self::assertSame('2024-04-19T17:19:07.952Z', $wire['ts']);
+        self::assertSame([], $wire['channel_values'], 'a list channel may legitimately be empty');
+        self::assertSame([], $wire['channel_versions'], 'always a map, so {} on the wire');
+        self::assertSame([], $wire['versions_seen']);
+
+        // The PHP-side value is still an ordinary empty array, so nothing that
+        // reads the object needed changing.
+        self::assertSame([], $copied->channelVersions);
+        self::assertSame([], $copied->versionsSeen);
     }
 
     public function testCopyReturnsTheSameConcreteClass(): void

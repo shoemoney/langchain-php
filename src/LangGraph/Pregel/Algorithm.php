@@ -1154,6 +1154,21 @@ final class Algorithm
             return ((int) (bool) $a) <=> ((int) (bool) $b);
         }
 
+        // Numeric when both are numbers, as JavaScript's `<` is. Upstream
+        // compares the raw values with `aPath[i] < bPath[i]` (algo.ts:289), and
+        // path segments are task indices — so upstream orders 9 before 10.
+        //
+        // A string comparison gets this backwards: "10" < "9" is true
+        // lexicographically, so the tenth concurrent task would fold BEFORE the
+        // ninth and the later write would win. That is not a crash and not a
+        // flake — it is a graph that resumes from a state nobody intended, and
+        // it only appears once a superstep has ten or more tasks.
+        if ((is_int($a) || is_float($a)) && (is_int($b) || is_float($b))) {
+            return $a <=> $b;
+        }
+
+        // Mixed number/string is the pathological case; JavaScript coerces the
+        // number to a string for `<`, which is what strcmp does here.
         return strcmp((string) $a, (string) $b);
     }
 

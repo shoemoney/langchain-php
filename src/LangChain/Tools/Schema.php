@@ -193,13 +193,39 @@ final class Schema
                 return $type === 'string';
             }
             if (is_array($type)) {
-                return $type !== [] && array_all($type, static fn (mixed $t): bool => $t === 'string');            }
+                // Written as a loop, not `array_all()`. That function landed in
+                // PHP 8.4, and this package declares `php: >=8.2` with a CI
+                // matrix of 8.2 / 8.3 / 8.4 — so it was a hard fatal on two of
+                // the three supported runtimes, invisible locally because the
+                // development box runs 8.5.
+                if ($type === []) {
+                    return false;
+                }
+
+                foreach ($type as $single) {
+                    if ($single !== 'string') {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
 
             return false;
         }
 
         if (isset($schema['enum']) && is_array($schema['enum'])) {
-            return $schema['enum'] !== [] && array_all($schema['enum'], static fn (mixed $v): bool => is_string($v));
+            if ($schema['enum'] === []) {
+                return false;
+            }
+
+            foreach ($schema['enum'] as $value) {
+                if (!is_string($value)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         if (array_key_exists('const', $schema)) {
@@ -214,6 +240,28 @@ final class Schema
             }
 
             return true;
+        }
+
+        // `anyOf` is handled here for the same reason `allOf` is: the schema
+        // VALIDATES a bare string through this spelling, so a tool declaring it
+        // must be routed down the string path too. Without this, a tool whose
+        // schema is `{"anyOf": [{"type": "string"}]}` passed validation for a
+        // bare string and was then handed the structured path, where the value
+        // arrives as `{"input": "..."}` instead — a silent shape change for the
+        // tool body.
+        if (isset($schema['anyOf']) && is_array($schema['anyOf'])) {
+            $options = array_values(array_filter($schema['anyOf'], 'is_array'));
+            if ($options === []) {
+                return false;
+            }
+
+            foreach ($options as $option) {
+                if ((new self($option))->validatesOnlyStrings()) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return false;
@@ -235,6 +283,19 @@ final class Schema
      */
     private function check(mixed $value, array $schema, string $path, array &$errors): void
     {
+        // `allOf` is a conjunction: EVERY subschema must hold. It was absent
+        // here altogether, so a tool declared `{"allOf": [{...required...}]}`
+        // validated nothing at all — arguments violating it reached the body.
+        if (isset($schema['allOf']) && is_array($schema['allOf'])) {
+            foreach ($schema['allOf'] as $option) {
+                if (is_array($option)) {
+                    $this->check($value, $option, $path, $errors);
+                }
+            }
+
+            return;
+        }
+
         if (isset($schema['anyOf']) && is_array($schema['anyOf'])) {
             foreach ($schema['anyOf'] as $option) {
                 if (is_array($option) && (new self($option))->errors($value) === []) {
@@ -266,6 +327,13 @@ final class Schema
 
         $type = $schema['type'] ?? null;
         if ($type === null) {
+            // `properties`, `required`, `items` and `additionalProperties` are
+            // independent of `type` in JSON Schema — `{"properties": {"a":
+            // {"type": "string"}}}` constrains `a` with no `type` at the top.
+            // Returning here skipped every one of them, so those constraints
+            // were silently unenforced.
+            $this->checkSub($value, $schema, $path, $errors);
+
             return;
         }
 
@@ -291,7 +359,18 @@ final class Schema
      */
     private function checkSub(mixed $value, array $schema, string $path, array &$errors): void
     {
-        if (is_array($value) && !\LangChain\Utils\Js::isList($value)) {
+        // An EMPTY array is a list as far as PHP is concerned, but a schema that
+        // declares `properties`, `required` or `additionalProperties` is talking
+        // about an OBJECT — and `{}` arrives from json_decode as exactly this
+        // same empty array. Taking the list reading there would skip `required`
+        // entirely, so an empty argument list would satisfy a schema that
+        // demands a key. A non-empty list is never an object, so this only
+        // widens the genuinely ambiguous case.
+        $declaresObject = array_key_exists('properties', $schema)
+            || array_key_exists('required', $schema)
+            || array_key_exists('additionalProperties', $schema);
+
+        if (is_array($value) && (!\LangChain\Utils\Js::isList($value) || ($value === [] && $declaresObject))) {
             $properties = $schema['properties'] ?? [];
             $required = $schema['required'] ?? [];
 

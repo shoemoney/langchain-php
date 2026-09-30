@@ -56,11 +56,19 @@ class MessagesPlaceholder extends BaseMessagePromptTemplate
     {
         $input = $values[$this->variableName] ?? null;
 
-        if ($this->optional && !$input) {
+        // "absent" is the falsy test, and in PHP that is NOT the same test as
+        // JavaScript's. Upstream writes `!input` (chat.ts:144), where an EMPTY
+        // ARRAY IS TRUTHY — so an empty message list passes and is coerced to
+        // an empty result. PHP's `[]` is falsy, so the same expression threw
+        // here, and a MessagesPlaceholder refused the first turn of every
+        // conversation, which is exactly the case an empty list describes.
+        $absent = $input === null || $input === false || $input === '';
+
+        if ($this->optional && $absent) {
             return [];
         }
 
-        if (!$input) {
+        if ($absent) {
             throw new InputFormatError(
                 "Field \"{$this->variableName}\" in prompt uses a MessagesPlaceholder, which expects an array of BaseMessages as an input value. Received: undefined"
             );

@@ -92,6 +92,28 @@ class AIMessageChunk extends BaseMessageChunk
                 continue;
             }
 
+            // A chunk's `args` is undecoded JSON *by construction* — that is
+            // what lets deltas be accumulated as strings. An already-decoded
+            // array is therefore not a shape this method can re-parse, and
+            // calling trim() on it raised a TypeError that aborted stream
+            // reconstruction outright — a crash, not a bad tool call.
+            //
+            // It is routed to the invalid list instead, which is the existing
+            // destination for arguments that could not be turned into an
+            // object. A caller that genuinely holds decoded arguments should
+            // use `AIMessage::toolCalls`, not round-trip them through chunks.
+            if ($rawArgs !== null && !is_string($rawArgs)) {
+                $invalid[] = array_filter([
+                    'name' => $name,
+                    'args' => $rawArgs,
+                    'error' => 'Tool call arguments in a chunk must be an undecoded JSON string, got '
+                        . get_debug_type($rawArgs) . '.',
+                    'id' => $id,
+                    'index' => $index,
+                ], static fn ($v) => $v !== null);
+                continue;
+            }
+
             if ($rawArgs === null || trim($rawArgs) === '') {
                 $calls[] = array_filter([
                     'name' => $name,

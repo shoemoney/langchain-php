@@ -53,11 +53,14 @@ final class ToolRuntime
         }
 
         return new self(
-            state: (array) ($configurableState = $config->configurable['__state'] ?? []),
+            state: (array) ($config->configurable['__state'] ?? []),
             toolCallId: is_string($config->toolCall['id'] ?? null) ? $config->toolCall['id'] : '',
             toolCall: $config->toolCall,
             configurable: $config->configurable,
             context: $config->context,
+            // `store` and `writer` are left at their constructor defaults: the
+            // config carries no field for either. They exist for the LangGraph
+            // integration, which injects them when it builds the runtime.
         );
     }
 }

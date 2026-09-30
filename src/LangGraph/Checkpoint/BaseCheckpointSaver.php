@@ -42,6 +42,30 @@ abstract class BaseCheckpointSaver implements \JsonSerializable
     /** How values are turned into bytes. */
     public BaseCheckpointSerializer $serde;
 
+    /**
+     * The checkpoint namespace a config asks for, or `''` for the root.
+     *
+     * Read through this rather than casting. `(string) $value` on a non-string
+     * does not fail — an array becomes the literal string `"Array"`, and an
+     * object becomes `"Object"`. Either collides with a real namespace of that
+     * name, so a checkpoint written under a malformed namespace is stored where
+     * a resume will not look for it, and one saved under a colliding name
+     * overwrites it. It also raises an "Array to string conversion" warning,
+     * which fails the suite outright under `failOnWarning`.
+     *
+     * A namespace is a path the engine builds as a string; anything else in the
+     * config is a caller mistake and is treated as "no namespace" rather than
+     * being silently turned into a valid-looking one.
+     *
+     * @param array<string, mixed> $config
+     */
+    protected static function checkpointNamespace(array $config): string
+    {
+        $ns = $config['checkpoint_ns'] ?? null;
+
+        return is_string($ns) ? $ns : '';
+    }
+
     public function __construct(?BaseCheckpointSerializer $serde = null)
     {
         $this->serde = $serde ?? new JsonPlusSerializer();

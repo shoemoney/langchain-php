@@ -142,6 +142,12 @@ final class Run
             'child_runs' => array_map(static fn (Run $r): array => $r->toArray(), $this->childRuns),
             'child_execution_order' => $this->childExecutionOrder,
             'run_type' => $this->runType,
+            // `actions` was a documented field of the run, written by
+            // `BaseTracer::handleAgentAction` and read by the console handler,
+            // yet absent from the serialised form — so a persisted run lost
+            // every agent step it had taken. Upstream's `Run` carries it as a
+            // public field, which any serialisation of the run includes.
+            'actions' => $this->actions,
             'extra' => $this->extra,
             'tags' => $this->tags,
             'error' => $this->error,

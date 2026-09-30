@@ -72,4 +72,31 @@ final class Js
         /** @var array<string, mixed> $value */
         return $value;
     }
+
+    /**
+     * `JSON.stringify`, with PHP's failure mode made to match JavaScript's.
+     *
+     * JavaScript's `JSON.stringify` throws a `TypeError` on a circular
+     * structure and on a BigInt; PHP's `json_encode` returns `false`, and
+     * `JSON_PARTIAL_OUTPUT_ON_ERROR` quietly substitutes `null`. Both mean the
+     * provider receives something other than what the caller passed, which is
+     * the one outcome nobody can debug from the far end.
+     *
+     * @throws \InvalidArgumentException when the value cannot be represented.
+     */
+    public static function encode(mixed $value): string
+    {
+        try {
+            return json_encode(
+                $value,
+                \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR,
+            );
+        } catch (\JsonException $e) {
+            throw new \InvalidArgumentException(
+                'Value could not be encoded as JSON for the provider: ' . $e->getMessage(),
+                0,
+                $e,
+            );
+        }
+    }
 }

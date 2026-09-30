@@ -87,7 +87,7 @@ class SqliteSaver extends PregelMemorySaver
             return null;
         }
 
-        $namespace = (string) ($configurable['checkpoint_ns'] ?? '');
+        $namespace = self::checkpointNamespace($configurable);
         $checkpointId = CheckpointId::fromConfig($config);
 
         // `setup()` always populates both, so neither branch can be null here.
@@ -201,7 +201,7 @@ class SqliteSaver extends PregelMemorySaver
             throw new \InvalidArgumentException('A checkpoint must have an id to be saved.');
         }
 
-        $namespace = (string) ($configurable['checkpoint_ns'] ?? '');
+        $namespace = self::checkpointNamespace($configurable);
         $parentId = self::stringOrNull($configurable['checkpoint_id'] ?? null);
 
         [$type, $serializedCheckpoint] = $this->serde->dumpsTyped($this->wireCheckpoint($checkpoint));
@@ -255,7 +255,7 @@ class SqliteSaver extends PregelMemorySaver
             throw new \InvalidArgumentException('Missing checkpoint_id field in config.configurable.');
         }
 
-        $namespace = (string) ($configurable['checkpoint_ns'] ?? '');
+        $namespace = self::checkpointNamespace($configurable);
 
         // When every write is to a special channel we replace, so a resume can
         // overwrite the interrupt it is answering. Otherwise we ignore, so one
@@ -334,7 +334,7 @@ class SqliteSaver extends PregelMemorySaver
         );
         $statement->execute([
             $threadId,
-            (string) ($configurable['checkpoint_ns'] ?? ''),
+            self::checkpointNamespace($configurable),
             $checkpointId,
             CheckpointConstants::TASKS,
         ]);

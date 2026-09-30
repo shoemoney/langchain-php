@@ -133,8 +133,12 @@ final class IO
      *    which is the scheduler's queue.
      *  - a `resume` becomes a write to `RESUME`, which the scratchpad picks up.
      *    A map keyed by task-id hashes is fanned out per task, *appending* to
-     *    any resume that task already has — a task can be interrupted twice and
-     *    resumed twice.
+     *    the MOST RECENT resume that task already has, and not all of them.
+     *    Upstream truncates the same way (`io.ts:108`, a `.slice(0, 1)`), so
+     *    this is deliberate fidelity rather than an oversight — a task's queued
+     *    resume values are replaced, not accumulated. It was previously
+     *    documented here as the opposite, which is what invited a reviewer to
+     *    read the code as a bug.
      *  - an `update` becomes writes to the named channels.
      *
      * All of it is attributed to the null task id: the command belongs to the
@@ -163,8 +167,15 @@ final class IO
 
         if ($cmd->resume !== null && $cmd->resume !== false) {
             $resume = $cmd->resume;
+            // Task-map detection: a NON-EMPTY map whose every key is a task
+            // hash. Upstream's guard is `Object.keys(resume).length &&
+            // Object.keys(resume).every(isXXH3)` (io.ts:100-102) — exactly
+            // these two conditions. A comparison of `array_keys($resume)`
+            // against itself sat here as well; it is true for every input and
+            // guarded nothing, and a future editor "simplifying" the hash check
+            // beside it would have broken task-map detection with nothing to
+            // catch it.
             $isTaskMap = is_array($resume) && $resume !== []
-                && array_keys($resume) === array_keys($resume)
                 && self::allKeysAreHashes($resume);
 
             if ($isTaskMap) {

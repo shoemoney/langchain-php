@@ -100,9 +100,6 @@ abstract class StructuredTool extends BaseLangChain
      */
     public array $extras = [];
 
-    /** @var array<string, mixed> */
-    protected array $input = [];
-
     /** @param array<string, mixed> $fields */
     public function __construct(array $fields = [])
     {

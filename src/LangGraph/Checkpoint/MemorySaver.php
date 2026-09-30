@@ -66,7 +66,7 @@ class MemorySaver extends PregelMemorySaver
             return null;
         }
 
-        $namespace = (string) ($configurable['checkpoint_ns'] ?? '');
+        $namespace = self::checkpointNamespace($configurable);
         $checkpointId = CheckpointId::fromConfig($config);
         if ($checkpointId === '') {
             $checkpointId = self::headId($this->storage[$threadId][$namespace] ?? []);
@@ -178,7 +178,7 @@ class MemorySaver extends PregelMemorySaver
             throw new \InvalidArgumentException('A checkpoint must have an id to be saved.');
         }
 
-        $namespace = (string) ($configurable['checkpoint_ns'] ?? '');
+        $namespace = self::checkpointNamespace($configurable);
         $parentId = self::stringOrNull($configurable['checkpoint_id'] ?? null);
 
         [$type, $serializedCheckpoint] = $this->serde->dumpsTyped($this->wireCheckpoint($checkpoint));
@@ -228,7 +228,7 @@ class MemorySaver extends PregelMemorySaver
             );
         }
 
-        $namespace = (string) ($configurable['checkpoint_ns'] ?? '');
+        $namespace = self::checkpointNamespace($configurable);
         $key = $this->writesKey($threadId, $namespace, $checkpointId);
         $existing = $this->writes[$key] ?? [];
 
@@ -277,7 +277,7 @@ class MemorySaver extends PregelMemorySaver
             return [];
         }
 
-        $namespace = (string) ($configurable['checkpoint_ns'] ?? '');
+        $namespace = self::checkpointNamespace($configurable);
         $sends = [];
         foreach ($this->pendingWrites($threadId, $namespace, $checkpointId) as $write) {
             if ($write[1] === CheckpointConstants::TASKS) {
