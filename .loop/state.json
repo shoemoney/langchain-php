@@ -505,6 +505,41 @@
    "chars": 4990,
    "findings": 5,
    "severity_hits": 5
+  },
+  "openai/gpt-4o-2024-11-20": {
+   "model": "openai/gpt-4o-2024-11-20",
+   "at": "2026-09-30T10:55:13",
+   "actual_model": "openai/gpt-4o-2024-11-20",
+   "usage": {
+    "prompt_tokens": 39036,
+    "completion_tokens": 560,
+    "total_tokens": 39596,
+    "cost": 0.10319,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.10319,
+     "upstream_inference_prompt_cost": 0.09759,
+     "upstream_inference_completions_cost": 0.0056
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/17-openai__gpt-4o-2024-11-20.md",
+   "chars": 2507,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -523,7 +558,8 @@
   "openai/o4-mini-high",
   "inclusionai/ling-3.0-flash-vl",
   "anthropic/claude-opus-5.5",
-  "~anthropic/claude-sonnet-latest"
+  "~anthropic/claude-sonnet-latest",
+  "openai/gpt-4o-2024-11-20"
  ],
  "next_index": 0
 }

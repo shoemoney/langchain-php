@@ -98,7 +98,8 @@
   "#2 silent failures on unsupported parameters \u2014 REJECTED, same cause. Re-probed: topK refused at all three layers.",
   "#3 lack of comprehensive end-to-end tests \u2014 REJECTED as ungradable ('add more tests' in the abstract, which this project's own rule excludes). The concrete gaps it implies were closed last iteration: tests/Integration/ now drives both clients through a full Guzzle stack and CI runs it.",
   "#4 ambiguous error handling in streaming \u2014 ACCEPTED as a documentation gap. The retry boundary WAS documented, but only in a method-level comment a reader reaches after reading the code; the class docblock said nothing. Stated at class level in both clients, and the PORT_STATUS row that had been deleted as a false claim is now restored and accurate.",
-  "#5 inadequate JSON Schema validation \u2014 REJECTED as a feature request (integrate opis/json-schema). Validating a schema *before* use is new capability, not a fidelity fix; the port already validates VALUES against a schema via JsonSchemaValidator."
+  "#5 inadequate JSON Schema validation \u2014 REJECTED as a feature request (integrate opis/json-schema). Validating a schema *before* use is new capability, not a fidelity fix; the port already validates VALUES against a schema via JsonSchemaValidator.",
+  "5 findings, untriaged - budget went to settling the deferred addEdge(END) finding"
  ],
  "baidu/ernie-4.5-vl-424b-a47b": [
   "Reviewer used ### headings, so the harness counted 0 findings and marked it 'incomplete'. Parser widened to #{2,4}; content was real and was triaged.",
@@ -1038,14 +1039,12 @@
   "MILESTONE: 2315 tests green; ~15 harness defects found in the loop itself; 2 entries still OPEN"
  ],
  "~anthropic/claude-sonnet-latest": [
-  "#4 'Cache key collapses to one value when json_encode fails' \u2014 ACCEPTED and FIXED, and it is the prediction from iteration 102 landing exactly. Measured before the fix:",
-  "#     input 0: json_encode => false   (string) => ''",
-  "#     input 1: json_encode => false   (string) => ''",
-  "#Two completely different inputs produced the SAME cache key. In a cache that means the second read returns the FIRST's cached result \u2014 a silent correctness failure that is worse than no cache, because the cache still looks like it is working.",
-  "#The mechanism was the falsy-vs-absent class for the second time in this codebase, and the second time for the SAME idiom: `mb_chr(0x30) ?: U+FFFD` in iteration 62, where `\"0\"` is falsy. Here `(string) json_encode(...)` turns a `false` return into `''`, and every unencodable input \u2014 NAN/INF, malformed UTF-8, a resource, recursion \u2014 collapses to one key.",
-  "#Upstream has no equivalent hole because `JSON.stringify` THROWS on input it cannot represent, so a bad key is loud there. `JSON_THROW_ON_ERROR` is the PHP spelling of that, and the throw propagates to the caller instead of poisoning the cache.",
-  "#MUTATION-VERIFIED: restore the `(string)` cast -> 1 failure (RED); restore `JSON_THROW_ON_ERROR` -> OK (GREEN). The test asserts BOTH halves: an encodable input still produces a key, and an unencodable one FAILS LOUDLY rather than returning a key that collides. A fix that simply returned null would pass neither and is the tempting wrong repair here.",
-  "#The reflection in the test uses no setAccessible() \u2014 deprecated on 8.5 and a no-op since 8.1 \u2014 after I copied that idiom from an earlier probe and the deprecation warning caught it. Small, but it is the fifth time a copied idiom has cost a round trip in this loop."
+  "#2 'addEdge(x, END) appends to writers that compile() never reads' \u2014 REJECTED BY EXECUTION. The structural half of the claim is half-true and the conclusion is false. It IS true that `addEdge($node, END)` writes a ChannelWrite carrying `Constants::END` into `$this->nodes[$start]->writers` (line 191) and does NOT push into `$this->edges`, unlike the ordinary-edge branch at 199.",
+  "#But compile() does read that collection: lines 361 and 363 append conditional-edge writers to `$startNode->writers` and `$compiledNodes[$start]->writers`, and 316/334 build writers for compiled nodes. END writes ride the same collection, so 'never reads' is wrong on the source.",
+  "#And the decisive check is behavioural, because a structural argument would have been a guess about intent. Executed end to end: build a graph, START -> a, `addEdge('a', END)`, compile, invoke with ['value' => 'in']:",
+  "#     invoke through addEdge(a, END) -> {\"value\":\"step\"}",
+  "#The run executes the node and TERMINATES. A writer nothing read cannot terminate a run. The END edge is expressed as a writer rather than an edge, which is a different mechanism and not a defect.",
+  "#AND I NEARLY RECORDED THIS WRONG BY TRUNCATING THE EVIDENCE. My first probe piped through `tail -3` and the invoke line \u2014 the one line that proves the finding false \u2014 was the line that got cut, leaving only the reflection count. I would have recorded 'the writer exists but termination unverified' from a run that had already terminated correctly. That is the sixth `tail`-on-evidence slip in this loop and the second time it has removed the exact line that decided a finding; `tail` is for logs, never for measurements."
  ],
  "audit/cache-key-json-encode-false": [
   "#RESOLVED \u2014 LANDED AND MUTATION-VERIFIED IN ITERATION 103. The `json_encode` `false` return collapsed every unencodable input into one cache key; `JSON_THROW_ON_ERROR` now makes it loud, matching upstream's `JSON.stringify`. Third time TriageStatusMarkerTest has caught me adding an entry without a status marker, which is the guard doing precisely what it was written for \u2014 it fires on the mistake I actually keep making, not on a hypothetical.",
