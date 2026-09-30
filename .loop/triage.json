@@ -278,7 +278,8 @@
   "#2 tautological array_keys($resume) === array_keys($resume) \u2014 ACCEPTED. True for every input, guarding nothing, and sitting beside the hash check it appeared to protect. Removed; the two remaining conditions are exactly upstream's Object.keys(resume).length && .every(isXXH3). The hash check is now pinned by a test that fails when it is removed.",
   "#3 transform() docblock describes the wrong upstream method / #4 duplicated @param on batch() / #5 comparePathSegments diverges from JS mixed comparison (reviewer marked it an inference) \u2014 REJECTED: prose nits with no reachable behaviour, and an inference the reviewer itself declined to stand behind.",
   "Note: my first two test runs of #2 failed on my own mistakes (wrong namespace, then wrapping named args in an array for a positional constructor), and a third failed because I asserted the resume was truncated to the MOST RECENT rather than the FIRST. The port was right each time.",
-  "ok, 5 findings, untriaged - budget went to fable #2"
+  "ok, 5 findings, untriaged - budget went to fable #2",
+  "ok, 5 findings, still untriaged"
  ],
  "mistralai/mistral-small-2603": [
   "The last review of the 53-model roster. One accepted, four rejected.",
@@ -1079,5 +1080,16 @@
   "#2 'Subsystems do not provide a clear end-to-end user journey', #3 'deliberate divergences should be reviewed for justification', #4 'documentation may not fully capture current state, especially regarding fixed issues' \u2014 DEFERRED unverified, all three VAGUE as stated: no defect, no file, no failing behaviour. #3 is in fact a restatement of what the Known non-exact section is FOR. #4 is adjacent to the fix-comment trap \u2014 PORT_STATUS rows are historical by design, so a reader expecting them to describe current state would be the confused one \u2014 but as written there is nothing to execute.",
   "#THE MEASUREMENT THAT MATTERS MOST: ZERO repeats of the defects fixed in the last three iterations, including `type: object` / `Js::isList`, which landed ONE iteration ago and is the kind of finding this advisory has reliably rediscovered before. The fencing, the banners and the marker guard are holding.",
   "5/8 sound; layering claim refuted with upstream package.json; ZERO repeats of recent fixes"
+ ],
+ "audit/schema-enum-const-strictness": [
+  "#CONFIRMED, and it is SELF-CONTRADICTORY WITHIN A SINGLE SCHEMA, which is the strongest form of the argument. Measured:",
+  "#     {\"type\":\"integer\",\"enum\":[3]}    vs 3.0   ->  errors: \"expected one of [3]\"",
+  "#     {\"type\":\"integer\",\"enum\":[3]}    vs 3     ->  accepted",
+  "#     {\"type\":\"integer\",\"const\":3}     vs 3.0   ->  errors: \"expected the constant 3\"",
+  "#     {\"type\":\"integer\"}                vs 3.0   ->  ACCEPTED",
+  "#One schema declares 3.0 an integer and then rejects it as not being 3. A value cannot satisfy `type: integer` and fail `enum` against the same integer.",
+  "#AND UPSTREAM SAYS OTHERWISE, on the language level rather than by reading its source: in JS, `3 === 3.0` is TRUE. JSON Schema's `enum`/`const` use instance equality, and in JSON a number has no int/float distinction \u2014 3.0 IS the number 3. So upstream's comparison accepts 3.0 against `enum: [3]` and this port's strict comparison rejects it. The port is wrong for a reason that is knowable without the upstream file, which is rare and worth using when it happens.",
+  "#NOT FIXED, for the same reason iteration 110's fix was scoped narrowly: the enum/const comparison is in the same predicate neighbourhood as `matchesType()`, which I changed one iteration ago, and JSON Schema comparison semantics have edges (bool vs int, string vs number) that a single `==` swap would blur. The right shape is a numeric-aware equality that treats int/float as equal and still refuses `true == 1`. That needs its own iteration and its own mutation matrix; recording the boundary now so the next one does not rediscover it.",
+  "CONFIRMED: enum/const reject 3.0 while type:integer accepts it; JS says 3===3.0"
  ]
 }
