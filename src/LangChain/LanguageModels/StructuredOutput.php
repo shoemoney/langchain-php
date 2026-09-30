@@ -105,6 +105,9 @@ final class StructuredOutput
             //
             //   bind([], ['runName' => 'x'])  -> runName=NULL, options={"runName":"x"}
             //   bind(['runName' => 'x'], [])  -> runName='x',   options=[]
+            // (Measured through bind() itself; see the note at the call site
+            //  below, which had this pair the other way round for several
+            //  iterations while the shipped call used the wrong slot.)
             //
             // This call previously used `run_name` in the kwargs slot, which was
             // wrong twice: the key was snake_case, and the slot was the kwargs
@@ -135,7 +138,7 @@ final class StructuredOutput
             // Measured through bind() itself:
             //   bind(['runName'=>'x'], [])  -> runName=NULL, options={"runName":"x"}
             //   bind([], ['runName'=>'x'])  -> runName='x',   options=[]
-            $result = $result->bind([], ['runName' => $runName]);
+            $result = $result->bind(['runName' => $runName], []);
         }
 
         return $result;
