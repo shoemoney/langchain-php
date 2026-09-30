@@ -147,7 +147,17 @@ final class SseParser
 
         foreach ($lines as $line) {
             if (str_starts_with($line, 'data:')) {
-                $data[] = ltrim(substr($line, 5), ' ');
+                // The SSE spec removes AT MOST ONE space after the field name:
+                // "data:  text" has the payload " text", not "text".
+                //
+                // `ltrim(..., ' ')` removed all of them, so a payload with
+                // meaningful leading whitespace was silently rewritten.
+                // Measured: "data:  text" yielded "text" instead of " text".
+                // `json_decode` tolerates surrounding whitespace, so the damage
+                // was invisible for JSON payloads and total for anything else —
+                // a plain-text event, a code block, an indented template.
+                $value = substr($line, 5);
+                $data[] = str_starts_with($value, ' ') ? substr($value, 1) : $value;
             }
         }
 

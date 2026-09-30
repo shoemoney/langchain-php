@@ -2939,6 +2939,41 @@
    "chars": 4003,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~openai/gpt-luna-latest": {
+   "model": "~openai/gpt-luna-latest",
+   "at": "2026-09-30T04:40:46",
+   "actual_model": "openai/gpt-6-luna",
+   "usage": {
+    "prompt_tokens": 38825,
+    "completion_tokens": 3471,
+    "total_tokens": 42296,
+    "cost": 0.00658855,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 38822,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.00658855,
+     "upstream_inference_prompt_cost": 0.00485305,
+     "upstream_inference_completions_cost": 0.0017355
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 2934,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 2934,
+   "status": "ok",
+   "file": ".loop/reviews/95-~openai__gpt-luna-latest.md",
+   "chars": 2458,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -3095,7 +3130,8 @@
   "~x-ai/grok-latest",
   "~anthropic/claude-haiku-latest",
   "~anthropic/claude-sonnet-latest",
-  "~deepseek/deepseek-flash-latest"
+  "~deepseek/deepseek-flash-latest",
+  "~openai/gpt-luna-latest"
  ],
  "next_index": 0
 }
