@@ -540,6 +540,41 @@
    "chars": 2507,
    "findings": 5,
    "severity_hits": 5
+  },
+  "z-ai/glm-4.5v": {
+   "model": "z-ai/glm-4.5v",
+   "at": "2026-09-30T10:58:44",
+   "actual_model": "z-ai/glm-4.5v",
+   "usage": {
+    "prompt_tokens": 24361,
+    "completion_tokens": 4535,
+    "total_tokens": 28896,
+    "cost": 0.0227796,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0227796,
+     "upstream_inference_prompt_cost": 0.0146166,
+     "upstream_inference_completions_cost": 0.008163
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 3638,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 3638,
+   "status": "incomplete",
+   "file": ".loop/reviews/18-z-ai__glm-4.5v.md",
+   "chars": 3789,
+   "findings": 4,
+   "severity_hits": 4
   }
  },
  "order": [
@@ -559,7 +594,8 @@
   "inclusionai/ling-3.0-flash-vl",
   "anthropic/claude-opus-5.5",
   "~anthropic/claude-sonnet-latest",
-  "openai/gpt-4o-2024-11-20"
+  "openai/gpt-4o-2024-11-20",
+  "z-ai/glm-4.5v"
  ],
  "next_index": 0
 }

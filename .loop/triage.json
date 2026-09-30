@@ -58,7 +58,8 @@
   "#3 wrong run manager for stampMessageId \u2014 PARTLY REJECTED. Upstream deliberately uses runManagers.at(0) for the id stamp (base.ts:893); matching it. The handleLLMError gap (real) was fixed this session.",
   "#4 streaming usage key mismatch \u2014 DEFERRED; usage flows and folds correctly in tests.",
   "#5 postStream retries a non-idempotent request \u2014 REJECTED with reasoning: the retry only fires BEFORE the first byte is yielded, so nothing has been delivered and no duplicate is possible. A failure after delivery propagates instead.",
-  "#5 postStream idempotency \u2014 remains REJECTED, same reasoning as last iteration."
+  "#5 postStream idempotency \u2014 remains REJECTED, same reasoning as last iteration.",
+  "NOT A REVIEW: status incomplete (4 findings) - not actioned"
  ],
  "stealth/space-bunny-alpha": [
   "Rescued on a later second pass. Two accepted, three rejected \u2014 the two accepted are the most consequential validation gaps the loop has found.",
@@ -94,12 +95,11 @@
   "NOT A REVIEW: status incomplete (4 findings) - not actioned"
  ],
  "openai/gpt-4o-2024-11-20": [
-  "#1 inconsistent key normalisation across layers \u2014 REJECTED, fixed in the previous iteration. Re-probed: max_tokens/maxTokens/top_p/topP all resolve to 42 through ctor, bound and per-call. The reviewer saw a packet built before the fix landed.",
-  "#2 silent failures on unsupported parameters \u2014 REJECTED, same cause. Re-probed: topK refused at all three layers.",
-  "#3 lack of comprehensive end-to-end tests \u2014 REJECTED as ungradable ('add more tests' in the abstract, which this project's own rule excludes). The concrete gaps it implies were closed last iteration: tests/Integration/ now drives both clients through a full Guzzle stack and CI runs it.",
-  "#4 ambiguous error handling in streaming \u2014 ACCEPTED as a documentation gap. The retry boundary WAS documented, but only in a method-level comment a reader reaches after reading the code; the class docblock said nothing. Stated at class level in both clients, and the PORT_STATUS row that had been deleted as a false claim is now restored and accurate.",
-  "#5 inadequate JSON Schema validation \u2014 REJECTED as a feature request (integrate opis/json-schema). Validating a schema *before* use is new capability, not a fidelity fix; the port already validates VALUES against a schema via JsonSchemaValidator.",
-  "5 findings, untriaged - budget went to settling the deferred addEdge(END) finding"
+  "#5 'Improper Handling of JSON Encoding Errors' (BLOCKER) \u2014 REJECTED AS A REPEAT of iteration 103. The evidence quotes `Algorithm::buildCacheKey() \u2014 (string) json_encode($input)`, and that line no longer exists: :1028 reads `json_encode($input, JSON_THROW_ON_ERROR)`, mutation-verified, with `testAnUnencodableCacheKeyFailsLoudlyRatherThanCollapsing` asserting that an unencodable input throws instead of collapsing to `\"\"`. Nothing to do; the finding is correct about the OLD code and wrong about the current tree.",
+  "#WHAT IS WORTH NOTING, because it should not have happened. Iteration 104's `ask.py` ran AFTER iteration 103 was committed and pushed, and `build_packet.py` ran before it in the same command, so the packet this review was written from contained the FIXED line. The model still reported the pre-fix form \u2014 evidently from a truncated excerpt or by recognising the `(string) json_encode(...)` idiom rather than reading the code in front of it. That is a reviewer reading a PATTERN rather than the source, and it is the mirror of the mistake this loop keeps making in reverse: the fix comment I wrote explains the old `(string)` form IN DETAIL, so the most quotable line in that file is the one that no longer applies.",
+  "#So this is the fix-comment trap one level deeper than iteration 90: there, a HISTORY narrative was read as current code; here, the history is correct and explicitly fenced, and the surrounding file is still the most quotable evidence of the OLD bug. A fenced history reduces the risk and does not remove it. The reduction is worth keeping; the residual is a cost of documenting why, which is a real trade rather than a free win.",
+  "#1 'Incorrect Handling of Optional Placeholders', #2 'Callable Partial Variables Misinterpreted', #3 'Validation Disabled for Mustache Templates', #4 'Silent Loss of Additional Content Fields' \u2014 DEFERRED unverified. All four are in the prompt-template area, none was executed, and #4's phrase 'silent loss' is the shape this project should probe rather than defer twice, but it needs a budget of its own.",
+  "#5 REJECTED as a repeat of iter-103 (line 1028 is already JSON_THROW_ON_ERROR); 4 deferred"
  ],
  "baidu/ernie-4.5-vl-424b-a47b": [
   "Reviewer used ### headings, so the harness counted 0 findings and marked it 'incomplete'. Parser widened to #{2,4}; content was real and was triaged.",
