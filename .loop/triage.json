@@ -1001,15 +1001,12 @@
   "CONFIRMED twice: _tags/_metadata upstream = deliberately unused; #2 rejected"
  ],
  "~moonshotai/kimi-latest": [
-  "#2 'ChatMessage block content silently dropped in coercion' \u2014 REJECTED BY EXECUTION, and this iteration nearly filed it as a CONFIRMED MAJOR before the probe was corrected.",
-  "#My FIRST probe produced this: `ChatMessage(block content) -> \"user\"`. That reads exactly like a live defect \u2014 block content dropped, role string leaking into content. It was an artefact of guessing the constructor. `ChatMessage::__construct` takes a SINGLE `$fields` argument (`string|array`), not `(role, content)`, so `new ChatMessage(\"user\", $blocks)` bound \"user\" to `$fields`, which the constructor expands to `['role' => 'chat', 'content' => 'user']`. The probe was measuring my own call.",
-  "#With the constructor read and the call corrected:",
-  "#     ChatMessage(block content) -> [{\"type\":\"text\",\"text\":\"hello\"},{\"type\":\"image_url\",...}]   PRESERVED",
-  "#     ChatMessage(string content)  -> \"plain string\"                                                   PRESERVED",
-  "#Block content survives. The quoted line `is_string($templateData) ? $templateData : ''` sits at :360-362 in the `fromTemplate` path, not the `fromMessages` path this finding is about.",
-  "#THE FOURTH GUESSED CONSTRUCTOR IN THIS LOOP, after CharacterTextSplitter, TextSplitter, RunnableBinding and Document. Every one cost a failed probe, and this one nearly cost a false MAJOR in the ledger. The generalisation is not new and I am recording it because I keep failing it: READ THE SIGNATURE BEFORE THE PROBE, and when a probe returns something surprising, suspect the probe before the code \u2014 a finding that contradicts what the code plainly does should be re-probed with a verified call shape before it is written down.",
-  "#1 'parseImagePrompts() mutates the caller-owned message' \u2014 REJECTED AS A SETTLED REPEAT. Fidelity divergence from upstream confirmed (upstream builds a local content array and returns `new MsgClass({content})`; the port assigns `$message->content = $blocks`); the DEFECT was refuted by probe across three calls and then again across the retained-instance case. Fourth time it has been reported.",
-  "#3 'fromMessages() drops metadata and tags', #4 'fromTemplate() ignores metadata/tags/partial options' and #5 'Only four verified findings' \u2014 DEFERRED unverified. #5 is self-describing and was emitted as a numbered finding anyway, which is now a recurring review-quality pattern.",
-  "#2 REJECTED by execution; my probe nearly filed a false MAJOR on a guessed constructor"
+  "#3 'fromMessages() drops metadata and tags' \u2014 REJECTED ON READING, and the refutation cost one grep rather than a probe. `fromMessages(array $promptMessages, array $extra = [])` USES `$extra` twice: it is passed to `coerceMessagePromptTemplateLike($promptMessage, $extra)`, and read as `$extra['validateTemplate'] ?? null` and `$extra['templateFormat'] ?? null`. Nothing is dropped.",
+  "#The second half of the finding is the more substantive error: `$extra` is not a metadata/tags bag in the first place. It maps to upstream's `_StringImageMessagePromptTemplateOptions { templateFormat?: Format }` \u2014 the template-format selector \u2014 so \"drops metadata and tags\" names fields this parameter never claimed to carry. A finding that invents a contract for a parameter in order to report it as broken is the mirror image of the fidelity misreads, and no less wrong.",
+  "##4 'PromptTemplate::fromTemplate() ignores metadata/tags/partial options inconsistently' \u2014 DEFERRED unverified, and named alongside #3 because both assert the same shape of missing options bag. If #4 is the same invention it will fall the same way, but I have not read `PromptTemplate::fromTemplate()`'s options handling this iteration and will not decide it by analogy.",
+  "#3 REJECTED: $extra IS used and maps to templateFormat, not metadata/tags"
+ ],
+ "inclusionai/ling-3.0-flash-vl": [
+  "NOT A REVIEW: TRUNCATED twice at the 24k reasoning cap"
  ]
 }

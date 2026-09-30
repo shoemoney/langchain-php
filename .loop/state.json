@@ -402,6 +402,39 @@
    "chars": 1857,
    "findings": 3,
    "severity_hits": 3
+  },
+  "inclusionai/ling-3.0-flash-vl": {
+   "model": "inclusionai/ling-3.0-flash-vl",
+   "at": "2026-09-30T09:49:52",
+   "actual_model": "inclusionai/ling-3.0-flash-vl",
+   "usage": {
+    "prompt_tokens": 42290,
+    "completion_tokens": 24000,
+    "total_tokens": 66290,
+    "cost": 0.00236649,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.00236649,
+     "upstream_inference_prompt_cost": 0.00088809,
+     "upstream_inference_completions_cost": 0.0014784
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 22476,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "length",
+   "reasoning_tokens": 22476,
+   "status": "truncated",
+   "chars": 87815,
+   "file": ".loop/reviews/14-inclusionai__ling-3.0-flash-vl.md"
   }
  },
  "order": [
@@ -417,7 +450,8 @@
   "amazon/nova-pro-v1",
   "prism-ml/ternary-bonsai-2-27b",
   "~moonshotai/kimi-latest",
-  "openai/o4-mini-high"
+  "openai/o4-mini-high",
+  "inclusionai/ling-3.0-flash-vl"
  ],
  "next_index": 0
 }
