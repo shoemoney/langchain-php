@@ -115,5 +115,12 @@
   "file": ".loop/advisory/llama-4-maverick.md",
   "chars": 4313,
   "cost": 0.0048
+ },
+ "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+  "status": "ok",
+  "at": "2026-09-30T14:23:04.553183+00:00",
+  "file": ".loop/advisory/nemotron-3-nano-omni-30b-a3b-reasoning-free.md",
+  "chars": 7220,
+  "cost": 0
  }
 }

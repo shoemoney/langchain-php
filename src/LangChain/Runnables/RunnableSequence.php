@@ -73,45 +73,47 @@ class RunnableSequence extends Runnable
     }
 
     /**
-     * The config a given step runs under.
+     * The config a sequence hands to step N.
      *
-     * Upstream tags every step `seq:step:N` so a trace attributes each step's
-     * run — and therefore its tokens and latency — to the step that produced it
-     * (`base.ts:2113`, five sites). Without it an LLM chain traced through this
-     * port is one flat run, and there is no way to see which link in the chain
-     * spent the time. The stored {@see self::$names} were otherwise dead data:
-     * written by the constructor, extended by `pipe()`, and read by nothing.
+     * WHAT THIS DOES NOW, stated first because a reader — or a reviewer — skims:
+     * it preserves the caller's `runName` and records the step as a TAG.
+     *
+     *     $tag = 'seq:step:' . ($index + 1);
+     *     return $config === null
+     *         ? (new RunnableConfig())->with(['tags' => [$tag]])
+     *         : $config->forChild(null)->with(['tags' => array_merge($config->tags, [$tag])]);
+     *
+     * Upstream records the step in the child CALLBACK manager
+     * (langchain-core/src/runnables/base.ts:1982-1985):
+     *
+     *     patchConfig(config, { callbacks: runManager?.getChild(`seq:step:${i + 1}`) })
+     *
+     * This port does not thread a callback manager through sequences, so `tags` is
+     * the carrier available. That is a documented divergence — a tag is a label,
+     * not an identity — recorded in PORT_STATUS under Known non-exact behaviours.
+     *
+     * ---------------------------------------------------------------------
+     * HISTORY — none of the following describes the code above. It is kept
+     * because the two defects were stacked and the order mattered, and because
+     * deleting this note would leave the next reader unable to tell why a
+     * forChild() call takes a null argument.
+     *
+     * An earlier version called `$config->forChild('seq:step:' . ($index + 1))`,
+     * and forChild() assigns `run_name` — so the step tagging overwrote the name
+     * it was annotating. Measured on an assembled structured-output pipeline named
+     * `pull_person`: `runName = "seq:step:1"` with `options = {"runName" =>
+     * "pull_person"}`, silently, because Run::name() falls back to the component
+     * id and then the run type.
+     *
+     * A first attempt at removing it was reverted having measured NULL instead of
+     * the bound name, and it was wrongly concluded the loss was upstream of this
+     * method. It was not: the bind slot was ALSO wrong at that time, so there was
+     * no name to preserve, and a preserved-but-absent name is indistinguishable
+     * from a clobbered one until exactly one cause is removed.
+     * ---------------------------------------------------------------------
      */
     private function stepConfig(?RunnableConfig $config, int $index): ?RunnableConfig
     {
-        // The step tag is a LABEL and now lives in `tags`, not in `runName`.
-        //
-        // Upstream records it in the CHILD CALLBACK manager
-        // (langchain-core/src/runnables/base.ts:1982-1985):
-        //
-        //     patchConfig(config, { callbacks: runManager?.getChild(`seq:step:${i + 1}`) })
-        //
-        // This port does not thread a callback manager through sequences, so the
-        // closest available carrier is `config->tags`. That is a documented
-        // divergence — a tag is a label, not an identity — and it is recorded in
-        // PORT_STATUS under Known non-exact behaviours rather than presented as
-        // faithful.
-        //
-        // The previous code called `$config->forChild('seq:step:' . ($index + 1))`,
-        // and `forChild()` ASSIGNS `run_name` — so the sequence's step tagging
-        // DESTROYED the name it was annotating. Measured on an assembled
-        // structured-output pipeline named `pull_person`:
-        //
-        //     runName = "seq:step:1"   options = {"runName" => "pull_person"}
-        //
-        // silently, because `Run::name()` falls back to the component id and then
-        // the run type, so a run missing its name still shows a plausible one.
-        //
-        // `forChild(null)` keeps the caller's runName and still establishes the
-        // parent/child run-id relationship, which is what tracing a tree needs.
-        // Two defects were stacked here and had to be fixed in order: while the
-        // bind slot was also wrong there was no name to preserve, and a
-        // preserved-but-absent name is indistinguishable from a clobbered one.
         $tag = 'seq:step:' . ($index + 1);
 
         if ($config === null) {
