@@ -189,8 +189,22 @@ A faithful PHP port of LangChain JS / LangGraph JS. Composer PSR-4, PHP >= 8.2 f
 {public_surface("Pregel", 30)}
 {public_surface("Schema", 25)}
 
-## 5. What previous reviewers already found (do NOT repeat these)
+## 5. What previous reviewers already found
+
 {prior_findings()}
+
+**These are ALREADY FIXED or ALREADY REJECTED.** Section 5 is there so you do
+not waste a review rediscovering them — NOT as material to re-analyse. A review
+that paraphrases section 5 back as its own "what the green suite hides" has
+found nothing and wasted an iteration.
+
+Concretely: do NOT list anything from section 5 under your own heading. If a
+section 5 item is genuinely still unfixed, say so in one line under that item's
+name and move on. If you have nothing NEW, say "no new findings in this element"
+and say so plainly — an honest empty review is worth more than a restatement,
+because a restatement reads like corroboration and is not. Corroboration only
+counts if you independently reached it from the source, and then you must say
+what the source shows.
 
 ## 6. Known non-exact behaviours (from PORT_STATUS.md)
 {run("sed -n '/Known non-exact/,/^## /p' PORT_STATUS.md | head -40") or '(section not found)'}
