@@ -61,9 +61,16 @@ class RunnableBinding extends Runnable
      * its per-call parameters (`BaseChatModel` reads `$config->options` and
      * passes it to the provider's `invocationParams()`).
      *
-     * They used to be stored and never read, which made `->bind(['temperature' =>
-     * 0])` a silent no-op on every runnable in the SDK. No test caught it
-     * because no test called `bind()` at all.
+     * HISTORY — none of this describes the behaviour above, which is current:
+     *
+     *     They used to be stored and never read, which made `->bind(['temperature' =>
+     *     0])` a silent no-op on every runnable in the SDK. No test caught it
+     *     because no test called `bind()` at all.
+     *
+     * Kept because the precedence rule below reads as arbitrary without it. It is
+     * fenced deliberately: a comment narrating a FIXED bug reads as present tense to
+     * anyone — human or model — skimming the source, and this project has now been
+     * bitten by that three times.
      *
      * Precedence, stated plainly because a reviewer read this the wrong way once:
      * **the bound kwargs win.** Upstream calls `this._mergeConfig(options,

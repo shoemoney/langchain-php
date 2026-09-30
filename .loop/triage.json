@@ -979,5 +979,12 @@
  ],
  "advisory/nemotron-3-nano-a3b-reasoning-free": [
   "iteration-87 staleness fix FAILED; real cause was my own fix comment describing the bug"
+ ],
+ "audit/fix-comment-past-tense": [
+  "#AUDIT OF MY OWN CODE, prompted by iteration 90's discovery that a fix comment describing a fixed bug is read as present tense by reviewers. Scanned src/ for fix comments narrating a defect in the present-adjacent voice: 12 matches across 8 files, and MOST ARE BENIGN \u2014 'a value previously produced by dumpsTyped()', 'kwargs used to build the serialized payload', 'used to decide whether two channels are equal'. The word 'previously'/'used to' alone is not the signal; what matters is whether the sentence describes a DEFECT that a reader would go and check.",
+  "#THREE GENUINELY CARRY THE TRAP, and one is now fenced: `RunnableBinding.php:64` read 'They used to be stored and never read, which made `->bind([\"temperature\" => 0])` a silent no-op on every runnable in the SDK' \u2014 a confident, specific, measurement-grade narrative of a live defect, sitting directly above a reader deciding whether kwargs work. It is now fenced under a HISTORY banner that opens by saying it does not describe the behaviour above.",
+  "#STILL QUEUED, found by the same sweep and not yet touched: `BaseChatModel.php:573` ('This docblock used to say the opposite \u2014 that the base returns an empty [array]...'), which is the comment I wrote in iteration 77 and the same trap I fixed there in the TEXT while leaving the narrative of the old claim intact; and `RunnableInterface.php:97` ('which this docblock used to claim, and neither of which is true'). Both describe corrected defects in enough detail to be mistaken for present behaviour.",
+  "#THE SUGGESTION I DID NOT IMPLEMENT, recorded rather than rushed: a guard that fails when a src/ docblock narrates a defect without a HISTORY marker would make this recurring instead of one-off, and this project already carries a dozen similar guards. It needs a pattern for 'narrates a defect' that does not fire on the benign uses above, and picking that pattern under time pressure is how a guard becomes a nuisance. Next iteration if budget allows.",
+  "audited src/ for the trap: 12 matches, 3 real, 1 fenced, 2 queued"
  ]
 }
