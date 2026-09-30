@@ -430,6 +430,52 @@ def save_state(s):
     state_path().write_text(json.dumps(s, indent=1))
 
 
+HEALTH = LOOP / "model_health.json"
+
+
+def healthy(model: str) -> bool:
+    """
+    Is this model able to GENERATE at all? Ask with the smallest possible request.
+
+    Three iterations of this loop were spent on a model that accepts every payload
+    and returns "Upstream error from Perceptron: Generation failed" — a budget was
+    added for a cause that was never established. The check that settles it costs ONE
+    short call: if a two-message, few-hundred-token request cannot produce content,
+    no brief length, image or message shape will make the model usable, and the
+    honest response is to stop selecting it.
+
+    Results are cached in `.loop/model_health.json`, because a model does not change
+    between iterations and a probe per selection would cost a call every time.
+    """
+    cache = {}
+    if HEALTH.exists():
+        try:
+            cache = json.loads(HEALTH.read_text())
+        except ValueError:
+            cache = {}
+    if model in cache:
+        return bool(cache[model])
+
+    ok = True
+    try:
+        r = call(
+            model,
+            "You answer with one word.",
+            "Reply with exactly: OK",
+            None,
+            max_tokens=16,
+        )
+        text = (r.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        ok = bool(text.strip())
+    except Exception:
+        ok = False
+
+    cache[model] = ok
+    HEALTH.write_text(json.dumps(cache, indent=1))
+    print(f"    health probe {model}: {'ok' if ok else 'UNUSABLE'}", flush=True)
+    return ok
+
+
 def pick():
     roster = json.loads((LOOP / "roster.json").read_text())
     st = load_state()
@@ -441,7 +487,12 @@ def pick():
         pool = [m for m in roster if not EXCLUDE.search(m["id"])]
     if not pool:
         sys.exit("no eligible models")
-    return random.choice(pool)["id"]
+    # Probe before selecting, not after failing. `healthy()` is cached, so this
+    # costs one short call per model ever tried rather than per iteration.
+    usable = [m for m in pool if healthy(m["id"])]
+    if not usable:
+        sys.exit("no healthy models in the roster")
+    return random.choice(usable)["id"]
 
 
 def main():
