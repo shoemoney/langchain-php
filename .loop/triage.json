@@ -1082,6 +1082,7 @@
   "5/8 sound; layering claim refuted with upstream package.json; ZERO repeats of recent fixes"
  ],
  "audit/schema-enum-const-strictness": [
+  "#OPEN \u2014 CONFIRMED, NOT YET FIXED. `{\"type\":\"integer\",\"enum\":[3]}` and `const: 3` reject `3.0` with strict comparison while `type: integer` ACCEPTS it, so one schema calls 3.0 an integer and then not-3. In JS `3 === 3.0` is true, so upstream accepts it. Fixing needs a numeric-aware equality that treats int/float as equal while still refusing `true == 1`, plus its own mutation matrix \u2014 not a bare `==` swap.",
   "#CONFIRMED, and it is SELF-CONTRADICTORY WITHIN A SINGLE SCHEMA, which is the strongest form of the argument. Measured:",
   "#     {\"type\":\"integer\",\"enum\":[3]}    vs 3.0   ->  errors: \"expected one of [3]\"",
   "#     {\"type\":\"integer\",\"enum\":[3]}    vs 3     ->  accepted",
