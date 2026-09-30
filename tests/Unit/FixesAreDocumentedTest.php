@@ -83,10 +83,47 @@ final class FixesAreDocumentedTest extends TestCase
                     continue 2;
                 }
             }
+
+            // PORT_STATUS.md documents THE PORT — where the PHP diverges from
+            // the TypeScript. A fix that touches only `.loop/`, `tests/` or
+            // `docs/` changes the harness or the guard, not the ported
+            // behaviour, and has nothing to say there.
+            //
+            // Scoping arrived the other way round: the first version demanded a
+            // row for every `fix:` commit, and CI failed on a commit that
+            // repaired this very guard. That is the opposite failure from the
+            // three before it — too strict rather than vacuous — but the same
+            // lesson in reverse: a guard that demands the wrong thing is as
+            // useless as one that checks nothing, and it trains you to ignore
+            // it.
+            if (!self::touchesThePort($hash)) {
+                continue;
+            }
+
             $commits[] = [$hash, $subject];
         }
 
         return $commits;
+    }
+
+    /**
+     * Whether a commit changed anything under `src/` — the ported code.
+     */
+    private static function touchesThePort(string $hash): bool
+    {
+        $root = dirname(__DIR__, 2);
+        $files = (string) shell_exec(
+            'cd ' . escapeshellarg($root)
+            . ' && git show --name-only --pretty=format: HEAD 2>/dev/null ' . escapeshellarg($hash)
+        );
+
+        foreach (explode("\n", $files) as $f) {
+            if (str_starts_with(trim($f), 'src/')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function testTheGuardCanActuallySeeHistory(): void
