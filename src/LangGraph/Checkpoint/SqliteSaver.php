@@ -152,14 +152,33 @@ class SqliteSaver extends PregelMemorySaver
         $filter = $listOptions->filter ?? [];
 
         // The metadata filter is pushed into SQL so that `limit` still bounds
-        // the *filtered* set. `json_quote(json_extract(...))` yields the value in
-        // its JSON form, which is what the comparison argument is encoded as —
-        // that is what makes `step = -1` and `parents = {"": id}` compare equal
-        // rather than comparing a number to the string "1".
+        // the *filtered* set.
+        //
+        // BOTH sides go through `json_extract`, which is the whole fix. The
+        // previous form compared `json_quote(json_extract(metadata, ?))` against
+        // a bound `json_encode($value)`, and those two are produced by different
+        // rules:
+        //
+        //   * SQLite has no boolean type. `json_extract` over a JSON `true`
+        //     yields the INTEGER 1, while `json_encode(true)` is the string
+        //     "true" — so a boolean filter could never match, silently.
+        //   * `json_extract` over the number 7 yields integer 7, while
+        //     `json_encode("7")` is the string "7" — so a numeric stored as a
+        //     number only matched when the caller passed the same PHP type.
+        //
+        // Measured against stored metadata `step=7, flag=true, name=p` before
+        // this change: `['step' => 7]` 1 result, `['step' => '7']` 0,
+        // `['flag' => true]` 0, `['flag' => 'true']` 0, `['name' => 'p']` 1.
+        //
+        // Extracting the bound parameter too puts both sides through the same
+        // function, so SQLite applies the same coercion to each: booleans agree
+        // because both become 1, numbers agree, and objects still compare as
+        // JSON rather than as the string "[object Object]".
         foreach ($filter as $key => $value) {
-            $where[] = 'json_quote(json_extract(CAST(metadata AS TEXT), ?)) = ?';
+            $where[] = 'json_extract(CAST(metadata AS TEXT), ?) = json_extract(?, ?)';
             $args[] = '$.' . $key;
             $args[] = json_encode($value, JSON_THROW_ON_ERROR);
+            $args[] = '$';
         }
 
         $sql = $this->selectSql() . ($where === [] ? '' : 'WHERE ' . implode(' AND ', $where) . "\n")
