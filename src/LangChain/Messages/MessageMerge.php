@@ -78,6 +78,24 @@ final class MessageMerge
         $first ??= '';
         $second ??= '';
 
+        // A single content BLOCK is an assoc array (`['type' => 'text', 'text' => ...]`)
+        // and a LIST of blocks is a sequential array. `array_merge($left, $block)`
+        // therefore appends the block's VALUES, not the block: measured,
+        //
+        //     list + ASSOC  ->  [{"type":"text","text":"L"}, "text", "R"]
+        //
+        // — the right-hand block SPLINTERED into two bare strings sitting among the
+        // blocks, and a string+block merge produced an object that was not even a
+        // list. So a non-list array is one block and is wrapped before any merge
+        // sees it. `array_is_list([])` is true, so the empty case is untouched and
+        // the degenerate [] behaviour is preserved.
+        if (is_array($first) && !array_is_list($first)) {
+            $first = [$first];
+        }
+        if (is_array($second) && !array_is_list($second)) {
+            $second = [$second];
+        }
+
         if (is_string($first)) {
             if ($first === '') {
                 return $second;

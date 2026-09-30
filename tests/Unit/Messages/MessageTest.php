@@ -489,4 +489,37 @@ final class MessageTest extends TestCase
             new \LangChain\Messages\FunctionMessage('fn', 'r'),
         ]);
     }
+
+    /**
+     * A single content BLOCK is assoc; a LIST of blocks is sequential.
+     *
+     * `array_merge($left, $block)` appends the block's VALUES, not the block, so
+     * merging a list with a single block produced, measured:
+     *
+     *     [{"type":"text","text":"L"}, "text", "R"]
+     *
+     * — the right-hand block SPLINTERED into two bare strings sitting among blocks,
+     * and a string+block merge produced an object that was not a list at all. A
+     * non-list array is therefore one block and is wrapped before any merge sees it.
+     *
+     * The empty case is the degenerate one: `array_is_list([])` is true, so `[]` is
+     * left alone and still returns the left side unchanged. Both halves are asserted
+     * because the fix could otherwise pass by wrapping everything.
+     */
+    public function testMergingASingleAssocBlockYieldsAListOfBlocks(): void
+    {
+        $left = [['type' => 'text', 'text' => 'L']];
+        $block = ['type' => 'text', 'text' => 'R'];
+
+        $merged = \LangChain\Messages\MessageMerge::mergeContent($left, $block);
+        self::assertSame([$left[0], $block], $merged);
+        self::assertTrue(array_is_list($merged), 'the merge must be a LIST of blocks');
+
+        $fromString = \LangChain\Messages\MessageMerge::mergeContent('ab', $block);
+        self::assertSame([['type' => 'text', 'text' => 'ab'], $block], $fromString);
+        self::assertTrue(array_is_list($fromString));
+
+        // The empty list is still empty, not wrapped.
+        self::assertSame($left, \LangChain\Messages\MessageMerge::mergeContent($left, []));
+    }
 }
