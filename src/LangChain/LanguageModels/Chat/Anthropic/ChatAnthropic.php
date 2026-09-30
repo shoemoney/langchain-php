@@ -690,10 +690,26 @@ class ChatAnthropic extends BaseChatModel
             );
         }
 
-        return $this->defaultHeaders + [
+        // The PINNED map goes on the LEFT so it wins.
+        //
+        // PHP's `+` keeps the left-hand side on a key collision, so
+        // `$this->defaultHeaders + [pinned]` let a caller silently override the
+        // pinned values. Measured: constructing with
+        // `defaultHeaders: ['anthropic-version' => '1999-01-01']` sent
+        // `1999-01-01` while the pinned const is `2023-06-01` — directly
+        // contradicting the API_VERSION docblock, which says the version is
+        // "Pinned, not configurable-by-default ... a silently negotiated
+        // version would make the same code behave differently on two days".
+        // That is precisely the harm it names: the tool-use wire format and the
+        // event stream both changed across versions, so a caller who sets the
+        // header by accident gets different parsing on a different day, with no
+        // error.
+        //
+        // Caller extras still merge — only the pinned KEYS are protected.
+        return [
             'x-api-key' => $this->apiKey,
             'anthropic-version' => self::API_VERSION,
             'content-type' => 'application/json',
-        ];
+        ] + $this->defaultHeaders;
     }
 }

@@ -2729,6 +2729,41 @@
    "chars": 2722,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~z-ai/glm-flash-latest": {
+   "model": "~z-ai/glm-flash-latest",
+   "at": "2026-09-30T03:25:54",
+   "actual_model": "z-ai/glm-5.3-flash",
+   "usage": {
+    "prompt_tokens": 47493,
+    "completion_tokens": 10442,
+    "total_tokens": 57935,
+    "cost": 0.01234495,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.01234495,
+     "upstream_inference_prompt_cost": 0.00712395,
+     "upstream_inference_completions_cost": 0.005221
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 9536,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 9536,
+   "status": "ok",
+   "file": ".loop/reviews/89-~z-ai__glm-flash-latest.md",
+   "chars": 3870,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2879,7 +2914,8 @@
   "google/gemini-3.7-flash",
   "bytedance-seed/seed-2.0-mini",
   "perplexity/sonar",
-  "~google/gemini-flash-latest"
+  "~google/gemini-flash-latest",
+  "~z-ai/glm-flash-latest"
  ],
  "next_index": 0
 }
