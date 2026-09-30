@@ -1657,6 +1657,41 @@
    "chars": 2671,
    "findings": 4,
    "severity_hits": 4
+  },
+  "~google/gemini-pro-latest": {
+   "model": "~google/gemini-pro-latest",
+   "at": "2026-09-30T18:30:17",
+   "actual_model": "google/gemini-3.1-pro-preview",
+   "usage": {
+    "prompt_tokens": 44871,
+    "completion_tokens": 22601,
+    "total_tokens": 67472,
+    "cost": 0.360954,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.360954,
+     "upstream_inference_prompt_cost": 0.089742,
+     "upstream_inference_completions_cost": 0.271212
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 21796,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 21796,
+   "status": "ok",
+   "file": ".loop/reviews/51-~google__gemini-pro-latest.md",
+   "chars": 3209,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1709,7 +1744,8 @@
   "perplexity/sonar-pro-search",
   "mistralai/ministral-8b-2512",
   "stealth/space-bunny-alpha",
-  "~openai/gpt-astra-latest"
+  "~openai/gpt-astra-latest",
+  "~google/gemini-pro-latest"
  ],
  "next_index": 0
 }
