@@ -2033,6 +2033,41 @@
    "chars": 2932,
    "findings": 5,
    "severity_hits": 5
+  },
+  "google/gemini-3-flash-preview": {
+   "model": "google/gemini-3-flash-preview",
+   "at": "2026-09-29T23:23:10",
+   "actual_model": "google/gemini-3-flash-preview",
+   "usage": {
+    "prompt_tokens": 32990,
+    "completion_tokens": 934,
+    "total_tokens": 33924,
+    "cost": 0.019297,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.019297,
+     "upstream_inference_prompt_cost": 0.016495,
+     "upstream_inference_completions_cost": 0.002802
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/65-google__gemini-3-flash-preview.md",
+   "chars": 3500,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2156,7 +2191,8 @@
   "qwen/qwen3.7-flash",
   "bytedance-seed/seed-1.6-flash",
   "prism-ml/ternary-bonsai-2-27b",
-  "bytedance-seed/seed-2.0-lite"
+  "bytedance-seed/seed-2.0-lite",
+  "google/gemini-3-flash-preview"
  ],
  "next_index": 0
 }

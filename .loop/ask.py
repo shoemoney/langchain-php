@@ -40,6 +40,17 @@ EVIDENCE RULES — this is where reviews most often go wrong:
   the quote was never in the source. One review did exactly this, claiming a
   duplicated docblock that does not exist in the file.
 * Evidence you cannot see in the packet is a guess. Leave the finding out.
+* **The presence of a line is not a defect.** Several reviews have quoted a
+  line and asserted what it *causes* without tracing it. A fallback operator
+  that only fires when a key is absent is not a collision; a `catch` that calls
+  the error handler two lines above the line you are pointing at has not been
+  missed. Before reporting, state the OBSERVABLE behaviour that is wrong, and
+  trace the path that produces it.
+* If the code you are pointing at carries a comment explaining it, you have
+  found that comment. Address it — say why it is wrong — rather than restating
+  the code it annotates as if the comment were not there. Several correct fixes
+  in this repository are long-documented in place, and reporting them again has
+  cost whole iterations.
 
 This is a PORT, not a product: suggesting a feature upstream does not have is a
 defect in your review, not an insight. Judge fidelity, correctness, safety and tests.
