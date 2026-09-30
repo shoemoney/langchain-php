@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\Tools;
-
 use LangChain\Tools\{DynamicStructuredTool, Schema, ToolException};
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -127,5 +126,39 @@ final class SchemaSpecSemanticsTest extends TestCase
 
         $this->expectException(ToolException::class);
         $schema->validate(INF);
+    }
+
+    /**
+     * A bare `{"type":"object"}` must accept an EMPTY object, and an stdClass.
+     *
+     * Two defects in one predicate at `Schema::matchesType()`:
+     *
+     *   'object' => is_array($value) && !Js::isList($value)
+     *
+     * `Js::isList([])` returns true — correctly, because in JS `[]` IS an array —
+     * but PHP's assoc-mode decoding makes `json_decode('{}')` and
+     * `json_decode('[]')` the SAME VALUE. So the object arm rejected `{}`, the most
+     * common degenerate case there is. And `is_array()` is false for a stdClass, so
+     * anything decoded without assoc-mode was rejected too, with an error reading
+     * "expected object, got object".
+     *
+     * The empty array is a real PHP ambiguity, not a mistake: in JS `{}` is an
+     * object and `[]` is an array. Accepting `[]` as an object keeps the empty
+     * object usable, and `array` still accepts it, so the ambiguity is shared rather
+     * than resolved against one type.
+     *
+     * The third assertion is the one that stops this being a loosening: a genuine
+     * non-empty JSON ARRAY must still be rejected as not-an-object, or the fix has
+     * simply removed the distinction instead of resolving the ambiguity.
+     */
+    public function testABareObjectSchemaAcceptsTheEmptyObjectCase(): void
+    {
+        $schema = new Schema(['type' => 'object']);
+
+        $this->assertSame([], $schema->errors([]), 'an empty object decodes to []');
+        $this->assertSame([], $schema->errors(new \stdClass()), 'a stdClass is an object');
+        $this->assertSame([], $schema->errors(['a' => 1]), 'an assoc array is an object');
+
+        $this->assertNotSame([], $schema->errors([1, 2]), 'a non-empty JSON array is NOT an object');
     }
 }

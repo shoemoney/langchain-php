@@ -492,7 +492,28 @@ final class Schema
     private static function matchesType(mixed $value, string $type): bool
     {
         return match ($type) {
-            'object' => is_array($value) && !\LangChain\Utils\Js::isList($value),
+            // `object` accepts an EMPTY array, and a stdClass.
+            //
+            // Two separate defects, one predicate:
+            //
+            //  - `Js::isList([])` returns TRUE — correctly, because in JS `[]` IS
+            //    an array. But PHP's assoc-mode decoding makes `json_decode('{}')`
+            //    and `json_decode('[]')` the SAME VALUE, `[]`. So `!isList([])`
+            //    is false and a bare `{"type":"object"}` schema could never
+            //    validate `{}` — the most common degenerate case there is.
+            //  - `is_array()` is false for a stdClass, so anything decoded
+            //    WITHOUT assoc-mode was rejected too, with an error reading
+            //    "expected object, got object", which is self-contradictory.
+            //
+            // The empty array is a genuine PHP ambiguity, not a mistake: in JS
+            // `{}` is an object and `[]` is an array, and PHP cannot represent the
+            // difference once decoded. Accepting `[]` as an object is the choice
+            // that keeps the empty object usable; `array` still accepts it too, so
+            // the ambiguity is shared rather than resolved against one type. That
+            // is recorded as a known non-exact behaviour rather than presented as
+            // a clean port.
+            'object' => $value instanceof \stdClass
+                || (is_array($value) && (!\LangChain\Utils\Js::isList($value) || $value === [])),
             'array' => is_array($value) && \LangChain\Utils\Js::isList($value),
             'string' => is_string($value),
             'number' => is_int($value) || is_float($value),

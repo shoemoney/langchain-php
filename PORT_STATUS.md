@@ -293,4 +293,4 @@ rediscovered as a surprise.
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **2316** |
+| **Total so far** | | **2317** |

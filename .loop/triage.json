@@ -172,15 +172,11 @@
   "#8 the three src/ orphans are dead code \u2014 DEFERRED with a reason, not a defect: BaseToolkit, ToolRuntime and FakeTool are referenced by nothing because ToolNode (the consumer) is an unported subsystem already documented as prebuilt in PORT_STATUS. Deleting them would delete the only ported half of a documented pair. Recorded rather than acted on."
  ],
  "anthropic/claude-fable-5.1": [
-  "#3 'A bare {\"type\":\"object\"} schema rejects {}' \u2014 ACCEPTED, and it is the best find in several iterations. Measured against `new Schema(['type' => 'object'])`:",
-  "#     empty array  []            -> errors: [{\"path\":\"$\",\"message\":\"expected object, got array\"}]",
-  "#     empty object stdClass()   -> errors: [{\"path\":\"$\",\"message\":\"expected object, got object\"}]   <- an OBJECT rejected as not an object",
-  "#     one key      ['a' => 1]   -> accepted",
-  "#ROOT CAUSE, at Schema.php:495: `'object' => is_array($value) && !\\LangChain\\Utils\\Js::isList($value),`. Two failures in one predicate. (a) An empty array IS a list, so `!isList([])` is false and `{}` is rejected \u2014 and since JSON `{}` decodes to `[]` in PHP, EVERY empty object fails. (b) `is_array()` is false for a stdClass, so anything decoded WITHOUT assoc-mode is rejected too, and the error message says 'got object', which is self-contradictory and would waste a reader's time.",
-  "#WHY IT MATTERS MORE THAN A SCHEMA QUIRK: a bare `{\"type\":\"object\"}` is the shape a caller writes when they mean 'any JSON object'. It cannot validate an empty one \u2014 which is the single most common degenerate case, and the same class this project has been bitten by repeatedly: the empty object that encoded as `[]` and broke round-tripping in an earlier release. Here it does not corrupt a value, it REJECTS a legitimate one, which is quieter still.",
-  "#NOT FIXED THIS ITERATION, and the reason is the fix's blast radius rather than the diagnosis. `Schema::isValidType()` is the single place every type check funnels through, so changing the object arm to accept `[]` and `stdClass` touches EVERY schema in the library \u2014 including the `Schema::string()` nested-as-property defect from an earlier release, which is guarded. The predicate looks like it encodes a deliberate array/object distinction, and `Js::isList` exists to express exactly that; whether `[]` should be a valid object depends on how `Js::isList([])` is defined, which I have not read. Next iteration starts there: read `Js::isList`, decide whether the fix is to admit `[]`, to admit stdClass, or both, and verify against the nested-schema guard that must not regress.",
-  "#1 'anyOf match returns early and skips every sibling constraint', #2 'invoke() writes toolCall onto the caller's own RunnableConfig' \u2014 DEFERRED unverified. #2 is another instance of the 'mutates the caller's object' family this loop has already refuted once on the image-prompt path, so it deserves execution before belief either way. #4 is partly self-declared inference the reviewer marks as such, which is good practice and not actionable. #5 'enum/const use strict comparison while integer accepts 3.0' is the falsy-vs-absent family's cousin and is worth a probe.",
-  "#3 ACCEPTED: type:object rejects {} AND stdClass; root cause Schema.php:495"
+  "#3 LANDED AND MUTATION-VERIFIED, after reading `Js::isList` first as iteration 109 said to. `Js::isList([])` returns TRUE explicitly (Js.php:54-56), and that is CORRECT for JS \u2014 `[]` IS an array there. The PHP problem is that assoc-mode decoding makes `json_decode('{}')` and `json_decode('[]')` the SAME VALUE, so `!isList([])` is false and a bare `{\"type\":\"object\"}` could never validate `{}`.",
+  "#So the empty case is a genuine PHP REPRESENTATIONAL AMBIGUITY, not a mistake to be coded around: in JS `{}` is an object and `[]` is an array, and PHP cannot hold the difference once decoded. The fix accepts `[]` as an object \u2014 keeping the empty object usable \u2014 and `array` still accepts it too, so the ambiguity is SHARED rather than resolved against one type. That is recorded as a known non-exact behaviour rather than presented as a clean port, because it is a divergence forced by the language.",
+  "#The object arm also now accepts a stdClass, which `is_array()` excluded outright; the old error message for that case read 'expected object, got object', which is self-contradictory and would have cost a reader real time.",
+  "#MUTATION-VERIFIED: restore the old predicate -> 1 failure (RED); restore the fix -> OK (GREEN), and the whole Schema group is 67 tests / 124 assertions green. The regression asserts THREE accepted shapes (empty array, stdClass, assoc array) AND that a non-empty JSON array is still rejected \u2014 without that fourth assertion the fix could pass by deleting the object/array distinction entirely, which is the tempting wrong repair for a complaint that `{}` is rejected.",
+  "#The fourth assertion is the whole safety property here: a bare `{\"type\":\"object\"}` must still reject `[1,2]`. Only the AMBIGUOUS empty case is admitted."
  ],
  "meta-llama/llama-4-maverick": [
   "All five probed; none reproduced.",
@@ -1068,5 +1064,8 @@
  ],
  "sakana/fugu-max": [
   "ok, 5 findings, untriaged - budget went to fable #3"
+ ],
+ "audit/schema-object-empty-array": [
+  "LANDED: type:object accepts [] and stdClass; the ambiguity is PHP's, documented"
  ]
 }
