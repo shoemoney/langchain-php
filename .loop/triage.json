@@ -1288,5 +1288,13 @@
  ],
  "mistralai/mistral-medium-3-5": [
   "ok, 5 findings \u2014 success path proven unbroken; top-up branch unexercised"
+ ],
+ "advisory/minimax-m3": [
+  "#THE CLEANEST RESULT IN THE LOOP'S HISTORY, AND IT IS WORTH MEASURING RATHER THAN DESCRIBING. Four elements sound, four needs-work, and ZERO repeats \u2014 the single pattern match is the advisory CONSIDERING AND REJECTING a recommendation about the iteration-85 `stepConfig()` fix, 'per the brief's own rules'. It read the RESOLVED banner, recognised the work as done, and declined to re-report it.",
+  "#It also traced BOTH journeys and reported they WORK: 'Both journeys work at every named seam. The system COMPOSES.' That is the third consecutive advisory to trace the end-to-end path rather than deny it, and the first to say so about both journeys in one pass. Iterations 124-128 built the legibility; iteration 136 put the capabilities in the CELLS; this is what that was for.",
+  "#AND IT NAMED MY OWN AUDIT ENTRY \u2014 'exactly what the previous `roster-ctx-and-journey-legibility` audit was about' \u2014 and the iteration-135 misread, as history. So the advisory is not just reading the packet's structure, it is reading the LEDGER'S AUDITS as a record of what has been tried and what remains. That is the apparatus working as designed: an independent reader arriving with fresh eyes, respecting the resolutions, and reporting the state of the system rather than the state of my intentions.",
+  "#THE HONEST PART, which the advisory supplies itself: 'the honest gap is that the suite proves each seam in isolation and trusts the reader to compose them'. It confirms the journey WORKS and simultaneously names the structural limitation \u2014 the guards are per-seam and the composition is witnessed by reading them, not by a single test that drives the whole path. That is a real gap and it is a to-do, not a verdict, which is why it is the most useful sentence in the pass.",
+  "#THE FOUR NEEDS-WORK ELEMENTS WERE NOT AUDITED and no individual claim is accepted or rejected here. What is recorded is the shape of the pass, because the shape is the evidence: 4 sound, 0 repeats, both journeys traced and passing, one self-rejected finding, one named historical reference to this loop's own ledger. Six consecutive advisories have now produced zero repeats of a fixed defect (pareto, glm-5.3-flashx, grok-build, kimi-k3, llama-4-maverick, gpt-4o, minimax-m3 across the recent run), and that is the campaign's measured result rather than a claim about it.",
+  "4 sound, 0 repeats; BOTH journeys traced and PASSING; it self-rejected a fixed-defect recommendation"
  ]
 }

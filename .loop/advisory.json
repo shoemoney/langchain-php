@@ -199,5 +199,12 @@
   "file": ".loop/advisory/kimi-k3.md",
   "chars": 13463,
   "cost": 0.2328
+ },
+ "minimax/minimax-m3": {
+  "status": "ok",
+  "at": "2026-09-30T19:52:58.657366+00:00",
+  "file": ".loop/advisory/minimax-m3.md",
+  "chars": 20340,
+  "cost": 0.0071
  }
 }
