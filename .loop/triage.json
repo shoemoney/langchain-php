@@ -844,5 +844,18 @@
   "#MUTATION-VERIFIED: restore the guard -> 1 error (RED), restore the fix -> OK (3 assertions) (GREEN). The third assertion is that an UNKNOWN node still throws, so the fix cannot be made to pass by deleting the guard outright \u2014 the most tempting wrong repair here, since the throw would simply disappear.",
   "#This was the finding the previous reviewer's #2 rejection sat next to, and it is the better of the two: its evidence describes an INTERNAL inconsistency that is verifiable without upstream at all, which is why it survived being deferred while its batch-mate was rejected. The lesson is that an evidence line pointing at a disagreement between two methods in the SAME port is worth more than one pointing at a difference from upstream, because it cannot be a fidelity misread.",
   "#1 ACCEPTED+FIXED: addConditionalEdges now permits START, matching addEdge and upstream fixtures"
+ ],
+ "advisory/mistral-large-2512": [
+  "#NO ADVISORY THIS ITERATION \u2014 the call returned `http_429` (rate limited) and produced no file. Noted and moved on rather than retried into a wall, which is the standing instruction for a failing model. The slot went to settling a deferred finding instead.",
+  "#amazon/nova-2-lite-v1 #1 'RunnableBinding merges configurable and metadata in wrong order' \u2014 REJECTED AS A REPEAT, and the code says so itself: the merge block carries the comment 'These two had it backwards, which made a bound default impossible to override per call.' Confirmed by probe with a correct fixture:",
+  "#     metadata.k          = 'call'      (call-time wins, matching upstream {...bound, ...options})",
+  "#     metadata.only_bound = 1           (a bound-only key SURVIVES the merge)",
+  "#     metadata.only_call  = 2",
+  "#     tags                = [\"bt\",\"t\"]  (bound first, call-time appended)",
+  "#All four are correct, so the order is right and the spread semantics are right.",
+  "#AND A FINDING OF MY OWN, which is the part worth keeping. My FIRST probe reported `metadata.only_bound = NULL` \u2014 a bound-only key vanishing \u2014 which reads exactly like a live defect and would have been filed as one. It was my own broken fixture: `RunnableBinding.__construct` is `(bound, kwargs, config)` and I passed the config as the SECOND positional argument, which is `$kwargs`. With nothing bound, nothing merged, and the bound-only key was absent for the most boring possible reason.",
+  "#That is the iteration-52 lesson arriving again, and this time I caught it because the symptom contradicted the code comment sitting directly above the merge. The habit that catches it is worth stating as a rule: when a probe result CONTRADICTS an in-source comment, suspect the probe first. A comment written by whoever implemented the merge knows what the merge does; a probe written from an API I had just guessed does not.",
+  "#nova-lite's #3 'composer.json autoload-dev omits integration test helpers' and #4 'RunnableBinding drops bound options layer' \u2014 #4 is now partly answered by the probe above (the bound layer is NOT dropped when constructed correctly), but nothing was executed against #3 and #4's own claim, so both remain recorded as unverified rather than credited with my probe's result.",
+  "http_429, no review; settled nova-lite #1 as a REPEAT after probe"
  ]
 }
