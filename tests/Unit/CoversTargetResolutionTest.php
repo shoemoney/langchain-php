@@ -101,10 +101,33 @@ final class CoversTargetResolutionTest extends TestCase
     private static function importedShortNames(string $src): array
     {
         preg_match_all('/^use\s+([^;]+);/m', $src, $m);
+
         $out = [];
         foreach ($m[1] as $u) {
+            $u = trim($u);
+
+            // Grouped imports count. `use LangChain\Tools\{Schema, ToolException};`
+            // is idiomatic, and parsing it as one string produced the short name
+            // `ToolException}` — so every grouped import read as an unresolved
+            // target. Found because a NEW test used a grouped use and the guard
+            // reported a defect in the test rather than in itself.
+            if (str_contains($u, '{')) {
+                $inside = explode('}', $u, 2)[0];
+                $inside = substr($inside, (int) strpos($inside, '{') + 1);
+                foreach (explode(',', $inside) as $name) {
+                    $name = trim($name);
+                    if ($name !== '') {
+                        $out[] = str_contains($name, ' as ')
+                            ? trim(explode(' as ', $name, 2)[1])
+                            : $name;
+                    }
+                }
+
+                continue;
+            }
+
             // `use function x` and `as` aliases both reduce to the last segment.
-            $u = preg_replace('/^use\s+(function|const)\s+/', '', trim($u));
+            $u = preg_replace('/^use\s+(function|const)\s+/', '', $u);
             $u = preg_split('/\s+as\s+/i', (string) $u)[0];
             $out[] = substr((string) strrchr('\\' . trim((string) $u), '\\'), 1);
         }
