@@ -77,16 +77,13 @@
   "#5 every markdown claim was unverified; PORT_STATUS per-subsystem rows tallied tests by hand and had rotted (messages claimed 47 vs 87 actual, channels 62 vs 75) \u2014 ACCEPTED and CLEARED. Root cause is structural: a hand-maintained tally in a table that changes every iteration is unguardable, so the 3 tallies were DELETED rather than corrected. PORT_STATUS's job is what is ported; the guarded 'Total so far' is the count. HANDOFF's Tests and Size rows synced to 2101/5963, 229 src, 71 test files, and DocsMatchRealityTest now guards the file counts EXACTLY (a data provider can add tests without adding a file, but a file count has no such excuse) and also fails when the row is absent, not only when it is wrong."
  ],
  "amazon/nova-2-lite-v1": [
-  "#2 'RunnableSequence stream ignores non-default channels' \u2014 REJECTED BY EXECUTION, and this one mattered most because the code is MINE, rewritten in iteration 55. Probed with a step that emits on both the default channel and a 'logs' channel:",
-  "#     channel='default' value=10                 (step a)",
-  "#     channel='default' value='10|def'           (step b, default first)",
-  "#     channel='logs'    value='side-channel-payload'   (step b, non-default)",
-  "#Non-default channels ARE forwarded, and in the step's OWN emission order. The rewritten loop yields every pair a step produces and only gates which channel's value becomes the NEXT step's input \u2014 which is what upstream does too. The reviewer read the CHANNEL_DEFAULT comparison and inferred that non-default channels were dropped, when the comparison governs input selection, not emission.",
-  "#5 'RunnableBranch conditions never receive config' \u2014 A REPEAT of a defect FIXED and mutation-verified in iteration 57, where conditions now receive the caller's config, with three regressions (a two-argument condition receives it, a ONE-argument condition does not receive a second argument, and a variadic receives both). The model could not have known. That is the third repeat of a settled finding in three iterations, which is now a pattern worth its own remedy rather than a note.",
-  "#1 'RunnableBinding merges configurable and metadata in wrong order', #3 'composer.json autoload-dev omits integration test helpers', #4 'RunnableBinding drops bound options layer' \u2014 DEFERRED unverified, none executed this iteration.",
-  "#HARNESS FIX LANDED, targeting the misread that produced FIVE rejections last iteration. The per-file reviewer prompt now carries the same measurement rule the advisory brief has had for several iterations \u2014 a namespace showing 0 test files is EXPECTED for test-support code and means nothing, and a coverage claim needs a reference count or an executed run, not a directory listing. Verified in ask.PROMPT (6,021 chars) rather than assumed. The first attempt at this edit BROKE ask.py with a SyntaxError \u2014 `LangChain\\Utils\\Testing` inside a non-raw triple-quoted string is a `\\U` unicode escape \u2014 and the fix was to use forward slashes; that is the third time a generated-string edit has needed a rollback in this loop, and the tell is always the same: unescaped backslashes in interpolated text.",
-  "#THE REPEAT RATE IS THE NUMBER TO WATCH NOW. Three repeats of settled findings in three iterations (image-prompt mutation, literal tokens, branch config) against a stream of otherwise-original findings. Either the packet does not make settled state visible enough, or reviewers are reasoning from the shape of the code rather than its behaviour. The coverage rule above addresses the second; the first is worth checking against the packet builder next.",
-  "#2 REJECTED by probe on my own code; #5 a settled repeat; coverage rule added to ask.PROMPT"
+  "#4 'RunnableBinding drops bound options layer' \u2014 REJECTED BY EXECUTION, and this time probed THROUGH THE WRAPPER, which is the fix for the mistake iterations 78-82 were built on. Measured:",
+  "#     options.temperature   = 0.5",
+  "#     options.stopSequences = [\"a\",\"b\"]",
+  "#     options.model_kwargs  = {\"k\":\"v\"}",
+  "#Three different option shapes, all reaching `config->options`. The bound options layer is not dropped, and `base/runname-bind-slot-regression` and `audit/bind-slot-wrapper-trap` already record the measured merge behaviour in detail.",
+  "#THE AREA HAS NOW BEEN REPROBED AND REJECTED FOUR TIMES (iterations 75, 82, 93-94, 99), which is worth naming rather than counting. `RunnableBinding::mergeConfig()` attracts repeated false findings in this codebase for one reason: it reads as if a bound layer could be silently lost, the language is close enough to correct-looking to be persuasive, and the FALSY case is easy to construct \u2014 `temperature: 0` is falsy, so a probe that checks `?? null` or truthiness reports 'dropped' for a value that is present and zero. Every one of these four rejections would have been accepted by a reviewer reasoning from the shape of the code, which is the same lesson as the underscore convention: decide it from behaviour, not from the silhouette.",
+  "#4 REJECTED by probe through the wrapper; 4th reprobe of this area, all false"
  ],
  "anthropic/claude-opus-5.5": [
   "#1 streamed responses never carry stop_reason \u2014 REJECTED on fidelity. Upstream carries stop_reason NOWHERE on an Anthropic message: chat_models.ts has no assignment and utils/message_outputs.ts never sets it; it appears only in utils/stream_events.ts:65, which is the Events API. The port additionally carries it on the EAGER path, a harmless superset. Adding it to the stream would invent behaviour upstream does not have.",
@@ -1027,5 +1024,8 @@
  ],
  "advisory/mistral-14b-2512": [
   "no longer repeats stepConfig (comment fix worked); DID repeat the pre-55 stream behaviour from a bottom-closed entry"
+ ],
+ "advisory/gemma-4-26b-a4b-it-free": [
+  "NOT A REVIEW: http_429 (third advisory rate-limit: iters 75, 82, 99)"
  ]
 }
