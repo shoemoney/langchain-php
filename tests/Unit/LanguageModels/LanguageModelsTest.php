@@ -654,6 +654,30 @@ final class LanguageModelsTest extends TestCase
         $this->assertSame(['tokenUsage' => ['totalTokens' => 5]], $results[0]->llmOutput);
         $this->assertSame(['tokenUsage' => []], $results[1]->llmOutput);
     }
+
+    /**
+     * Batch token usage is SUMMED, not discarded.
+     *
+     * `combineLLMOutput()`'s docblock claimed the base "returns an empty array,
+     * which means a batch's token usage is discarded", while the body has always
+     * folded every entry through `sumOutputs()`. The docblock was corrected; this
+     * is its executable counterpart, so the claim cannot drift back unnoticed.
+     *
+     * It matters because that is the kind of documentation that changes what a
+     * caller builds: believing batch totals do not exist is a reason to go write
+     * your own accounting.
+     */
+    public function testBatchTokenUsageIsSummedNotDiscarded(): void
+    {
+        $combined = (new DeltaUsageChatModel())->combine([
+            ['token_usage' => ['prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15]],
+            ['token_usage' => ['prompt_tokens' => 7, 'completion_tokens' => 3, 'total_tokens' => 10]],
+        ]);
+
+        $this->assertSame(17, $combined['token_usage']['prompt_tokens']);
+        $this->assertSame(8, $combined['token_usage']['completion_tokens']);
+        $this->assertSame(25, $combined['token_usage']['total_tokens']);
+    }
 }
 
 /**
@@ -686,6 +710,12 @@ final class SilentStreamingChatModel extends BaseChatModel
  */
 final class DeltaUsageChatModel extends BaseChatModel
 {
+    /** Public passthrough so the batch-summary test needs no reflection. */
+    public function combine(array $llmOutputs): array
+    {
+        return $this->combineLLMOutput($llmOutputs);
+    }
+
     public function llmType(): string
     {
         return 'delta-usage-fake';

@@ -218,6 +218,41 @@
    "chars": 10745,
    "findings": 15,
    "severity_hits": 11
+  },
+  "~anthropic/claude-opus-latest": {
+   "model": "~anthropic/claude-opus-latest",
+   "at": "2026-09-30T08:11:20",
+   "actual_model": "anthropic/claude-opus-5.5",
+   "usage": {
+    "prompt_tokens": 62934,
+    "completion_tokens": 4051,
+    "total_tokens": 66985,
+    "cost": 0.332756,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.332756,
+     "upstream_inference_prompt_cost": 0.251736,
+     "upstream_inference_completions_cost": 0.08102
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 2687,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 2687,
+   "status": "ok",
+   "file": ".loop/reviews/08-~anthropic__claude-opus-latest.md",
+   "chars": 3609,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -227,7 +262,8 @@
   "stepfun/step-3.7-flash",
   "amazon/nova-2-lite-v1",
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-  "unbiased/pareto"
+  "unbiased/pareto",
+  "~anthropic/claude-opus-latest"
  ],
  "next_index": 0
 }

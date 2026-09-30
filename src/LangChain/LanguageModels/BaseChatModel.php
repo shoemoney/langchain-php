@@ -565,10 +565,16 @@ abstract class BaseChatModel extends BaseLanguageModel
      * Fold per-prompt `llmOutput` into the one the returned `LLMResult` carries.
      *
      * Each entry is a single prompt's output; this produces the batch summary.
-     * The base returns an empty array, which means a batch's token usage is
-     * discarded — a caller invoking several prompts at once gets no totals at
-     * all. A provider that wants a different shape (a provider-specific
-     * aggregate, a string join) overrides this.
+     * The base SUMS them: `sumOutputs()` folds one entry at a time, so numeric
+     * token counts across a batch accumulate into the totals the returned
+     * `LLMResult` carries. A provider that wants a different shape (a
+     * provider-specific aggregate, a string join) overrides this.
+     *
+     * This docblock used to say the opposite — that the base "returns an empty
+     * array, which means a batch's token usage is discarded" — while the body
+     * summed. Documentation that describes behaviour the code beneath it does not
+     * have is worse than no documentation: a caller reading it would believe
+     * batch usage totals do not exist and go build their own accounting.
      *
      * @param list<array<string, mixed>> $llmOutputs One entry per prompt.
      *

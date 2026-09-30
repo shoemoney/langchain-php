@@ -225,7 +225,8 @@
   "#5 'TextLength::utf16CodeUnits() astral count double-counts? No \u2014 correct.' \u2014 SELF-REFUTING and reported as a finding, which is worth flagging as a review-quality signal: the model reached the correct conclusion and emitted it as a numbered defect anyway. A finding whose own text concludes there is no defect should not occupy one of five slots.",
   "#the 'RunnableInterface::batch() docblock duplicates the contract' finding \u2014 REJECTED, TWELFTH sighting. Contiguous inspection has repeatedly shown exactly one batch docblock. Recorded once per appearance and not re-derived a twelfth time.",
   "#nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free returned EMPTY RESPONSE and was not a review; noted and re-asked, which produced unbiased/pareto's 15.",
-  "#1 REJECTED by execution (loc.lines correct+monotonic); 15 findings, largest batch"
+  "#1 REJECTED by execution (loc.lines correct+monotonic); 15 findings, largest batch",
+  "#4 REJECTED by execution: metadata not aliased, COW proves it"
  ],
  "mistralai/ministral-8b-2512": [
   "First review of the TRACING layer. One accepted, four rejected.",
@@ -352,7 +353,8 @@
   "#layering / #composition / #error-handling / #fidelity / #documentation \u2014 all 'sound', no change. Notably it independently confirmed layering is unidirectional (LangGraph -> LangChain, 15 files, never the reverse) and named the two seams that actually bit: empty tool-call args must encode as {} not [], and channel_versions must serialise as {} so a JS-written checkpoint resumes."
  ],
  "~anthropic/claude-opus-latest": [
-  "2 ACCEPT (MAJOR, proved by execution), 1 ACCEPT (docs), 1 REJECT \u2014 holistic read of model base & streaming"
+  "2 ACCEPT (MAJOR, proved by execution), 1 ACCEPT (docs), 1 REJECT \u2014 holistic read of model base & streaming",
+  "#3 ACCEPTED+FIXED (docblock contradicted code; behaviour pinned, mutation on the CODE)"
  ],
  "~anthropic/claude-opus-latest (served by anthropic/claude-opus-5.5)": [
   "#1 stream stall break ends the generator cleanly \u2014 ACCEPTED, MAJOR, proved. Probe with a stalling PSR-7 stream and streamSilenceLimit=0.05: elapsed 0.06s (stall path DID trigger), yielded [\"data: {...}\"], threw NULL. A dropped connection was indistinguishable from a finished answer. Now throws HttpException naming the URL; the data received before the stall is still yielded. Mutation-verified (restoring the break fails the test).",
