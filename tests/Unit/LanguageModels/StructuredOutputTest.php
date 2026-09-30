@@ -377,7 +377,32 @@ final class StructuredOutputTest extends TestCase
         // which is where RunnableConfig reads it. `options` mirrors it because
         // RunnableBinding records what it merged; the port does not yet strip
         // that echo, so neither is asserted absent here.
-        self::assertSame('pull_person', $seen->options['runName'] ?? null);
+        // Asserted THROUGH the wrapper the code actually calls. `Runnable::bind()`
+        // is `bind(array $kwargs, ?array $config)` and forwards to
+        // `new RunnableBinding($this, $kwargs, $config)`, so the CONFIG slot is the
+        // SECOND argument. Measured through the wrapper:
+        //
+        //     bind(kwargs={'runName':'x'}, config=[])   ->  runName=NULL, options={"runName":"x"}
+        //     bind(kwargs=[],           config={'runName':'x'}) ->  runName='x',  options=[]
+        //
+        // Iterations 78 and 79 measured this through `new RunnableBinding(...)`
+        // DIRECTLY, whose signature is (bound, kwargs, config) — the opposite
+        // order. That produced a correct-looking conclusion about the wrong call,
+        // and a "fix" that moved the name from one wrong slot to another. This
+        // file's own comment warned about exactly that trap: verifying a
+        // constructor and then applying the conclusion to a wrapper method is not
+        // the same act, and the wrapper's signature is the one that ships.
+        // (1) The slot is now right: the name reaches CONFIG and is NOT echoed
+        //     into options, which is the signature of the config slot and only
+        //     the config slot.
+        self::assertArrayNotHasKey('runName', $seen->options, 'the name must reach config, not options');
+
+        // (2) The name is STILL LOST downstream, and that is a SEPARATE open
+        //     defect: `RunnableSequence::stepConfig()` overwrites runName with
+        //     `seq:step:1`. Asserted explicitly so this test fails loudly when
+        //     stepConfig is fixed, instead of quietly passing over a known
+        //     defect. PORT_STATUS records it as an outstanding item.
+        self::assertSame('seq:step:1', $seen->runName, 'the sequence clobber is still open');
 
         // What is STILL WRONG, and what this test was written to find: the name
         // does not arrive as the step's runName. `RunnableSequence::stepConfig()`

@@ -138,7 +138,7 @@ final class StructuredOutput
             // Measured through bind() itself:
             //   bind(['runName'=>'x'], [])  -> runName=NULL, options={"runName":"x"}
             //   bind([], ['runName'=>'x'])  -> runName='x',   options=[]
-            $result = $result->bind(['runName' => $runName], []);
+            $result = $result->bind([], ['runName' => $runName]);
         }
 
         return $result;

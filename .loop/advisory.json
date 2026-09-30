@@ -97,5 +97,9 @@
  "mistralai/mistral-large-2512": {
   "status": "http_429",
   "at": "2026-09-30T13:01:21.931028+00:00"
+ },
+ "google/gemma-4-31b-it:free": {
+  "status": "http_429",
+  "at": "2026-09-30T13:38:11.045295+00:00"
  }
 }
