@@ -156,6 +156,28 @@ final class PartialJsonParser
             $result .= '\\';
         }
 
+        // A stream cut INSIDE an escape pair must not lose the half it saw.
+        //
+        // `parseUnicodeEscape()` stores a high surrogate and returns '' while it
+        // waits for its low partner. If the stream ends there, the state was
+        // simply abandoned and the character vanished.
+        //
+        // Measured before this: `"a\uD83D` recovered as bytes `61` — the letter
+        // 'a' and nothing else, the high surrogate dropped with no error. A
+        // consumer diffing partial results would see the string lose a
+        // character silently, which is worse than seeing U+FFFD where the
+        // character began.
+        //
+        // U+FFFD is the same choice already made for an unpaired LOW surrogate,
+        // and for the short-hex truncation at line 223: something has to occupy
+        // the position, and the replacement character says "there was a
+        // character here and I could not read it" rather than pretending the
+        // input never mentioned it.
+        if ($this->pendingHighSurrogate !== null) {
+            $this->pendingHighSurrogate = null;
+            $result .= "\u{FFFD}";
+        }
+
         return $result;
     }
 
