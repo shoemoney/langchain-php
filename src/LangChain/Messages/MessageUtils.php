@@ -333,7 +333,15 @@ final class MessageUtils
                     'index' => $call['index'] ?? $i,
                     'id' => $call['id'] ?? null,
                     'name' => $call['name'] ?? null,
-                    'args' => json_encode($call['args'] ?? [], JSON_UNESCAPED_SLASHES),
+                    // An EMPTY args object must encode as `{}`, not `[]`. In JSON a
+                    // call with no arguments carries an empty OBJECT, and `json_encode([])`
+                    // emits an empty ARRAY — the same defect class that broke round-tripping
+                    // in an earlier release, one layer down: the value is not lost, it is
+                    // the wrong shape, so a consumer decoding `args` gets a list where it
+                    // expects a map and every key lookup misses.
+                    'args' => ($call['args'] ?? []) === []
+                        ? '{}'
+                        : json_encode($call['args'], JSON_UNESCAPED_SLASHES),
                 ], static fn ($v) => $v !== null);
             }
         }

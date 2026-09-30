@@ -87,4 +87,29 @@ final class ConvertToChunkTest extends TestCase
 
         return $message;
     }
+
+    /**
+     * A tool call with no arguments encodes `args` as `{}`, never `[]`.
+     *
+     * In JSON a call with no arguments carries an empty OBJECT. `json_encode([])`
+     * emits an empty ARRAY, so a consumer decoding `args` gets a list where it
+     * expects a map and every key lookup misses. This is the same defect class
+     * that broke round-tripping in an earlier release — the value is not lost, it
+     * is the wrong SHAPE, which is quieter and travels further.
+     */
+    public function testAToolCallWithNoArgumentsEncodesAnEmptyObjectNotAnArray(): void
+    {
+        $message = new \LangChain\Messages\AIMessage([
+            'toolCalls' => [
+                ['index' => 0, 'id' => 'call_1', 'name' => 'no_args', 'args' => []],
+                ['index' => 1, 'id' => 'call_2', 'name' => 'with_args', 'args' => ['a' => 1]],
+            ],
+        ]);
+
+        $chunks = MessageUtils::convertToChunk($message)->toolCallChunks;
+
+        self::assertCount(2, $chunks, 'the tool calls must survive the conversion at all');
+        self::assertSame('{}', $chunks[0]['args'], 'empty args is an empty OBJECT');
+        self::assertSame('{"a":1}', $chunks[1]['args'], 'non-empty args is unchanged');
+    }
 }
