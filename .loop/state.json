@@ -288,6 +288,41 @@
    "chars": 2546,
    "findings": 5,
    "severity_hits": 5
+  },
+  "amazon/nova-pro-v1": {
+   "model": "amazon/nova-pro-v1",
+   "at": "2026-09-30T09:12:08",
+   "actual_model": "amazon/nova-pro-v1",
+   "usage": {
+    "prompt_tokens": 44491,
+    "completion_tokens": 514,
+    "total_tokens": 45005,
+    "cost": 0.0372376,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0372376,
+     "upstream_inference_prompt_cost": 0.0355928,
+     "upstream_inference_completions_cost": 0.0016448
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/10-amazon__nova-pro-v1.md",
+   "chars": 2225,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -299,7 +334,8 @@
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "unbiased/pareto",
   "~anthropic/claude-opus-latest",
-  "~openai/gpt-luna-latest"
+  "~openai/gpt-luna-latest",
+  "amazon/nova-pro-v1"
  ],
  "next_index": 0
 }
