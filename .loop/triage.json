@@ -1338,5 +1338,13 @@
   "#WHAT IS NOT CLAIMED: that a comment restructure prevents every future leak. It removes the shape that produced this one, and it is the third fix rather than a pattern guarantee. The general remedy is a guard over fix comments, which this loop has repeatedly declined because the discriminator (\"does this sentence describe current behaviour or history\") is a judgement no regex can make.",
   "#3 resume comment, #4 applyWrites path sorting, #5 StateGraph input channels unvalidated - DEFERRED unverified.",
   "CAUSE FOUND: both fix comments LED WITH THE DEFECT; restructured current-first"
+ ],
+ "audit/advisory-no-context-budget": [
+  "#OPEN - status not stated; set it when the work closes.",
+  "#OPEN - advisory.py HAS NO CONTEXT BUDGET, AND THAT IS A NAMED GAP RATHER THAN A MYSTERY. The pass 400'd on perceptron/perceptron-mk1.5, whose roster ctx is 36,864 - one of only three roster models under 90k alongside rekaai/reka-edge (16,384) and z-ai/glm-4.5v (65,536). ask.py has had an explicit context budget since iteration 130 (IMAGE_TOKENS, PROMPT_TOKENS, effective window, and the image dropped when it will not fit). advisory.py has NONE of that: it sends the full brief and always attaches the arch PNG, for every model, whatever the roster says its window is.",
+  "#WHAT I CANNOT ESTABLISH from one failure, and am not claiming: that the 36,864 window is genuinely too small. The brief is ~32,400 chars (about 9,000 tokens) plus roughly 1,445 for the image plus a system prompt measured at ~6,100, which sums to under 17,000 and should fit. Either the model reports a smaller effective window than its roster entry, or something in the request is larger than this estimate, or the failure is not a size problem at all. One 400 does not distinguish those.",
+  "#WHAT IS THE COST, and it is the part worth fixing rather than theorising about: the three small-context roster entries are the ones most likely to be picked, and every one of them either wastes a slot or gets recorded as a model that served a pass. The iteration-130 fix was applied to ONE caller and the lesson was drawn too narrowly - the rule is about the request, not about the script that makes it, and advisory.py is still the unguarded caller.",
+  "#THE GENERAL FORM, which keeps recurring across this loop: a fix applied where the bug was OBSERVED rather than where the RULE lives. ask.py was fixed because ask.py 400'd; advisory.py was not, because advisory.py had not 400'd yet. The same shape as the fix comments leading with the defect, and as the ledger marker rule living in triage.json rather than in the writer.",
+  "OPEN: advisory.py has NO ctx budget (ask.py got one in 130); pass 400'd on ctx=36864"
  ]
 }

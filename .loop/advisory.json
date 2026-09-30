@@ -213,5 +213,9 @@
   "file": ".loop/advisory/sonar-pro-search.md",
   "chars": 16583,
   "cost": 0.099
+ },
+ "perceptron/perceptron-mk1.5": {
+  "status": "http_400",
+  "at": "2026-09-30T20:34:42.064515+00:00"
  }
 }
