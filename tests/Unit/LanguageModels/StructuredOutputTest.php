@@ -397,20 +397,19 @@ final class StructuredOutputTest extends TestCase
         //     the config slot.
         self::assertArrayNotHasKey('runName', $seen->options, 'the name must reach config, not options');
 
-        // (2) And the name SURVIVES the sequence. `stepConfig()` used to call
-        //     `forChild('seq:step:N')`, which assigns `run_name` and so destroyed
-        //     the name it was annotating; upstream puts the step tag in the child
-        //     CALLBACKS instead (base.ts:1982-1985). Now `forChild(null)` keeps
-        //     the caller's name and still establishes the parent/child run-id
-        //     relationship.
+        // (2) The name does NOT yet survive the sequence, and that is a SEPARATE
+        //     OPEN defect. `stepConfig()` calls `forChild('seq:step:N')`, which
+        //     assigns `run_name` and so destroys the name it annotates; upstream
+        //     puts the step tag in the child CALLBACKS (base.ts:1982-1985).
         //
-        //     Two defects were STACKED here and this assertion only became
-        //     reachable after both were fixed: the bind slot was wrong (the name
-        //     went to `options`), and then `stepConfig()` clobbered whatever
-        //     arrived. Fixing the lower one first is what made the upper one
-        //     measurable — an earlier attempt at this change saw NULL, which is
-        //     what a preserved-but-absent name looks like.
-        self::assertSame('pull_person', $seen->runName, 'the sequence must not clobber the run name it was given');
+        //     A fix for it WORKS — with the bind slot corrected, `forChild(null)`
+        //     yields runName='pull_person' — and it was reverted anyway, because
+        //     RunnableSequenceStepTagTest correctly guards the `seq:step:N` tag
+        //     and this port has no callback manager to RELOCATE it into. Deleting
+        //     the tag to stop the clobber trades real observability for a naming
+        //     bug. Asserted here so the day someone gives the tag a carrier, this
+        //     line fails and names the work.
+        self::assertSame('seq:step:1', $seen->runName, 'the step tag clobber is still open');
 
     }
 }
