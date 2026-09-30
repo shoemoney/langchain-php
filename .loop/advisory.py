@@ -219,6 +219,18 @@ heavily referenced namespace as unreferenced on this number alone.
 {public_surface("Pregel", 30)}
 {public_surface("Schema", 25)}
 
+**THE LEDGER CAN BE STALE — section 5 is a record, not the source of
+truth.** A prior finding or audit verdict listed here may have been FIXED since
+it was written, and a resolved item still reads exactly like an open one. It has
+already happened: an advisory's single top recommendation was to fix
+`RunnableSequence::stream()`, a defect that had been fixed and mutation-verified
+five iterations earlier, because the ledger entry still read "fix deferred".
+
+So before you offer ANY recommendation drawn from section 5, re-check it against
+the live source in front of you, and say what you checked. If a resolved defect
+appears as your highest-leverage change, that is a defect in this BRIEF, not a
+finding about the code — say so instead of recommending it.
+
 ## 5. What previous reviewers already found
 
 {prior_findings()}

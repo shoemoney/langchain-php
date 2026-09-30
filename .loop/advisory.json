@@ -79,5 +79,12 @@
   "file": ".loop/advisory/claude-haiku-4-5.md",
   "chars": 15364,
   "cost": 0.0322
+ },
+ "deepseek/deepseek-v4.1-flash": {
+  "status": "ok",
+  "at": "2026-09-30T11:42:05.765724+00:00",
+  "file": ".loop/advisory/deepseek-v4-1-flash.md",
+  "chars": 10466,
+  "cost": 0.0127
  }
 }
