@@ -1433,5 +1433,15 @@
  ],
  "mistralai/mistral-large-2512": [
   "#3 BLOCKER REJECTED by execution (empty array works); prior #1 a repeat of iter-120"
+ ],
+ "audit/prompt-template-ctor-blocker": [
+  "#OPEN - status not stated; set it when the work closes.",
+  "#NEW BLOCKER FOUND WHILE PROVING A REVIEWER WRONG \u2014 `PromptTemplate` cannot be constructed at all through its documented config shape. Measured: `new PromptTemplate(['template' => 'a {x}'])` and `new PromptTemplate(['template' => 'a {x} b {y}', 'inputVariables' => ['x','y']])` BOTH throw `RuntimeException: Invalid prompt schema: Template::validateTemplateBlock(): Argument #1 ($message) must be of type array, string given, called in Template.php on line 250`. The plainest possible construction of the primary prompt class fails.",
+  "#THE CAUSE IS VISIBLE IN THE SOURCE I READ. `checkValidTemplate(string|array $template, ...)` branches on `is_array($template)` and, for the array form, does `foreach ($template as $message) { self::validateTemplateBlock($message, ...) }` where `validateTemplateBlock` declares `array $message`. The constructor normalises `template` into a block list that still contains RAW STRING blocks, so the very first iteration hands a string to a parameter typed `array`. The `catch (\\Throwable)` then rewraps a TypeError as `RuntimeException(\"Invalid prompt schema: ...\")`, which is why the message reads like a schema problem instead of a type bug \u2014 the rewrap HIDES the real cause, the same way the empty-stream RuntimeException masked a stream-manager lifecycle in 122.",
+  "#WHY 2339 GREEN TESTS NEVER SAW IT: `grep -rn 'new PromptTemplate(\\[' tests/` returns NOTHING. No test constructs this class through the array config, so the entire primary API is unexercised while the suite reports 2339 passing. This is the exact shape the hard rules warn about \u2014 a green suite proving less than it appears \u2014 and the first time the blind spot is a whole CLASS's entry point rather than one branch. The deferral I recorded in 168 for mistral #1 is now moot as stated: the reviewer described a non-string partial value, but the class cannot be reached far enough to have partials.",
+  "#NOT FIXED THIS ITERATION. I found it with a probe whose budget was already spent, and shipping a fix I have not mutation-verified is the one thing this loop has never done. Recorded as the top target for 170: read `Template::validateTemplateBlock` and the constructor normalisation, decide whether a raw-string block should be COERCED to `['type' => 'text', 'text' => $s]` (compare `libs/langchain-core/src/prompts/base.ts` `PromptTemplate` constructor) or whether the branch should call `renderTemplate` for string blocks, then add a test that constructs BOTH shapes and mutation-verify."
+ ],
+ "probe": [
+  "NEW BLOCKER: PromptTemplate array-config ctor throws; no test exercises that shape"
  ]
 }
