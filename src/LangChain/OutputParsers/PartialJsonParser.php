@@ -229,9 +229,24 @@ final class PartialJsonParser
                 return mb_chr($code, 'UTF-8') ?: "\u{FFFD}";
             }
 
-            // Fewer than four digits: emit the raw text. A stream cut mid-escape
-            // is the normal case here, not an error.
-            return 'u' . $hex;
+            // Fewer than four digits: emit the raw text WITH ITS BACKSLASH.
+            //
+            // `parseString` already has a rule for a stream cut mid-escape — it
+            // re-emits the backslash (`if ($escaped) { $result .= '\\'; }`) so
+            // the recovered text looks like what the caller wrote. This branch
+            // broke that rule: `match` had already consumed the `\\`, so
+            // returning `'u' . $hex` dropped it.
+            //
+            // Measured before the fix, by bytes: `"a\u1` recovered as
+            // 61 75 31 — 'a', 'u', '1', with no 5c. So a caller diffing partial
+            // results — `JsonOutputParser`'s `diff: true` path — sees the string
+            // flip from '' to 'au1' to 'a\u1234' to the real character, and emits
+            // a spurious JSON-Patch `replace` for every chunk of every emoji in
+            // the stream. Silent, and it grows with the payload.
+            //
+            // Keeping the escape is also the more faithful reading: the input
+            // contained a backslash, and dropping it invents a different string.
+            return '\\u' . $hex;
         }
 
         throw new \RuntimeException(
