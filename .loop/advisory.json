@@ -33,5 +33,16 @@
   "file": ".loop/advisory/o4-mini.md",
   "chars": 5828,
   "cost": 0.0352
+ },
+ "google/gemma-4-26b-a4b-it:free": {
+  "status": "http_429",
+  "at": "2026-09-30T08:45:52.833815+00:00"
+ },
+ "z-ai/glm-4.6v": {
+  "status": "ok",
+  "at": "2026-09-30T08:48:12.922423+00:00",
+  "file": ".loop/advisory/glm-4-6v.md",
+  "chars": 6565,
+  "cost": 0.0072
  }
 }
