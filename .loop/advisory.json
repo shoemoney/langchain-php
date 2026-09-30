@@ -108,5 +108,12 @@
   "file": ".loop/advisory/muse-glimmer-30b.md",
   "chars": 8360,
   "cost": 0.0081
+ },
+ "meta-llama/llama-4-maverick": {
+  "status": "ok",
+  "at": "2026-09-30T14:06:52.396112+00:00",
+  "file": ".loop/advisory/llama-4-maverick.md",
+  "chars": 4313,
+  "cost": 0.0048
  }
 }

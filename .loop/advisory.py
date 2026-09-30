@@ -167,11 +167,42 @@ def test_digest():
 def prior_findings(limit=45):
     """What every previous reviewer already said, so the advisor does not repeat it."""
     t = json.loads((LOOP / "triage.json").read_text())
-    lines = []
+
+    # Status first, then detail. Taking the last N lines across every key worked
+    # until one key accumulated more notes than the budget: `audit/stepconfig-clobber`
+    # reached 33 notes, its resolution was pushed out of the tail, and an advisory
+    # recommended a defect that had been fixed and mutation-verified two iterations
+    # earlier as outstanding. That is the iteration-60 stale-verdict failure again,
+    # with a different cause — not a stale entry but a truncated one.
+    #
+    # So each key contributes its FIRST note (which now carries a RESOLVED banner
+    # when the work is closed) and its LAST note (the most recent state), deduped,
+    # before any middle notes fill the remaining budget.
+    status, recent, filler = [], [], []
     for model, items in t.items():
-        for it in items:
-            lines.append(f"[{model}] {it}")
-    return "\n".join(lines[-limit:])
+        if not items:
+            continue
+        status.append(f"[{model}] {items[0]}")
+        if len(items) > 1:
+            recent.append(f"[{model}] {items[-1]}")
+        for it in items[1:-1]:
+            filler.append(f"[{model}] {it}")
+
+    # `audit/` keys are the investigations and carry the RESOLVED banners; with
+    # 125 keys against a 45-line budget they have to go first or the cap silently
+    # decides which defects an advisory is allowed to know about, which is not a
+    # decision a truncation should be making.
+    def rank(entry: str) -> tuple[int, str]:
+        return (0 if "] #RESOLVED" in entry or "[audit/" in entry else 1, entry)
+
+    status.sort(key=rank)
+    recent.sort(key=rank)
+
+    lines = status + recent
+    if len(lines) < limit:
+        lines += filler[-((limit - len(lines))):]
+
+    return "\n".join(lines[:limit])
 
 
 def brief():
