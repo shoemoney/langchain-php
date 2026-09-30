@@ -2480,6 +2480,41 @@
    "chars": 1533,
    "findings": 3,
    "severity_hits": 3
+  },
+  "google/gemini-3.1-flash-lite": {
+   "model": "google/gemini-3.1-flash-lite",
+   "at": "2026-09-30T02:23:13",
+   "actual_model": "google/gemini-3.1-flash-lite",
+   "usage": {
+    "prompt_tokens": 33840,
+    "completion_tokens": 2344,
+    "total_tokens": 36184,
+    "cost": 0.011976,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.011976,
+     "upstream_inference_prompt_cost": 0.00846,
+     "upstream_inference_completions_cost": 0.003516
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1649,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1649,
+   "status": "ok",
+   "file": ".loop/reviews/81-google__gemini-3.1-flash-lite.md",
+   "chars": 3183,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2622,7 +2657,8 @@
   "google/gemini-3.6-flash",
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "qwen/qwen3.8-27b:free",
-  "google/gemini-3.5-flash-lite"
+  "google/gemini-3.5-flash-lite",
+  "google/gemini-3.1-flash-lite"
  ],
  "next_index": 0
 }
