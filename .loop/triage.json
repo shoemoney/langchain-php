@@ -881,5 +881,13 @@
   "#So the bind-slot fix is NECESSARY BUT NOT SUFFICIENT. `RunnableSequence::stepConfig()` overwrites runName with `seq:step:1` before the binding's config reaches the step \u2014 the open defect PORT_STATUS records as 'Highest-value item outstanding', now confirmed live by a test rather than by reading a ledger row.",
   "#HOW THE TEST IS WRITTEN, which is the part I had to think about. Asserting the real name would encode the fix as if it were done. Asserting the clobbered value would make the defect permanent. So it asserts the BIND SLOT \u2014 what this iteration fixed \u2014 with the clobber asserted explicitly and commented as open, so the moment someone fixes stepConfig this test tells them precisely what to update. A test that quietly passes over a known defect is how a known defect becomes an undocumented one.",
   "regression written, mutation-verified; and it CONFIRMED stepConfig clobber is still live"
+ ],
+ "audit/stepconfig-clobber": [
+  "#ATTEMPTED, MEASURED, AND REVERTED \u2014 and the narrowing is the valuable part. Iteration 79 confirmed the clobber live (`runName=\"seq:step:1\"`). I changed `stepConfig()` from `$config->forChild('seq:step:' . ($index + 1))` to `forChild(null)`, matching upstream's base.ts:1982-1985 in the one respect that matters (the tag must not land in runName).",
+  "#RESULT: runName became NULL, not the intended `pull_person`. Measured after the change: `runName = NULL`.",
+  "#So removing the clobber is NOT sufficient, and the fix I would have shipped is strictly WORSE than the code it replaced: it loses the `seq:step:N` tag entirely AND still fails to deliver the name. Two regressions instead of one. Reverted.",
+  "#WHAT THIS NARROWS, which is the point of spending the iteration on it: the name is lost UPSTREAM of stepConfig, not by it. The binding's `runName` never reaches the step at all \u2014 stepConfig was only overwriting an already-absent value with a wrong one. That reframes the whole 'highest-value item outstanding': the search is not 'why does stepConfig clobber', it is 'where between RunnableBinding::mergeConfig() and the config the first step's invoke() receives does runName disappear'. `forChild()` was never the culprit.",
+  "#WHAT I AM NOT DOING, stated plainly: I am not asserting `runName = NULL` in the test to make it green. The test from iteration 79 asserts the clobbered value with an explicit 'the sequence clobber is still open' comment, and that stays true after this revert. Encoding the intermediate broken state as an expectation is how a regression becomes the specification.",
+  "ATTEMPTED and REVERTED: removing the clobber yields NULL, not the name; loss is upstream"
  ]
 }
