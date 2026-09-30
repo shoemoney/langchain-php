@@ -1068,5 +1068,15 @@
  "audit/schema-object-empty-array": [
   "#RESOLVED \u2014 LANDED AND MUTATION-VERIFIED IN ITERATION 110. A bare `{\"type\":\"object\"}` could never validate `{}` because PHP's assoc-mode decoding makes `{}` and `[]` the same value; the empty array is now accepted by BOTH `object` and `array`, and a genuine non-empty JSON array is still rejected. Fourth time TriageStatusMarkerTest has caught me adding an entry in the wrong vocabulary \u2014 `#LANDED AND MUTATION-VERIFIED` reads correctly to a human scanning for outcome, which is exactly why it is the wrong marker.",
   "LANDED: type:object accepts [] and stdClass; the ambiguity is PHP's, documented"
+ ],
+ "advisory/nova-lite-v1": [
+  "#1 'The architecture shows a LangGraph -> LangChain dependency, contrary to the expected direction based on the TypeScript upstream' \u2014 REJECTED with the upstream package manifest quoted, as the standing instruction requires before rejecting a layering claim. `langgraph-js/libs/langgraph/package.json` declares:",
+  "#     \"@langchain/langgraph\": \"workspace:*\"",
+  "#     \"@langchain/core\": \"^1.1.44\"",
+  "#LangGraph depends on @langchain/core UPSTREAM. The direction is not contrary to anything \u2014 it is a faithful copy of upstream's own dependency. This is the recurring fidelity misread in this repo (alongside Pregel's public class fields and langchain-core's src/utils/testing): a reviewer infers the expected layering from first principles instead of reading the manifest.",
+  "#5 'Namespaces heavily referenced but with no associated tests indicate dead code or untested areas' \u2014 REJECTED, and this is the SECOND time this exact inference has appeared despite being documented in the advisory brief itself. `LangChain\\Utils\\Testing` has zero test files and is referenced by 10; that 0 is EXPECTED because it is test-SUPPORT code the suite USES. The brief says so in as many words and the model still reported it, which is worth recording: a warning inside a 34KB brief does not reliably survive it.",
+  "#2 'Subsystems do not provide a clear end-to-end user journey', #3 'deliberate divergences should be reviewed for justification', #4 'documentation may not fully capture current state, especially regarding fixed issues' \u2014 DEFERRED unverified, all three VAGUE as stated: no defect, no file, no failing behaviour. #3 is in fact a restatement of what the Known non-exact section is FOR. #4 is adjacent to the fix-comment trap \u2014 PORT_STATUS rows are historical by design, so a reader expecting them to describe current state would be the confused one \u2014 but as written there is nothing to execute.",
+  "#THE MEASUREMENT THAT MATTERS MOST: ZERO repeats of the defects fixed in the last three iterations, including `type: object` / `Js::isList`, which landed ONE iteration ago and is the kind of finding this advisory has reliably rediscovered before. The fencing, the banners and the marker guard are holding.",
+  "5/8 sound; layering claim refuted with upstream package.json; ZERO repeats of recent fixes"
  ]
 }

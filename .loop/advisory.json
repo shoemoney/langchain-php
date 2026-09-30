@@ -136,5 +136,12 @@
   "file": ".loop/advisory/gpt-chat-latest.md",
   "chars": 12569,
   "cost": 0.1479
+ },
+ "amazon/nova-lite-v1": {
+  "status": "ok",
+  "at": "2026-09-30T16:32:12.235161+00:00",
+  "file": ".loop/advisory/nova-lite-v1.md",
+  "chars": 4831,
+  "cost": 0.0009
  }
 }
