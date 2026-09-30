@@ -657,5 +657,11 @@
  ],
  "advisory/gpt-4o-2024-11-20": [
   "4/8 rejected; the empty-stream claim was the defect fixed last iteration"
+ ],
+ "audit/advisory-past-tense-warning": [
+  "#THE FIX WORKS. Verified against the right object this time: `brief()` \u2014 the exact string passed as the user message at advisory.py's call site (`b = brief()` then `call(model, SYSTEM, prompt() + chr(10)*2 + b, png)`). assert 'PAST-TENSE TRAP' in brief() is TRUE, brief() is 42,983 chars, and the surrounding text is the rule itself. The warning reaches the model.",
+  "#THE TWO COMMITS THAT FOLLOWED IT WERE BOTH WRONG, and the way they were wrong is the point. I asserted SYSTEM (failed), asserted ELEMENTS (failed), then concluded the edit was DEAD CODE and shipped that claim too \u2014 three confident statements, none of which had been checked against the object that matters. The actual structure is `brief()` returning an f-string concatenation whose locals hold the text, so a `dir(module)` scan cannot see it: my scan's negative result was real, and I read it as proof of absence when it was only proof that I had looked in the wrong place.",
+  "#THE GENERAL RULE, and it is the same one the warning itself states: a verification aimed at the wrong object returns a confident negative, and 'the check FAILED' and 'the thing is broken' are different claims. Three assertions failed against three different wrong targets and I escalated each failure into a conclusion about the CODE rather than about the TARGET. The harness lesson I set out to install got installed correctly and then defeated me three times in the same session, which is the strongest available evidence that the rule is worth writing down at all.",
+  "VERIFIED in brief(); two prior commits asserted false verifications"
  ]
 }
