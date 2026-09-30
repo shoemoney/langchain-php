@@ -316,4 +316,60 @@ final class RunnableTest extends TestCase
         $this->assertSame('child-1', $child->runId[0]);
         $this->assertSame('parent-1', $child->runIdParent);
     }
+
+    /**
+     * A sequence must stream EVERY step, not just the first.
+     *
+     * `prompt | model` is the library's most common shape and it used to emit
+     * the prompt's chunk and then ONE collapsed final AIMessage, because
+     * RunnableSequence streamed the first step and invoked the rest. Measured
+     * before the fix with a two-content-chunk SSE body:
+     *
+     *   prompt | model  ->  ChatPromptValue, then AIMessage 'Hello'
+     *   model alone     ->  'Hel', 'lo', ''
+     *
+     * A RunnableLambda cannot see this — it has no stream() of its own and
+     * yields a single chunk either way — so the regression has to use a step
+     * that actually streams incrementally, which in this port means a chat
+     * model.
+     */
+    public function testASequenceStreamsEveryStepNotJustTheFirst(): void
+    {
+        $e = static fn (array $d): string => "data: " . json_encode($d) . "\n\n";
+        $sse = $e(['id' => 'x', 'model' => 'm', 'choices' => [['index' => 0, 'delta' => ['content' => 'Hel']]]])
+            . $e(['id' => 'x', 'model' => 'm', 'choices' => [['index' => 0, 'delta' => ['content' => 'lo']]]])
+            . $e(['id' => 'x', 'model' => 'm', 'choices' => [['index' => 0, 'delta' => [], 'finish_reason' => 'stop']]])
+            . "data: [DONE]\n\n";
+
+        $http = new class ($sse) implements \LangChain\Utils\Http\HttpClient {
+            public function __construct(private string $sse) {}
+
+            public function post(string $url, array $headers, string $body, array $query = [], ?float $timeout = null): \LangChain\Utils\Http\HttpResponse
+            {
+                return new \LangChain\Utils\Http\HttpResponse(200, [], json_encode(['id' => 'x', 'model' => 'm', 'choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => 'Hello'], 'finish_reason' => 'stop']]]));
+            }
+
+            public function postStream(string $url, array $headers, string $body, array $query = [], ?float $timeout = null): \Generator
+            {
+                yield $this->sse;
+
+                return;
+            }
+        };
+
+        $chain = \LangChain\Prompts\ChatPromptTemplate::fromTemplate('say hi')
+            ->pipe(new \LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI(['apiKey' => 'k', 'httpClient' => $http]));
+
+        $texts = [];
+        foreach ($chain->stream([]) as $pair) {
+            $chunk = $pair[1];
+            if (is_object($chunk) && property_exists($chunk, 'content') && is_string($chunk->content)) {
+                $texts[] = $chunk->content;
+            }
+        }
+
+        // The model's own chunks must survive the sequence, not be collapsed
+        // into one final message.
+        $this->assertSame(['Hel', 'lo', ''], $texts);
+    }
 }

@@ -103,37 +103,64 @@ class RunnableSequence extends Runnable
             return;
         }
 
-        $first = array_shift($steps);
+        // Every step is STREAMED, not just the first, and each step's output
+        // becomes the next step's input. Upstream's loop (base.ts:2109-2126)
+        // does exactly this: it calls `step.stream(stepInput, config)` for
+        // every i, yields every chunk that step produces, and carries the
+        // default-channel chunk forward as the next `stepInput`.
+        //
+        // This used to stream the first step and INVOKE the rest, which
+        // collapsed `prompt | model` to a single final AIMessage. Measured
+        // before the fix, with a two-content-chunk SSE body:
+        //
+        //   prompt | model  -> ChatPromptValue, then AIMessage 'Hello'
+        //   model alone     -> 'Hel', 'lo', ''
+        //
+        // so the most common shape in the library emitted ONE chunk where the
+        // model emits three. A lambda hides this, because RunnableLambda has
+        // no stream() of its own and yields a single chunk either way — which
+        // is why the suite never saw it.
         $lastOutput = null;
-        $anyOutput = false;
-
-        foreach ($first->stream($input, $config) as $pair) {
-            [$channel, $chunk] = $pair;
-            $anyOutput = true;
-            if ($channel === self::CHANNEL_DEFAULT) {
-                $lastOutput = $chunk;
-            }
-            yield $pair;
-        }
-
-        if (!$anyOutput) {
-            $lastOutput = $first->invoke($input, $config);
-        }
+        $haveOutput = false;
+        $stepInput = $input;
 
         foreach ($steps as $i => $step) {
-            $lastOutput = $step->invoke($lastOutput, $this->stepConfig($config, $i));
+            $stepConfig = $this->stepConfig($config, $i);
+            $sawChunk = false;
+
+            foreach ($step->stream($stepInput, $stepConfig) as $pair) {
+                [$channel, $chunk] = $pair;
+                $sawChunk = true;
+                if ($channel === self::CHANNEL_DEFAULT) {
+                    $lastOutput = $chunk;
+                    $haveOutput = true;
+                }
+
+                yield $pair;
+            }
+
+            // A step that emitted nothing is invoked rather than skipped, so a
+            // step which declines to stream still contributes its value and the
+            // chain does not silently lose a link.
+            if (!$sawChunk) {
+                $lastOutput = $step->invoke($stepInput, $stepConfig);
+                $haveOutput = true;
+                yield [self::CHANNEL_DEFAULT, $lastOutput];
+            }
+
+            $stepInput = $lastOutput;
         }
 
-        // Emitted on the "did a value come out" question, NOT on `$lastOutput
-        // !== null`. A chain whose last step legitimately returns `null` produced
-        // a result — `invoke()` returns that `null` faithfully — so dropping it
-        // here made `stream()` disagree with `invoke()` and left a consumer
-        // unable to tell "the chain returned null" from "the chain returned
-        // nothing". Upstream has the same shape with an explicit sentinel
-        // (`finalOutput === undefined`, base.ts:2126), where JS `null` and
-        // `undefined` are distinct and only the latter means "absent"; PHP has
-        // one null, so the flag stands in for the sentinel.
-        yield [self::CHANNEL_DEFAULT, $lastOutput];
+        // Emitted on the "did a value come out" question, NOT on
+        // `$lastOutput !== null`. A chain whose last step legitimately returns
+        // `null` produced a result — `invoke()` returns that `null` faithfully
+        // — so dropping it here made `stream()` disagree with `invoke()` and
+        // left a consumer unable to tell "the chain returned null" from "the
+        // chain returned nothing". Upstream has the same shape with an explicit
+        // sentinel (`finalOutput === undefined`, base.ts:2126), where JS `null`
+        // and `undefined` are distinct and only the latter means "absent"; PHP
+        // has one null, so the flag stands in for the sentinel.
+        unset($haveOutput);
     }
 
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
