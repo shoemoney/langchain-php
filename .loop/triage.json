@@ -1028,7 +1028,7 @@
  "advisory/gemma-4-26b-a4b-it-free": [
   "NOT A REVIEW: http_429 (third advisory rate-limit: iters 75, 82, 99)"
  ],
- "audit/iteration-100": [
+ "milestone/iteration-100": [
   "#MILESTONE, recorded because a hundred iterations is a point at which the shape of the work is worth naming rather than assuming. Measured at iteration 100: 2315 tests / 6406 assertions green, 230 source files, 107 test files, PHP 8.2/8.3/8.4 plus coverage in CI, v0.1.0 cut and main pushed every iteration.",
   "#WHAT LANDED, by category rather than as a list: three reverse-engineered `str_starts_with` argument orders in the partial JSON parser (complete JSON containing true/false/null threw); a falsy-vs-absent class of three `mb_chr(...) ?: U+FFFD` sites where `\"0\"` decoded to a replacement character; a lossy-and-quiet surrogate path; a silently-ignored `chunkSize` that turned out to be a retraction; reversed `addTags` semantics traced to upstream and left alone; five iterated defects in one area that finally closed by RELOCATING a tag rather than deleting it.",
   "#WHAT THE LOOP ACTUALLY PRODUCED, which is not the above: around fifteen harness-level findings. My own past-tense fix comments were read by a model as present-tense defects. My own ledger recorded a resolution at the BOTTOM of a note list where only the top is read. A truncation in the brief's prior-findings section was silently deciding which defects an advisory was allowed to know about. And twice I nearly shipped wrong work \u2014 a BLOCKER built on my own bad fixture, and a `bind()` fix made from a probe that measured the constructor while the code calls the wrapper.",
