@@ -101,5 +101,12 @@
  "google/gemma-4-31b-it:free": {
   "status": "http_429",
   "at": "2026-09-30T13:38:11.045295+00:00"
+ },
+ "meta/muse-glimmer-30b": {
+  "status": "ok",
+  "at": "2026-09-30T13:53:03.376551+00:00",
+  "file": ".loop/advisory/muse-glimmer-30b.md",
+  "chars": 8360,
+  "cost": 0.0081
  }
 }
