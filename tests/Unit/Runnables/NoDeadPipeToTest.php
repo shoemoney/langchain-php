@@ -28,7 +28,7 @@ use PHPUnit\Framework\TestCase;
  * invented API was broken. Removal is safer than repair: a caller who wants this
  * writes `->pipe(new RunnableLambda($fn))`, which is upstream-shaped and runs.
  */
-#[CoversClass(RunnableInterface::class)]
+#[CoversClass(RunnableLambda::class)]
 final class NoDeadPipeToTest extends TestCase
 {
     public function testPipeToDoesNotExist(): void
