@@ -3,7 +3,8 @@
 Append a triage note SAFELY. The one sanctioned way to write triage.json.
 
     python3 .loop/triage_add.py "audit/some-key" "#OPEN - what is true" "more detail..."
-    printf '%s\n' "#OPEN - note text" "second note" | python3 .loop/triage_add.py --stdin audit/some-key
+    printf '%s\n' "note text" | python3 .loop/triage_add.py --stdin audit/some-key
+    printf '%s\n' "what landed" | python3 .loop/triage_add.py --stdin audit/some-key --status=RESOLVED
 
 Why this exists, in a number rather than a resolution: hand-written triage writes in
 this loop produced a status-marker failure EIGHT times — `.append(a, b)` instead of
@@ -43,7 +44,12 @@ def main(argv: list[str]) -> int:
         # protected the JSON but the SHELL had already mangled the text before
         # the script saw it, so the guarantee has to cover the whole path.
         key = argv[2]
+        status = "OPEN"
+        if len(argv) >= 4 and argv[3].startswith("--status="):
+            status = argv[3].split("=", 1)[1].strip().lstrip("#").upper()
         notes = [ln.rstrip("\n") for ln in sys.stdin.read().split("\n") if ln.strip()]
+        if status != "OPEN" and notes and not notes[0].startswith("#"):
+            notes = [f"#{status} - {notes[0]}"] + notes[1:]
     else:
         if len(argv) < 3:
             print(__doc__)
