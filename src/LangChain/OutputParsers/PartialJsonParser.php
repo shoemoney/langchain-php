@@ -150,6 +150,24 @@ final class PartialJsonParser
             } elseif ($char === '"') {
                 $this->pos++;
 
+                // A high surrogate still pending at the closing quote never
+                // found its partner, and returning here used to discard it
+                // SILENTLY. Measured: {"a":"x\ud800y"} returned {"a":"xy"} — three
+                // characters became two and nothing reported it, which is the
+                // worst possible failure for a parser: lossy and quiet.
+                //
+                // Upstream does not hit this because `String.fromCharCode` yields
+                // the lone surrogate and a JS string holds code units natively.
+                // PHP has no such value — mbstring refuses it, since a surrogate
+                // is not a Unicode scalar — so U+FFFD is the faithful stand-in,
+                // and it is already this method's documented policy for an
+                // unpaired surrogate. The only gap was this path.
+                if ($this->pendingHighSurrogate !== null) {
+                    $this->pendingHighSurrogate = null;
+
+                    return $result . "\u{FFFD}";
+                }
+
                 return $result;
             } else {
                 $result .= $char;

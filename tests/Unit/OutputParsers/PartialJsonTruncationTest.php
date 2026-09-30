@@ -133,4 +133,35 @@ final class PartialJsonTruncationTest extends TestCase
             'ordinary letter unaffected' => ['{"a": "A\u0041B"}', 'AAB'],
         ];
     }
+
+    /**
+     * An unpaired high surrogate must become U+FFFD, not vanish.
+     *
+     * The closing-quote branch returned immediately, discarding any pending high
+     * surrogate, so the parser was LOSSY AND QUIET:
+     *
+     *     {"a":"x\ud800y","b":"z"}  ->  {"a":"xy","b":"z"}
+     *
+     * three characters became two and nothing reported it. Upstream never hits
+     * this because `String.fromCharCode` yields the lone surrogate and a JS string
+     * holds code units natively; PHP has no such value, and U+FFFD was already this
+     * method's documented policy for an unpaired surrogate. Only this path skipped it.
+     *
+     * The valid-pair case is in the same provider deliberately: a fix that simply
+     * appended U+FFFD everywhere would pass the first case and break every emoji.
+     */
+    #[DataProvider('surrogateCases')]
+    public function testAnUnpairedHighSurrogateBecomesTheReplacementCharacter(string $json, string $expected): void
+    {
+        $this->assertSame($expected, (new PartialJsonParser($json))->parse()['a']);
+    }
+
+    public static function surrogateCases(): array
+    {
+        return [
+            'lone high surrogate mid-string' => ['{"a":"x\ud800y"}', "xy\u{FFFD}"],
+            'lone high surrogate alone' => ['{"a":"\ud800"}', "\u{FFFD}"],
+            'a valid pair is untouched' => ['{"a":"\ud834\udd1e"}', "\u{1D11E}"],
+        ];
+    }
 }
