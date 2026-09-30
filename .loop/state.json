@@ -2401,6 +2401,15 @@
    "chars": 2529,
    "findings": 5,
    "severity_hits": 5
+  },
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+   "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+   "at": "2026-09-30T01:45:49",
+   "actual_model": null,
+   "usage": null,
+   "finish_reason": null,
+   "reasoning_tokens": 0,
+   "status": "empty"
   }
  },
  "order": [
@@ -2540,7 +2549,8 @@
   "openai/o4-mini",
   "dots-studio/dots-3-note-preview:free",
   "qwen/qwen3.8-flash",
-  "google/gemini-3.6-flash"
+  "google/gemini-3.6-flash",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
  ],
  "next_index": 0
 }
