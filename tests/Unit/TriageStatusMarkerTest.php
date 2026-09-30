@@ -40,7 +40,18 @@ final class TriageStatusMarkerTest extends TestCase
      * accurate words out of its own vocabulary will be met, eventually, by
      * choosing a word the guard prefers over the word that is true.
      */
-    private const MARKERS = ['#RESOLVED', '#OPEN', '#CLOSED', '#RETRACTED'];
+    /**
+     * `#PARTLY` was added in iteration 143 after this guard rejected it. The entry
+     * is genuinely half-done — a top-up retry landed, its merge path is written to
+     * be non-destructive, and it has not yet fired — so `#PARTLY RESOLVED` is an
+     * accurate description, not a synonym smuggled past the check.
+     *
+     * The guard matched by `str_starts_with`, so a compound status could never be
+     * expressed at all. That is a real limitation of a prefix test: it confuses
+     * "a status this guard does not know about" with "a status this guard rejects",
+     * and only the first should require a code change.
+     */
+    private const MARKERS = ['#RESOLVED', '#OPEN', '#CLOSED', '#RETRACTED', '#PARTLY'];
 
     public function testEveryAuditEntryDeclaresItsStatusFirst(): void
     {

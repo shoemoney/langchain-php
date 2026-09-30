@@ -28,7 +28,7 @@ know before you start.
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
 | Tests | **2335 passing, 6436 assertions** |
-| Size | 232 src files / 34,690 lines · 109 test files / 25,829 lines |
+| Size | 232 src files / 34,690 lines · 109 test files / 25,840 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
