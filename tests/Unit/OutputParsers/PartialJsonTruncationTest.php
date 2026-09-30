@@ -24,10 +24,17 @@ final class PartialJsonTruncationTest extends TestCase
     /** @return iterable<string, array{string, string}> */
     public static function truncatedEscapes(): iterable
     {
-        yield 'two digits' => ['"a\u12', 'au12'];
-        yield 'one digit' => ['"a\u1', 'au1'];
-        yield 'no digits' => ['"a\u', 'au'];
-        yield 'at the very start' => ['"\uD', 'uD'];
+        // These expectations USED to drop the backslash — 'au12' for `"a\u12`.
+        // The parser has always re-emitted it for a cut escape
+        // (`if ($escaped) { $result .= '\\'; }`), so the short-hex branch was
+        // the inconsistency, and this data provider enshrined it. The
+        // consequence was a spurious JSON-Patch `replace` per chunk per emoji
+        // for `diff: true` consumers. See TruncatedEscapeRecoveryTest, which
+        // pins the bytes.
+        yield 'two digits' => ['"a\u12', 'a\\u12'];
+        yield 'one digit' => ['"a\u1', 'a\\u1'];
+        yield 'no digits' => ['"a\u', 'a\\u'];
+        yield 'at the very start' => ['"\uD', '\\uD'];
     }
 
     #[DataProvider('truncatedEscapes')]
