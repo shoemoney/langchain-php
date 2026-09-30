@@ -1141,5 +1141,14 @@
  ],
  "dots-studio/dots-3-note-preview_free": [
   "NOT A REVIEW: TRUNCATED at the 24k reasoning cap"
+ ],
+ "audit/ledger-deferral-audit-121": [
+  "#AUDIT OF MY OWN DEFERRAL REASONS, prompted by iteration 120's lesson. Seven ledger entries across the loop cite an unreachable upstream as a reason for a deferral, and iteration 120 proved one of those reasons was WRONG \u2014 `addConditionalEdges` does not exist upstream, the implementation lives in langgraph-core, and the file was in the checkout the whole time. A false blocker in the ledger is worse than a missing finding, so the whole class was re-examined.",
+  "#THE SPECIFIC ERROR I WAS LOOKING FOR WAS: deferring an INTERNAL consistency question (does this port contradict ITSELF) by citing upstream reachability. Upstream cannot settle 'does A disagree with B inside this port' \u2014 only the port can. Using an upstream excuse for that would be a category error, and it is the kind that survives review because the citation looks rigorous. Measured across every note in the ledger:",
+  "#     deferrals that are INTERNAL but justified by unreachable upstream:  0",
+  "#ZERO. Every deferral citing an unreachable upstream was a genuine FIDELITY question, and every internal-inconsistency finding in the log was decided on internal evidence \u2014 the image-prompt mutation probe, the combineLLMOutput docblock, the validatesOnlyStrings asymmetry, the addEdge(END) writer. The deferral reasons are internally consistent, which is not a thing I expected to be able to say about 120 iterations of my own bookkeeping and is worth recording as measured rather than assumed.",
+  "#THE ONE STILL-OPEN DEFERRAL IS SOUND, and on the right grounds. `google/gemini-3.7-flash` #1 \u2014 `validatesOnlyStrings()` returns true on a bare `Schema::string()` but false on `new Schema(['schema' => ['type' => 'string']])`, while `errors()` unwraps. The asymmetry is real and internal, and it is deferred because it is UNREACHABLE through the public API: no factory emits the `['schema' => ...]` shape. That is a reason about the port's own surface, not about upstream, and it was already measured in an earlier iteration.",
+  "#WHAT THE AUDIT DOES NOT CLAIM: that the seven citations were individually right. One was demonstrably wrong (iteration 120), so the class is not proven clean \u2014 it is proven free of the CATEGORY error, which is the narrower and checkable claim. The next honest step would be to re-run iteration 120's content-search method over each of the seven and confirm the rest still hold, and that is worth doing rather than assuming.",
+  "0 internal questions deferred by citing upstream; 1 open deferral sound on port-surface grounds"
  ]
 }

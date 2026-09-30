@@ -781,6 +781,41 @@
    "status": "truncated",
    "chars": 92928,
    "file": ".loop/reviews/24-dots-studio__dots-3-note-preview_free.md"
+  },
+  "~anthropic/claude-fable-latest": {
+   "model": "~anthropic/claude-fable-latest",
+   "at": "2026-09-30T12:21:25",
+   "actual_model": "anthropic/claude-fable-5.1",
+   "usage": {
+    "prompt_tokens": 68657,
+    "completion_tokens": 8307,
+    "total_tokens": 76964,
+    "cost": 1.10192,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 1.10192,
+     "upstream_inference_prompt_cost": 0.68657,
+     "upstream_inference_completions_cost": 0.41535
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 6706,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 6706,
+   "status": "ok",
+   "file": ".loop/reviews/25-~anthropic__claude-fable-latest.md",
+   "chars": 3937,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -807,7 +842,8 @@
   "sakana/fugu-max",
   "moonshotai/kimi-k3",
   "~openai/gpt-terra-latest",
-  "dots-studio/dots-3-note-preview:free"
+  "dots-studio/dots-3-note-preview:free",
+  "~anthropic/claude-fable-latest"
  ],
  "next_index": 0
 }
