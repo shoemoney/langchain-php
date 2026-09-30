@@ -1048,6 +1048,7 @@
   "#The reflection in the test uses no setAccessible() \u2014 deprecated on 8.5 and a no-op since 8.1 \u2014 after I copied that idiom from an earlier probe and the deprecation warning caught it. Small, but it is the fifth time a copied idiom has cost a round trip in this loop."
  ],
  "audit/cache-key-json-encode-false": [
+  "#RESOLVED \u2014 LANDED AND MUTATION-VERIFIED IN ITERATION 103. The `json_encode` `false` return collapsed every unencodable input into one cache key; `JSON_THROW_ON_ERROR` now makes it loud, matching upstream's `JSON.stringify`. Third time TriageStatusMarkerTest has caught me adding an entry without a status marker, which is the guard doing precisely what it was written for \u2014 it fires on the mistake I actually keep making, not on a hypothetical.",
   "ACCEPTED+FIXED: json_encode false -> '' collapsed every unencodable input into one cache key"
  ]
 }
