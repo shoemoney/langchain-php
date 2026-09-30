@@ -1038,13 +1038,16 @@
   "MILESTONE: 2315 tests green; ~15 harness defects found in the loop itself; 2 entries still OPEN"
  ],
  "~anthropic/claude-sonnet-latest": [
-  "#1 'A second conditional edge from the same node silently replaces the first' \u2014 BEHAVIOUR CONFIRMED, VERDICT DEFERRED, and the deferral is on FIDELITY grounds rather than because the mechanism is unclear. Measured by registering two conditional edges from node 'a', both with pathMap null: `branches['a']` holds ONE entry, `__self__` \u2014 the second call overwrote the first, because `addConditionalEdges` keys on `$branchName = $pathMap === null ? Constants::SELF : (array_values($pathMap)[0] ?? Constants::SELF)` and SELF collides.",
-  "#WHAT BLOCKS THE VERDICT: upstream's graph source is not reachable from this checkout. `grep -rl addConditionalEdges` across `langgraphjs/libs/` returns only a CHANGELOG entry, so I cannot read the storage shape the comparison depends on \u2014 whether upstream keys branches by name (and would collide identically) or by index (and would not). In a port where FIDELITY BEATS PREFERENCE, and where two of my own recent fixes were wrong for precisely this reason, accepting a behaviour change on an unreadable upstream is the exact failure this loop has been refusing for ninety iterations. DEFERRED until the upstream file is in the tree.",
-  "#NOTHING ELSE WAS TOUCHED for it. No code change, no regression, no ledger row, because a deferred finding is not a fix and writing one would imply the other.",
-  "#2 'addEdge(x, END) appends to writers that compile() never reads' \u2014 DEFERRED unverified. The quoted line is plausible \u2014 END written to `$this->nodes[$start]->writers[]` without an entry in `$this->edges` \u2014 and this is the same StateGraph area as the iteration-70 fix, so it deserves execution rather than a shrug. Nothing was executed.",
-  "#3 'compile() performs no graph validation' \u2014 DEFERRED unverified. Vague as stated: upstream's own compile() validates only what it must, and 'no validation' needs a specific missing check and a graph shape that should have been rejected.",
-  "#4 'Cache key collapses to one value when json_encode fails' \u2014 DEFERRED unverified, but this is the most PROMISING of the batch and I am recording that ranking rather than burying it: json_encode returning false for a non-UTF-8 or recursive array is exactly the falsy-vs-absent shape that produced the real `mb_chr(0x30)` defect in iteration 62, and it is cheap to probe. Next candidate if #1's upstream file does not arrive.",
-  "#5 'PORT_STATUS.md contradicts itself on open defects and breaks its own tables' \u2014 DEFERRED unverified, and it is a DOCS-CONTRADICT-CODE claim, which is this project's named hard-rule class. `MarkdownTableShapeTest` and `DocsMatchRealityTest` both pass, so whatever it means it is not one of the two things those guards check. Worth a real look.",
-  "#1 behaviour CONFIRMED (2 branches -> 1) but DEFERRED: upstream graph source absent from checkout"
+  "#4 'Cache key collapses to one value when json_encode fails' \u2014 ACCEPTED and FIXED, and it is the prediction from iteration 102 landing exactly. Measured before the fix:",
+  "#     input 0: json_encode => false   (string) => ''",
+  "#     input 1: json_encode => false   (string) => ''",
+  "#Two completely different inputs produced the SAME cache key. In a cache that means the second read returns the FIRST's cached result \u2014 a silent correctness failure that is worse than no cache, because the cache still looks like it is working.",
+  "#The mechanism was the falsy-vs-absent class for the second time in this codebase, and the second time for the SAME idiom: `mb_chr(0x30) ?: U+FFFD` in iteration 62, where `\"0\"` is falsy. Here `(string) json_encode(...)` turns a `false` return into `''`, and every unencodable input \u2014 NAN/INF, malformed UTF-8, a resource, recursion \u2014 collapses to one key.",
+  "#Upstream has no equivalent hole because `JSON.stringify` THROWS on input it cannot represent, so a bad key is loud there. `JSON_THROW_ON_ERROR` is the PHP spelling of that, and the throw propagates to the caller instead of poisoning the cache.",
+  "#MUTATION-VERIFIED: restore the `(string)` cast -> 1 failure (RED); restore `JSON_THROW_ON_ERROR` -> OK (GREEN). The test asserts BOTH halves: an encodable input still produces a key, and an unencodable one FAILS LOUDLY rather than returning a key that collides. A fix that simply returned null would pass neither and is the tempting wrong repair here.",
+  "#The reflection in the test uses no setAccessible() \u2014 deprecated on 8.5 and a no-op since 8.1 \u2014 after I copied that idiom from an earlier probe and the deprecation warning caught it. Small, but it is the fifth time a copied idiom has cost a round trip in this loop."
+ ],
+ "audit/cache-key-json-encode-false": [
+  "ACCEPTED+FIXED: json_encode false -> '' collapsed every unencodable input into one cache key"
  ]
 }

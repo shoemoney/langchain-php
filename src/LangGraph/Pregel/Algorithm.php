@@ -1010,9 +1010,22 @@ final class Algorithm
         }
 
         $keyFunc = $cachePolicy['keyFunc'] ?? null;
+        // A cache key that silently collapses is worse than no cache at all: two
+        // DIFFERENT inputs sharing one key means the second read returns the
+        // first's cached result. `json_encode()` returns `false` on failure —
+        // NAN/INF, malformed UTF-8, a resource, recursion — and `(string) false`
+        // is `""`, so every unencodable input hashed to the SAME key:
+        //
+        //     input 0: json_encode => false   (string) => ''
+        //     input 1: json_encode => false   (string) => ''
+        //
+        // Upstream has no equivalent hole because `JSON.stringify` THROWS on
+        // input it cannot represent, so a bad key is loud there. Failing loudly
+        // is the faithful behaviour, and `JSON_THROW_ON_ERROR` is how PHP spells
+        // it: the throw propagates to the caller rather than poisoning the cache.
         $key = $keyFunc !== null
             ? (string) $keyFunc($input)
-            : (string) json_encode($input);
+            : json_encode($input, JSON_THROW_ON_ERROR);
 
         return [
             'ns' => [Constants::CACHE_NS_WRITES, $nodeName, $node],

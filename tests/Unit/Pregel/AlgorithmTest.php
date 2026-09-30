@@ -926,4 +926,34 @@ final class AlgorithmTest extends TestCase
         $this->assertSame('', CheckpointFunctions::getNullChannelVersion(['x' => 'a']));
         $this->assertNull(CheckpointFunctions::getNullChannelVersion([]));
     }
+
+    /**
+     * Two unencodable inputs must not share one cache key.
+     *
+     * `json_encode()` returns `false` on failure — NAN/INF, malformed UTF-8, a
+     * resource, recursion — and the old code cast it: `(string) json_encode($input)`.
+     * `(string) false` is `""`, so every unencodable input produced the SAME key:
+     *
+     *     input 0: json_encode => false   (string) => ''
+     *     input 1: json_encode => false   (string) => ''
+     *
+     * Two different inputs, one cache entry, and the second read returns the
+     * first's result. That is a silent correctness failure in a cache — worse
+     * than no cache, because the cache looks like it is working.
+     *
+     * Upstream has no equivalent hole: `JSON.stringify` THROWS on input it cannot
+     * represent, so a bad key is loud there. `JSON_THROW_ON_ERROR` is the PHP
+     * spelling of that, and the second case asserts the failure stays loud
+     * rather than becoming a key.
+     */
+    public function testAnUnencodableCacheKeyFailsLoudlyRatherThanCollapsing(): void
+    {
+        $method = new \ReflectionMethod(\LangGraph\Pregel\Algorithm::class, 'buildCacheKey');
+        $policy = ['ttl' => 60];
+        $good = $method->invoke(null, $policy, 'node', ['value' => 'fine'], 'n');
+        $this->assertIsArray($good, 'an encodable input still produces a key');
+
+        $this->expectException(\JsonException::class);
+        $method->invoke(null, $policy, 'node', ['value' => NAN], 'n');
+    }
 }
