@@ -960,6 +960,41 @@
    "chars": 1348,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~anthropic/claude-haiku-latest": {
+   "model": "~anthropic/claude-haiku-latest",
+   "at": "2026-09-30T13:35:33",
+   "actual_model": "anthropic/claude-haiku-4.5",
+   "usage": {
+    "prompt_tokens": 52402,
+    "completion_tokens": 3624,
+    "total_tokens": 56026,
+    "cost": 0.070522,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.070522,
+     "upstream_inference_prompt_cost": 0.052402,
+     "upstream_inference_completions_cost": 0.01812
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1850,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1850,
+   "status": "ok",
+   "file": ".loop/reviews/31-~anthropic__claude-haiku-latest.md",
+   "chars": 6995,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -992,7 +1027,8 @@
   "~openai/gpt-sol-latest",
   "baidu/ernie-4.5-vl-424b-a47b",
   "rekaai/reka-edge",
-  "qwen/qwen3-vl-235b-a22b-thinking"
+  "qwen/qwen3-vl-235b-a22b-thinking",
+  "~anthropic/claude-haiku-latest"
  ],
  "next_index": 0
 }

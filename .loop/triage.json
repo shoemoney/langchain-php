@@ -1216,5 +1216,20 @@
   "#ELEMENT 3 (composition) is marked 'needs work (unproven at the seams \u2014 no defect located)' \u2014 an honest self-limiting verdict, which is worth noting because the same model had no trouble asserting a hard defect in element 7. And its own top list names a second item: 'generateMessages signature shape is a divergence candidate absent from the known-divergences table', which is DEFERRED unverified \u2014 a divergence candidate is not a divergence until the upstream signature is read.",
   "#5 elements sound plus one sound-with-a-contradiction-that-is-not-one. ZERO repeats of any fixed defect, and the two elements marked needs-work are marked with their own uncertainty stated rather than a fabricated claim.",
   "element 7's 'contradiction' is a MISCOUNT: 27 rows sum to 232, matching the Size row"
+ ],
+ "~anthropic/claude-haiku-latest": [
+  "#1 'MessageMerge::mergeContent() succeeds on incompatible second-side block types' \u2014 DEFERRED, and I am recording the exact branch I narrowed it to rather than a verdict I did not earn. `mergeContent()` ends with:",
+  "#     if (is_array($second)) {",
+  "#         $left = self::contentBlocks($first);",
+  "#         $merged = self::mergeLists($left, $second);",
+  "#         if ($merged !== null) { return $merged; }",
+  "#         return array_merge($left, $second);        // <-- no type check on $second",
+  "#     }",
+  "#So when `mergeLists()` cannot merge the two lists it falls back to a plain concatenation of block lists with no compatibility test. That is where the claim lives, and it is a REAL question rather than a stylistic one: a mixed-content list is legal, so `['text'] + [{'type':'image_url'}]` may be a correct merge rather than an incompatible one.",
+  "#WHAT WOULD SETTLE IT, and why I did not do it: a fidelity verdict needs upstream's `mergeContent` array branch, and the port's own comment block at :63-77 shows the method has already been reconciled against upstream behaviour in detail once. Whether upstream concatenates two block lists unchecked or validates them is a read I did not do this iteration. Guessing from the shape of the PHP would be exactly the reasoning that produced the retracted BLOCKER in iteration 52 and the false 'drops tool calls' finding in 117.",
+  "#NEXT: read upstream's `mergeContent` for the two-array case and merge a `['text']` against a `[{type:'image_url'}]` through both. If upstream concatenates, the finding is rejected and the fallback needs no guard; if it validates, the fallback is a real divergence and it needs one.",
+  "##2 convertToChunk() does not preserve the message's additional_kwargs aliases, #3 BaseMessage constructor accepts a bare dict of mixed blocks without validating, #4 chunk-to-message does not validate accumulated tool calls, #5 AIMessageChunk concat does not preserve tool_call_id from ToolMessageChunk \u2014 DEFERRED unverified. #4 and #5 are both about CONCAT losing a field, which is the same class as the `convertToChunk` tool-call drop that turned out to be a false finding in iteration 117, so both need execution against a real message before they are believed.",
+  "#WORTH NOTING ABOUT THIS REVIEW: all five findings are in message merge algebra and the package focus is the same area, so the reviewer's attention is landing where the loop's own recent work has been. It is a different model from the last three, and it produced no repeats of anything fixed \u2014 the fencing is still holding across roster re-burns.",
+  "#1 DEFERRED: narrowed to the array_merge fallback at :105-106; needs upstream's mergeContent"
  ]
 }
