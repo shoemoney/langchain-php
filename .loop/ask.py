@@ -488,19 +488,27 @@ def main():
                 have = {m.lower() for m in re.findall(r"^#{2,4}\s*\d+[.)]\s*(.+)$", text, re.M)}
                 print(f"    incomplete ({f5} findings) — asking for the remaining ones "
                       f"({MORE_RETRIES} left)", flush=True)
-                resp3 = call(
-                    model,
-                    SYSTEM,
-                    prompt()
-                    + f"\n\n# Review packet\n\n{b}\n\n"
+                # Content is an ARRAY, like the two calls above it (:360 and
+                # :438). This block used to pass loose strings positionally,
+                # which put a base64 PNG where `max_tokens` goes and left three
+                # names (SYSTEM, prompt(), b) that exist nowhere in this file —
+                # so the path raised NameError the first time it ever ran.
+                # Iteration 190; the never-executed path is now exercised by
+                # the mutation check recorded in `audit/ask-py-topup-never-ran`.
+                topup = (
+                    f"\n\n# Review packet\n\n{packet}\n\n"
                     + "Your previous answer listed "
                     + f"{len(have)} finding(s): " + "; ".join(sorted(have)) + ".\n"
                     + f"List ONLY the additional findings you did not include, up to "
                     + f"{5 - len(have)} more, in the same format. If there are none, say so.\n"
-                    + "Do not repeat a finding you have already given.",
-                    png,
+                    + "Do not repeat a finding you have already given."
                 )
-                text2 = text.rstrip() + "\n\n---\n\n" + resp3
+                resp3 = call(model, [{"type": "text", "text": PROMPT + topup}])
+                # `call()` returns the response DICT; `text_of()` is the
+                # extractor the two earlier paths both use. Concatenating the
+                # dict itself raises TypeError.
+                text3 = text_of(resp3)
+                text2 = text.rstrip() + "\n\n---\n\n" + text3
                 path = f"{REVIEWS}/{n:02d}-{slug(model)}-topup.md"
                 open(path, "w", encoding="utf-8").write(
                     f"# Review {n} - {model} (top-up)\n"
