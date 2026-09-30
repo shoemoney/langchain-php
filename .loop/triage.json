@@ -1286,6 +1286,7 @@
   "6/8 sound; it TRACES 'bind tools -> stream inside a checkpointed StateGraph' and cites my mutation iterations"
  ],
  "audit/review-yield-rate": [
+  "#PARTLY RESOLVED \u2014 THE 429 RETRY PATH WAS EXERCISED FOR REAL, closing iteration 141's 'untested in anger' caveat: 3 attempts at 20/40/60s then `rate_limited` recorded rather than `http_429`, so the model is not burned as having served a review. The top-up retry for an `incomplete` answer remains unexercised \u2014 a different condition with different handling.",
   "#THE 429 RETRY PATH WAS EXERCISED FOR REAL, which closes the caveat iteration 141 recorded as untested. The reviewer call hit a rate limit and the harness did exactly what it was written to do:",
   "#     429 rate limited \u2014 waiting 20s (attempt 1/3)",
   "#     429 rate limited \u2014 waiting 40s (attempt 2/3)",
