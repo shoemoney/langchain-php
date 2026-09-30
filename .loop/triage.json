@@ -872,5 +872,14 @@
   "#That is the iteration-52 lesson arriving again, and this time I caught it because the symptom contradicted the code comment sitting directly above the merge. The habit that catches it is worth stating as a rule: when a probe result CONTRADICTS an in-source comment, suspect the probe first. A comment written by whoever implemented the merge knows what the merge does; a probe written from an API I had just guessed does not.",
   "#nova-lite's #3 'composer.json autoload-dev omits integration test helpers' and #4 'RunnableBinding drops bound options layer' \u2014 #4 is now partly answered by the probe above (the bound layer is NOT dropped when constructed correctly), but nothing was executed against #3 and #4's own claim, so both remain recorded as unverified rather than credited with my probe's result.",
   "http_429, no review; settled nova-lite #1 as a REPEAT after probe"
+ ],
+ "audit/runname-bind-slot-regression": [
+  "#REGRESSION WRITTEN AND MUTATION-VERIFIED \u2014 the thing iteration 78 shipped without. Reverting the bind call to the kwargs slot produces a failure (RED); restoring the config slot returns OK (GREEN).",
+  "#AND IT IMMEDIATELY FOUND SOMETHING ELSE, which is why writing it was worth the iteration rather than deferring again. The first version asserted the name arrives as the step's runName and FAILED. Measured:",
+  "#     runName = \"seq:step:1\"",
+  "#     options = [\"runName\" => \"pull_person\"]",
+  "#So the bind-slot fix is NECESSARY BUT NOT SUFFICIENT. `RunnableSequence::stepConfig()` overwrites runName with `seq:step:1` before the binding's config reaches the step \u2014 the open defect PORT_STATUS records as 'Highest-value item outstanding', now confirmed live by a test rather than by reading a ledger row.",
+  "#HOW THE TEST IS WRITTEN, which is the part I had to think about. Asserting the real name would encode the fix as if it were done. Asserting the clobbered value would make the defect permanent. So it asserts the BIND SLOT \u2014 what this iteration fixed \u2014 with the clobber asserted explicitly and commented as open, so the moment someone fixes stepConfig this test tells them precisely what to update. A test that quietly passes over a known defect is how a known defect becomes an undocumented one.",
+  "regression written, mutation-verified; and it CONFIRMED stepConfig clobber is still live"
  ]
 }

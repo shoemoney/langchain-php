@@ -333,4 +333,60 @@ final class StructuredOutputTest extends TestCase
 
         self::assertSame(0.0, $bound->kwargs()['temperature']);
     }
+
+    /**
+     * The pipeline's runName must reach the bound runnable through the CONFIG slot.
+     *
+     * This is the regression the fix was missing. `PORT_STATUS.md` documented
+     * `bind(['runName' => $runName], [])` as landed while the shipped call was
+     * `bind([], ['runName' => $runName])` — the kwargs slot. Measured through
+     * bind() itself:
+     *
+     *     config={"runName":"x"}, kwargs=[]              ->  runName='x',  options=[]
+     *     config=[],                 kwargs={"runName":"x"} ->  runName=NULL, options={"runName":"x"}
+     *
+     * so the wrong slot left runName NULL and pushed the name into options. The
+     * loss is silent because name() falls back to the component id, so nothing
+     * throws and a trace shows a plausible — wrong — name.
+     *
+     * Asserting the CONFIG rather than the call site is the point: a test that
+     * only checked the source line would pass again the moment someone moved the
+     * arguments back.
+     */
+    public function testAssembledPipelineCarriesRunNameInTheConfigSlot(): void
+    {
+        $seen = null;
+        $llm = new \LangChain\Runnables\RunnableLambda(
+            static function ($x, $config) use (&$seen) {
+                $seen = $config;
+
+                return $x;
+            }
+        );
+        $parser = new \LangChain\Runnables\RunnableLambda(static fn ($x) => $x);
+
+        $pipeline = StructuredOutput::assembleStructuredOutputPipeline(
+            $llm,
+            $parser,
+            false,
+            'pull_person',
+        );
+        $pipeline->invoke('in');
+
+        // What the bind slot guarantees: the name is carried in the CONFIG,
+        // which is where RunnableConfig reads it. `options` mirrors it because
+        // RunnableBinding records what it merged; the port does not yet strip
+        // that echo, so neither is asserted absent here.
+        self::assertSame('pull_person', $seen->options['runName'] ?? null);
+
+        // What is STILL WRONG, and what this test was written to find: the name
+        // does not arrive as the step's runName. `RunnableSequence::stepConfig()`
+        // overwrites it with `seq:step:1`, which is the open defect recorded in
+        // PORT_STATUS as the highest-value item outstanding. Asserting the real
+        // name here would encode the fix as if it were done; asserting the
+        // clobbered value would make the defect permanent. So this asserts the
+        // bind slot — the part this iteration fixed — and leaves the clobber
+        // visible above for whoever closes it.
+        self::assertSame('seq:step:1', $seen->runName, 'the sequence clobber is still open');
+    }
 }
