@@ -313,5 +313,9 @@
   "#5 the artifact is dropped when there is no tool_call_id \u2014 REJECTED on fidelity. Upstream's _formatToolOutput is `if (toolCallId && !isDirectToolOutput(content)) { ...new ToolMessage... }` and otherwise returns content (tools/index.ts:1049). The port's `if ($toolCallId === null || isDirectToolOutput($content)) return $content;` is the same line.",
   "#1/#2/#3 rejected last iteration on upstream reads (identical error string; Zod reasoning does not apply to a JSON-Schema port; validatesOnlyStrings never recognises that shape).",
   "Net: 5/5 rejected, the tool path verified faithful end to end."
+ ],
+ "shoemoney/deploy-audit": [
+  "#1 coverage job failed while 8.2/8.3/8.4 were green \u2014 ACCEPTED and CLEARED. #[CoversClass(ToolOutput::class)] inside namespace LangChain\\Tests\\Unit\\Tools resolved to LangChain\\Tests\\Unit\\Tools\\ToolOutput, which does not exist. Invisible locally: no coverage driver, attribute still parses, test still passes. 55 warnings, non-zero exit. Fixed the missing use statements (ToolOutput, ToolUtils) and added CoversTargetResolutionTest, which strips comments so prose describing a broken attribute is not read as one. Mutation-verified in both files plus a negative case.",
+  "#2 a property declared as a Schema INSTANCE failed validation OPEN \u2014 ACCEPTED and CLEARED, found by installing the package into a clean external project and calling the public API. Schema::object(['a' => Schema::string()]) emitted {\"a\":{\"schema\":{\"type\":\"string\"}}} and errors() found no 'type', so a string field accepted 1, null, [] and an object. Both consumers now unwrap nested instances at any depth; a ['string','null'] union passes through. Both halves mutation-verified independently. The suite never caught it because every existing test built properties as plain arrays."
  ]
 }
