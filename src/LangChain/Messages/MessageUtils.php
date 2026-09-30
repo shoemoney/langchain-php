@@ -341,10 +341,31 @@ final class MessageUtils
             $base['tool_call_chunks'] = $chunks;
         }
 
+        // Upstream branches on the CLASS for chat messages, not the role:
+        // `ChatMessage.isInstance(message)` (messages/utils.ts:547). A ChatMessage's
+        // `type` IS its role ('user', 'assistant', ...), so a role-keyed match can
+        // never reach it — which is exactly how it fell into the `default` arm and
+        // came out an AIMessageChunk.
+        if ($message instanceof ChatMessage) {
+            // The role lives in `type`, and `$base` carries content, kwargs,
+            // metadata, id and name but not type — so without this the chunk comes
+            // back a generic 'chat' and loses the speaker.
+            $base['role'] = $message->type;
+
+            return new ChatMessageChunk($base);
+        }
+
         return match ($message->type) {
             BaseMessage::ROLE_HUMAN => new HumanMessageChunk($base),
             BaseMessage::ROLE_SYSTEM => new SystemMessageChunk($base),
-            default => new AIMessageChunk($base),
+            BaseMessage::ROLE_AI => new AIMessageChunk($base),
+            BaseMessage::ROLE_FUNCTION => new FunctionMessageChunk($base),
+            // Upstream throws `new Error("Unknown message type.")` rather than
+            // relabelling. Silently calling an unknown turn an assistant turn is
+            // how a message changes speaker with nothing reporting it.
+            default => throw new \InvalidArgumentException(
+                'Cannot convert a ' . $message->type . ' message to a chunk.'
+            ),
         };
     }
 }
