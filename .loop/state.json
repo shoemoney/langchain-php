@@ -1413,6 +1413,41 @@
    "chars": 2628,
    "findings": 5,
    "severity_hits": 5
+  },
+  "openai/gpt-4o-mini-2024-07-18": {
+   "model": "openai/gpt-4o-mini-2024-07-18",
+   "at": "2026-09-30T17:03:30",
+   "actual_model": "openai/gpt-4o-mini-2024-07-18",
+   "usage": {
+    "prompt_tokens": 81369,
+    "completion_tokens": 428,
+    "total_tokens": 81797,
+    "cost": 0.01246215,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.01246215,
+     "upstream_inference_prompt_cost": 0.01220535,
+     "upstream_inference_completions_cost": 0.0002568
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/44-openai__gpt-4o-mini-2024-07-18.md",
+   "chars": 1950,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1458,7 +1493,8 @@
   "mistralai/mistral-large-2512",
   "anthropic/claude-haiku-4.5",
   "~openai/gpt-mini-latest",
-  "x-ai/grok-build-0.1"
+  "x-ai/grok-build-0.1",
+  "openai/gpt-4o-mini-2024-07-18"
  ],
  "next_index": 0
 }
