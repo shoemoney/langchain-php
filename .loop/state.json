@@ -1483,6 +1483,41 @@
    "chars": 3776,
    "findings": 5,
    "severity_hits": 5
+  },
+  "z-ai/glm-5v-turbo": {
+   "model": "z-ai/glm-5v-turbo",
+   "at": "2026-09-30T17:23:49",
+   "actual_model": "z-ai/glm-5v-turbo",
+   "usage": {
+    "prompt_tokens": 46550,
+    "completion_tokens": 4205,
+    "total_tokens": 50755,
+    "cost": 0.07268,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.07268,
+     "upstream_inference_prompt_cost": 0.05586,
+     "upstream_inference_completions_cost": 0.01682
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 3352,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 3352,
+   "status": "ok",
+   "file": ".loop/reviews/46-z-ai__glm-5v-turbo.md",
+   "chars": 3550,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1530,7 +1565,8 @@
   "~openai/gpt-mini-latest",
   "x-ai/grok-build-0.1",
   "openai/gpt-4o-mini-2024-07-18",
-  "bytedance-seed/seed-2-1-turbo"
+  "bytedance-seed/seed-2-1-turbo",
+  "z-ai/glm-5v-turbo"
  ],
  "next_index": 0
 }
