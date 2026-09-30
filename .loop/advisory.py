@@ -372,18 +372,22 @@ Be specific and be blunt. Rank your findings at the end by (impact x confidence)
 
 RATE_LIMIT_RETRIES = 3      # a 429 is transient; the model is fine
 RATE_LIMIT_BACKOFF = 20     # seconds, multiplied by the attempt number
+IMAGE_TOKENS = 1_600        # the arch PNG costs this whatever else happens
+PROMPT_TOKENS = 6_100       # measured: reka reported 6,006 text tokens
+SMALL_CTX = 90_000           # below this a roster ctx is treated as a real window
 
 
-def call(model, system, user_text, png_b64, max_tokens=32000):
+def call(model, system, user_text, png_b64=None, max_tokens=32000):
     key = os.environ["OPENROUTER_API_KEY"]
     body = {
         "model": model,
         "messages": [
             {"role": "system", "content": system},
-            {"role": "user", "content": [
-                {"type": "text", "text": user_text},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{png_b64}"}},
-            ]},
+            {"role": "user", "content": (
+                [{"type": "text", "text": user_text}]
+                + ([{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{png_b64}"}}]
+                   if png_b64 else [])
+            )},
         ],
         "max_tokens": max_tokens,
         "temperature": 0.2,
@@ -462,7 +466,32 @@ def main():
         print(f"{model} already served an advisory pass — pass --model for someone else")
         return
 
+    # Charge the whole request against the model's window, the way ask.py has
+    # since iteration 130. This script used to send the full brief and ALWAYS
+    # attach the PNG regardless of the roster's ctx, so every small-context model
+    # it picked was a candidate for a 400 — which is what happened to
+    # perceptron/perceptron-mk1.5 (ctx 36,864) in iteration 156.
+    #
+    # The rule is about the REQUEST, not the script that makes it: iteration 130
+    # fixed ask.py because ask.py 400'd, and left this caller unguarded. Three
+    # roster models sit under SMALL_CTX, so this is the common case rather than
+    # an edge.
+    roster = json.loads((LOOP / "roster.json").read_text())
+    ctx = next((m.get("ctx") or 0 for m in roster if m["id"] == model), 0)
     png = base64.b64encode((LOOP / "arch.png").read_bytes()).decode()
+    attach_png = True
+
+    if ctx and ctx < SMALL_CTX:
+        effective = ctx - IMAGE_TOKENS - PROMPT_TOKENS
+        budget = max(1_500, int(effective * 1.4))
+        if len(b) > budget:
+            b = b[:budget] + "\n\n_[brief truncated to fit this model's context window]_"
+        # Below ~2k effective tokens the image cannot fit alongside the prompt;
+        # dropping it is the difference between a call that runs and one that 400s.
+        attach_png = effective >= 2_000
+        print(f"    (context {ctx:,} tokens — brief trimmed to ~{budget:,} chars"
+              f"{', image dropped' if not attach_png else ''})", flush=True)
+
     print(f"advisory: {model}  (brief {len(b):,} chars)")
 
     # The brief is regenerated per call, not cached: ask.py's own lesson is that
@@ -479,7 +508,7 @@ def main():
     last_status = None
     for attempt in range(1, RATE_LIMIT_RETRIES + 1):
         try:
-            resp = call(model, SYSTEM, prompt() + "\n\n" + b, png)
+            resp = call(model, SYSTEM, prompt() + "\n\n" + b, png if attach_png else None)
             break
         except urllib.error.HTTPError as e:
             last_status = f"http_{e.code}"
