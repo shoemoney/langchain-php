@@ -240,12 +240,17 @@
   "#4 callback hooks are not properly typed \u2014 REJECTED as a PHP language fact, already documented: generic method signatures are erased at runtime, which is why BaseCallbackHandler declares concrete no-op hooks."
  ],
  "minimax/minimax-01": [
-  "#1 'Unhandled exceptions in CallbackManager' (BLOCKER) \u2014 REJECTED TWICE OVER, on two independent grounds. First, it is VAGUE: the entire evidence is the string `CallbackManager.php`. No line, no exception type, no failing input, no reproduction. That is the same shape as the finding rejected in iteration 88, and a severity label does not supply what the evidence omits.",
-  "#Second, and decisively, the ledger ALREADY HOLDS A MEASURED NEGATIVE for this exact area, recorded from `~anthropic/claude-opus-latest`: 'negative callback handler failures are RECORDED, not swallowed. BaseRunManager::dispatch (line 126) and CallbackManager::dispatch (line 605) both catch Throwable, and the two things that could make that a silent-success defect were checked BY EXECUTION \u2014 the record works, and a raising handler's failure is recorded before the retry.' That is not a reading of the code; it is a probe, and it covered the two candidate causes. A BLOCKER that arrives after its own refutation has been measured is a repeat, not a finding.",
-  "#THE STRUCTURE OF THE CLAIM IS WORTH NAMING, because it recurs: 'unhandled exceptions in X' is unfalsifiable as stated. EVERY method has some exception that escapes it \u2014 an Error, a TypeError from a bad argument, a throw from a callback. The question is never 'can anything escape' but 'does anything that matters escape, and does the caller need to know'. Without a named type and a consequence, the finding asserts a category rather than a defect, and 'BLOCKER' is a severity attached to a category.",
-  "#2 raiseError handled inconsistently and #4 a possible infinite loop in BaseTracer::endTrace \u2014 DEFERRED unverified. #4 is the more interesting of the two and the one I would take next: an infinite loop in trace teardown would be a real hang, and it is checkable by reading the loop rather than by a probe. #3 unused raiseError on BaseCallbackHandler and #5 unused parentRunId parameter are both MINOR and both are the kind of thing that is often deliberate \u2014 a handler base class declaring a flag subclasses read, a tracer signature kept for interface compatibility.",
-  "#ZERO REPEATS of any defect fixed in the last ten iterations, from a model I have not used before.",
-  "#1 BLOCKER REJECTED: evidence is a file path, and the ledger already holds a measured negative for this area"
+  "#4 'Potential infinite loop in BaseTracer::endTrace' (MAJOR) \u2014 REJECTED BY READING, and the reading is dispositive rather than suggestive. The method is nine lines with no iteration of any kind:",
+  "#     protected function endTrace(Run $run): void {",
+  "#         $parentRun = $run->parentRunId !== null ? $this->getRunById($run->parentRunId) : null;",
+  "#         if ($parentRun !== null) { $parentRun->childExecutionOrder = max(...); } else { $this->persistRun($run); }",
+  "#         $this->onRunUpdate($run);",
+  "#         unset($this->runMap[$run->id]);",
+  "#     }",
+  "#Grepped the body for `while|for|foreach|do` and for self-calls or a recursive `$this->endTrace`: NONE. There is one conditional, one map lookup, two hook calls and an unset. A method with no loop cannot spin; the only way to hang would be a subclass whose `persistRun()` or `onRunUpdate()` loops, which is the subclass's behaviour and not this method's, and no such subclass is named in the finding.",
+  "#This is the case the ledger's own rule was written for. Iteration 138 named it as next precisely because it was checkable BY READING rather than by probe \u2014 and it took one `sed` to settle, where a probe would have cost four attempts of the kind that have cost this loop seven wasted probes and one committed false finding. The triage rule that pays is not 'how do I check this' but 'is this checkable by reading, and if so do that instead of building a fixture'.",
+  "#2 raiseError handled inconsistently, #3 unused raiseError on BaseCallbackHandler, #5 unused parentRunId parameter in handleToolStart \u2014 DEFERRED unverified. #2 and #3 are the same subject from two angles and would be settled by one read of the dispatch path; both are MINOR and a handler base class declaring a flag its subclasses read is a normal interface convention rather than dead code.",
+  "#4 REJECTED by reading: endTrace has no loop, no recursion \u2014 nine lines, one conditional"
  ],
  "z-ai/glm-4.6v": [
   "One accepted, four rejected.",
