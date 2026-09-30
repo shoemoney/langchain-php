@@ -85,9 +85,29 @@ def inventory():
         ns = str(rel.parent).replace("/", ".")
         inv[ns]["src"] += 1
         inv[ns]["lines"] += len(p.read_text(encoding="utf-8", errors="replace").splitlines())
+    # Attribute each test file to the src namespace it covers. Keying tests by
+    # their own namespace reported "0 test files" for every src namespace and
+    # told the reviewer the suite was blind — it is not, the two sides simply
+    # have different namespace names.
     for p in (ROOT / "tests").rglob("*Test.php"):
-        rel = p.relative_to(ROOT / "tests")
-        inv[str(rel.parent).replace("/", ".")]["test_files"] += 1
+        rel = p.relative_to(ROOT / "tests").parent.as_posix()
+        for prefix in ("Unit/", "Integration/"):
+            if rel.startswith(prefix):
+                rel = rel[len(prefix):]
+                break
+        target = rel.replace("/", ".")
+        # A test lives at tests/Unit/<ns-path>/XTest.php while its source lives
+        # at src/<Vendor>/<ns-path>/X.php, so the test path is a SUFFIX of the
+        # src namespace, never equal to it. Longest suffix wins so
+        # "LanguageModels.Chat" is not credited to "LanguageModels".
+        candidates = [
+            (len(k), k) for k in inv
+            if k == target or k.endswith("." + target) or target.startswith(k + ".")
+        ]
+        if candidates:
+            inv[max(candidates)[1]]["test_files"] += 1
+        else:
+            inv.setdefault(target, {"src": 0, "lines": 0, "test_files": 0})["test_files"] += 1
     return {k: v for k, v in sorted(inv.items()) if k not in (".", "")}
 
 

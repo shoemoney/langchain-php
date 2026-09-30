@@ -211,7 +211,21 @@ final class JsonPlusEncoder
                 }
             }
 
-            return $out;
+            // An object with no public properties walked to nothing, and
+            // returning the empty ARRAY made `json_encode` write `[]`. But the
+            // value was an object: `json_encode((object) [])` is `{}`, and that
+            // difference is the whole wire contract for a map.
+            //
+            // It is not cosmetic. A brand-new thread checkpoints with an empty
+            // `channel_versions` and an empty `versions_seen`, so this is the
+            // FIRST thing written, not an edge case — and a JS reader given `[]`
+            // where it expects an object cannot read the checkpoint back. The
+            // cast in `Checkpoint::toArray()` was already correct; the walk
+            // here was undoing it one layer down.
+            //
+            // Non-empty needs no help: a string-keyed PHP array already encodes
+            // as an object.
+            return $out === [] ? new \stdClass() : $out;
         }
 
         return $value;
