@@ -1010,19 +1010,27 @@ final class Algorithm
         }
 
         $keyFunc = $cachePolicy['keyFunc'] ?? null;
-        // A cache key that silently collapses is worse than no cache at all: two
-        // DIFFERENT inputs sharing one key means the second read returns the
-        // first's cached result. `json_encode()` returns `false` on failure —
-        // NAN/INF, malformed UTF-8, a resource, recursion — and `(string) false`
-        // is `""`, so every unencodable input hashed to the SAME key:
+        // WHAT THIS DOES NOW: an unencodable input THROWS rather than collapsing.
+        // `json_encode($input, JSON_THROW_ON_ERROR)` raises instead of returning
+        // false, so a bad cache key propagates to the caller. Upstream matches:
+        // `JSON.stringify` throws on input it cannot represent, so a bad key is
+        // loud there too, and failing loudly is the faithful behaviour.
         //
-        //     input 0: json_encode => false   (string) => ''
-        //     input 1: json_encode => false   (string) => ''
+        // HISTORY — none of the following describes the code above, which is
+        // current. It is kept because the failure mode is not obvious from the
+        // line that prevents it, and it is fenced because a reviewer read the
+        // version of this comment that led with it and reported a BLOCKER for a
+        // defect that was already fixed and mutation-verified:
         //
-        // Upstream has no equivalent hole because `JSON.stringify` THROWS on
-        // input it cannot represent, so a bad key is loud there. Failing loudly
-        // is the faithful behaviour, and `JSON_THROW_ON_ERROR` is how PHP spells
-        // it: the throw propagates to the caller rather than poisoning the cache.
+        //     a cache key that silently collapses is worse than no cache at all:
+        //     two DIFFERENT inputs sharing one key means the second read returns
+        //     the first's cached result. `json_encode()` returned `false` on
+        //     failure — NAN/INF, malformed UTF-8, a resource, recursion — and
+        //     `(string) false` was `""`, so every unencodable input hashed to
+        //     the SAME key:
+        //
+        //         input 0: json_encode => false   (string) => ''
+        //         input 1: json_encode => false   (string) => ''
         $key = $keyFunc !== null
             ? (string) $keyFunc($input)
             : json_encode($input, JSON_THROW_ON_ERROR);
