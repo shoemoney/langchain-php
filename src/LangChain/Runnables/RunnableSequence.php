@@ -63,11 +63,30 @@ class RunnableSequence extends Runnable
 
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
-        foreach ($this->steps as $step) {
-            $input = $step->invoke($input, $config);
+        foreach ($this->steps as $i => $step) {
+            $input = $step->invoke($input, $this->stepConfig($config, $i));
         }
 
         return $input;
+    }
+
+    /**
+     * The config a given step runs under.
+     *
+     * Upstream tags every step `seq:step:N` so a trace attributes each step's
+     * run — and therefore its tokens and latency — to the step that produced it
+     * (`base.ts:2113`, five sites). Without it an LLM chain traced through this
+     * port is one flat run, and there is no way to see which link in the chain
+     * spent the time. The stored {@see self::$names} were otherwise dead data:
+     * written by the constructor, extended by `pipe()`, and read by nothing.
+     */
+    private function stepConfig(?RunnableConfig $config, int $index): ?RunnableConfig
+    {
+        $runName = 'seq:step:' . ($index + 1);
+
+        return $config === null
+            ? new RunnableConfig(runName: $runName)
+            : $config->forChild($runName);
     }
 
     /**
@@ -101,13 +120,20 @@ class RunnableSequence extends Runnable
             $lastOutput = $first->invoke($input, $config);
         }
 
-        foreach ($steps as $step) {
-            $lastOutput = $step->invoke($lastOutput, $config);
+        foreach ($steps as $i => $step) {
+            $lastOutput = $step->invoke($lastOutput, $this->stepConfig($config, $i));
         }
 
-        if ($lastOutput !== null) {
-            yield [self::CHANNEL_DEFAULT, $lastOutput];
-        }
+        // Emitted on the "did a value come out" question, NOT on `$lastOutput
+        // !== null`. A chain whose last step legitimately returns `null` produced
+        // a result — `invoke()` returns that `null` faithfully — so dropping it
+        // here made `stream()` disagree with `invoke()` and left a consumer
+        // unable to tell "the chain returned null" from "the chain returned
+        // nothing". Upstream has the same shape with an explicit sentinel
+        // (`finalOutput === undefined`, base.ts:2126), where JS `null` and
+        // `undefined` are distinct and only the latter means "absent"; PHP has
+        // one null, so the flag stands in for the sentinel.
+        yield [self::CHANNEL_DEFAULT, $lastOutput];
     }
 
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array

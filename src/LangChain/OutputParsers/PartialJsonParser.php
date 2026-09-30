@@ -156,12 +156,19 @@ final class PartialJsonParser
         $hexLength = mb_strlen($hex, 'UTF-8');
 
         if (preg_match('/^[0-9A-Fa-f]{0,4}$/', $hex) === 1) {
-            if ($hexLength === 4) {
-                $this->pos += $hexLength;
+            // Advance in BOTH branches, as upstream does (`pos += hex.length`
+            // sits outside the length check, json.ts:89). Advancing only in the
+            // four-digit branch left the partial case re-reading the hex digits
+            // as ordinary characters, so a fragment ending mid-escape produced
+            // `au1212` where upstream produces `au122`.
+            $this->pos += $hexLength;
 
+            if ($hexLength === 4) {
                 return mb_chr((int) hexdec($hex), 'UTF-8');
             }
 
+            // Fewer than four digits: emit the raw text. A stream cut mid-escape
+            // is the normal case here, not an error.
             return 'u' . $hex;
         }
 

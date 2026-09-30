@@ -67,6 +67,25 @@ interface RunnableInterface
      * @param array<string, mixed>|null $options
      * @return list<mixed>
      */
+    /**
+     * Run several inputs.
+     *
+     * `$config` is upstream's `options` — the call options — and is passed
+     * through. `$options` is upstream's `batchOptions`
+     * (`{maxConcurrency, returnExceptions}`) and the base implementation
+     * **ignores it**, which is worth stating rather than leaving to be
+     * discovered:
+     *
+     *  - `maxConcurrency` has no meaning here. PHP is synchronous and this
+     *    method maps inputs to results in order, so there is nothing to bound.
+     *  - `returnExceptions` would return a `\\Throwable` in place of the result
+     *    for a failed input. It is not implemented; a failing input throws.
+     *
+     * A subclass that can honour either should say so in its own docblock.
+     *
+     * @param list<mixed>              $inputs
+     * @param array<string, mixed>|null $options Upstream `batchOptions`. Unused by default.
+     */
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array;
 
     /**

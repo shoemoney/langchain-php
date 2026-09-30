@@ -131,10 +131,24 @@ final class RunnableTest extends TestCase
         $this->assertSame(['a' => 1, 'b' => 20], $result);
     }
 
-    public function testParallelRejectsScalarInput(): void
+    /**
+     * A scalar is passed straight through to every branch.
+     *
+     * This used to assert the opposite — that a non-array input was rejected.
+     * Upstream's `RunnableMap.invoke` applies no such check: it hands whatever it
+     * was given to each branch. Rejecting scalars made `{raw: llm}`, the first
+     * step of every `includeRaw` structured-output pipeline, impossible to use
+     * with the string input that is by far the most common thing passed to a
+     * model.
+     */
+    public function testParallelPassesScalarInputToEveryBranch(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        RunnableParallel::from(['a' => static fn ($x) => $x])->invoke('scalar');
+        $result = RunnableParallel::from([
+            'a' => static fn (mixed $x): string => 'saw:' . $x,
+            'b' => static fn (mixed $x): int => strlen((string) $x),
+        ])->invoke('scalar');
+
+        $this->assertSame(['a' => 'saw:scalar', 'b' => 6], $result);
     }
 
     public function testParallelStreamKeysChannelsByBranchName(): void

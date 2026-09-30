@@ -47,6 +47,14 @@ abstract class Runnable implements RunnableInterface
         yield [self::CHANNEL_DEFAULT, $this->invoke($input, $config)];
     }
 
+    /**
+     * `$options` (upstream `batchOptions`) is accepted and ignored — see
+     * {@see RunnableInterface::batch()} for why, and what a subclass would have
+     * to do to honour it.
+     *
+     * @param list<mixed>              $inputs
+     * @param array<string, mixed>|null $options Unused.
+     */
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
     {
         return array_map(
@@ -93,15 +101,6 @@ abstract class Runnable implements RunnableInterface
     public function bind(array $kwargs = [], ?array $config = null): RunnableBinding
     {
         return new RunnableBinding($this, $kwargs, $config);
-    }
-
-    /**
-     * Run a list of branches in parallel, keyed by name, and return every
-     * branch's result keyed the same way.
-     */
-    public function map(): RunnableParallel
-    {
-        return new RunnableParallel([]);
     }
 
     /**

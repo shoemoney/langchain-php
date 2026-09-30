@@ -46,7 +46,12 @@ class RunnableParallel extends Runnable
     }
 
     /**
-     * Add a branch, for the fluent `->map()->add(...)` style.
+     * Add a branch to this map.
+     *
+     * There is no `Runnable::map()` to start this chain: upstream has no such
+     * method, and the one this port had returned an empty map while discarding
+     * the runnable it was called on — which reads as "map this runnable" and
+     * does nothing of the kind. Build with {@see self::from()} instead.
      */
     public function add(string $key, mixed $branch): self
     {
@@ -62,15 +67,15 @@ class RunnableParallel extends Runnable
      * is what lets a retriever and a passthrough coexist in the same map, each
      * picking the parts of the input it cares about. Narrowing to `input[$key]`
      * here would make the canonical `{context, question}` RAG map impossible.
+     *
+     * The input is **not** required to be a record. Upstream passes whatever it
+     * was given straight to each branch, and requiring an array here would make
+     * `{raw: llm}` — the first step of every `includeRaw` structured-output
+     * pipeline — unusable with the string input that is by far the most common
+     * thing anyone passes a model.
      */
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
-        if (!is_array($input)) {
-            throw new \InvalidArgumentException(
-                'RunnableParallel expects a keyed array input, got ' . get_debug_type($input) . '.'
-            );
-        }
-
         $out = [];
         foreach ($this->branches as $key => $branch) {
             $out[$key] = $branch->invoke($input, $config?->forChild("map:key:{$key}"));

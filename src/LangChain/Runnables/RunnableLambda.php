@@ -58,6 +58,26 @@ class RunnableLambda extends Runnable
         $func = $this->func;
 
         if ($this->bound === []) {
+            // Upstream's lambda signature is `(input, config?, ...rest)`, so a
+            // lambda that declares a second parameter can read the run config —
+            // `config->options` is where a call-time `temperature` or
+            // `max_tokens` override lives, and without this a pipeline built
+            // from lambdas silently dropped them.
+            //
+            // Passed only when the callable can actually receive it. PHP permits
+            // extra positional arguments to a userland function, but handing a
+            // config to a lambda whose second parameter means something else
+            // would be a silent behaviour change for a case that is currently
+            // unambiguous, so the arity is checked first.
+            $reflection = $this->reflectCallable($func);
+
+            if ($reflection === null
+                || $reflection->isVariadic()
+                || $reflection->getNumberOfParameters() >= 2
+            ) {
+                return $func($input, $config);
+            }
+
             return $func($input);
         }
 
