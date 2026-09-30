@@ -131,10 +131,7 @@ A divergence this project has only HALF-verified — the upstream side not yet r
 because the file is not in this checkout — is not one of the two kinds above and does
 not belong here. Several such findings exist in the triage ledger with their reasons
 recorded. Putting one here would place a guess beside a measurement with nothing to
-distinguish them, and the reader has no way to tell which is which. An earlier revision
-of this preamble named a "third category" and then said third-kind rows did not belong
-in the table, which is the same muddle from the other direction: it implied the table
-held three kinds while enumerating two.
+distinguish them, and the reader has no way to tell which is which.
 
 So: two kinds live here, both settled. Unverified lives in the ledger, with its reason.
 
