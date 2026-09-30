@@ -453,22 +453,46 @@ def healthy(model: str) -> bool:
             cache = json.loads(HEALTH.read_text())
         except ValueError:
             cache = {}
-    if model in cache:
-        return bool(cache[model])
+    # Only a real boolean is a cached verdict. A non-boolean entry — `null`, or a
+    # file truncated mid-write — is UNKNOWN and must be probed, not treated as a
+    # failure: iteration 160 marked reka-edge `null` to force a re-probe and it was
+    # excluded for the wrong reason, never probed at all. Reading "not True" as
+    # "unusable" is the same conflation as a falsy value standing for an absent
+    # one, which is the bug class this loop has now found in mb_chr, json_encode
+    # and a schema validator.
+    if isinstance(cache.get(model), bool):
+        return cache[model]
 
+    # Two questions, because iteration 159's single tiny probe could only answer
+    # one of them. rekaai/reka-edge answered a sixteen-token request happily and
+    # then returned http_400 on a real brief inside its own 16,384-token window, so
+    # "can it generate" is not the question selection actually needs to ask.
     ok = True
     try:
-        r = call(
-            model,
-            "You answer with one word.",
-            "Reply with exactly: OK",
-            None,
-            max_tokens=16,
-        )
+        r = call(model, "You answer with one word.", "Reply with exactly: OK", None, max_tokens=16)
         text = (r.get("choices") or [{}])[0].get("message", {}).get("content") or ""
         ok = bool(text.strip())
     except Exception:
         ok = False
+
+    if ok:
+        # Second probe: the SAME order of payload the advisory actually sends.
+        # The answer is one word, so max_tokens stays tiny and the cost is input
+        # tokens only - which is the axis that fails.
+        filler = ("The quick brown fox jumps over the lazy dog. " * 260)[:12000]
+        try:
+            r = call(
+                model,
+                "You answer with one word.",
+                filler + "\n\nReply with exactly: OK",
+                None,
+                max_tokens=16,
+            )
+            text = (r.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+            ok = bool(text.strip())
+        except Exception:
+            ok = False
+            print(f"    (holds-a-brief probe {model}: UNUSABLE)", flush=True)
 
     cache[model] = ok
     HEALTH.write_text(json.dumps(cache, indent=1))

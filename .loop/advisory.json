@@ -221,5 +221,23 @@
  "rekaai/reka-edge": {
   "status": "http_400",
   "at": "2026-09-30T20:45:52.394420+00:00"
+ },
+ "xiaomi/mimo-v2.6-pro-ultraspeed": {
+  "status": "ok",
+  "at": "2026-09-30T20:50:04.742873+00:00",
+  "file": ".loop/advisory/mimo-v2-6-pro-ultraspeed.md",
+  "chars": 23936,
+  "cost": 0.2286
+ },
+ "openai/gpt-6.1-sol-pro": {
+  "status": "ok",
+  "at": "2026-09-30T20:51:43.141916+00:00",
+  "file": ".loop/advisory/gpt-6-1-sol-pro.md",
+  "chars": 12834,
+  "cost": 0.1179
+ },
+ "nex-agi/nex-n2.5-mini": {
+  "status": "empty",
+  "at": "2026-09-30T20:55:28.444938+00:00"
  }
 }
