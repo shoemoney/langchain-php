@@ -172,12 +172,15 @@
   "#8 the three src/ orphans are dead code \u2014 DEFERRED with a reason, not a defect: BaseToolkit, ToolRuntime and FakeTool are referenced by nothing because ToolNode (the consumer) is an unported subsystem already documented as prebuilt in PORT_STATUS. Deleting them would delete the only ported half of a documented pair. Recorded rather than acted on."
  ],
  "anthropic/claude-fable-5.1": [
-  "#2 every OpenAI delta carries model_name/model_provider, so the fold concatenates them \u2014 ACCEPTED. Probe: 3 deltas -> model_name 'gpt-4ogpt-4ogpt-4o'. model_provider was already in REPLACE_KEYS; model_name was not, and upstream declares it as a named (identity) member of ResponseMetadata beside an open index signature. Mutation-verified; the revert diff shows the corruption directly.",
-  "#3 per-call tools bypass conversion \u2014 ACCEPTED, and serious. Probe: a StructuredTool passed per-call was serialised as {\"lc\":1,\"type\":\"constructor\",...} and sent to the provider as the tool definition. bindTools() converted; invocationParams() did not. Mutation-verified.",
-  "#1 withStructuredOutput mis-wraps a schema that is already a function definition \u2014 REJECTED. The base implementation strips `name` (the parser's lookup key, not part of the schema) and builds the OpenAI envelope; a schema carrying a nested `function` key is not a shape the base handles or claims to, and the provider clients both translate the envelope correctly (verified repeatedly).",
-  "#4 handleLLMNewToken receives a different chunk type per provider \u2014 REJECTED as inherent and faithful. Upstream passes the provider's own chunk; the port mirrors that, and a shared shape would be a divergence, not a fix.",
-  "#5 streaming failures discard the transport cause \u2014 REJECTED, fixed earlier this iteration: both clients now attach `previous` on the stream-establishment path, pinned by TransportCauseParityTest on both paths.",
-  "ok, 5 findings, untriaged - budget went to settling deferred #4"
+  "#3 'A bare {\"type\":\"object\"} schema rejects {}' \u2014 ACCEPTED, and it is the best find in several iterations. Measured against `new Schema(['type' => 'object'])`:",
+  "#     empty array  []            -> errors: [{\"path\":\"$\",\"message\":\"expected object, got array\"}]",
+  "#     empty object stdClass()   -> errors: [{\"path\":\"$\",\"message\":\"expected object, got object\"}]   <- an OBJECT rejected as not an object",
+  "#     one key      ['a' => 1]   -> accepted",
+  "#ROOT CAUSE, at Schema.php:495: `'object' => is_array($value) && !\\LangChain\\Utils\\Js::isList($value),`. Two failures in one predicate. (a) An empty array IS a list, so `!isList([])` is false and `{}` is rejected \u2014 and since JSON `{}` decodes to `[]` in PHP, EVERY empty object fails. (b) `is_array()` is false for a stdClass, so anything decoded WITHOUT assoc-mode is rejected too, and the error message says 'got object', which is self-contradictory and would waste a reader's time.",
+  "#WHY IT MATTERS MORE THAN A SCHEMA QUIRK: a bare `{\"type\":\"object\"}` is the shape a caller writes when they mean 'any JSON object'. It cannot validate an empty one \u2014 which is the single most common degenerate case, and the same class this project has been bitten by repeatedly: the empty object that encoded as `[]` and broke round-tripping in an earlier release. Here it does not corrupt a value, it REJECTS a legitimate one, which is quieter still.",
+  "#NOT FIXED THIS ITERATION, and the reason is the fix's blast radius rather than the diagnosis. `Schema::isValidType()` is the single place every type check funnels through, so changing the object arm to accept `[]` and `stdClass` touches EVERY schema in the library \u2014 including the `Schema::string()` nested-as-property defect from an earlier release, which is guarded. The predicate looks like it encodes a deliberate array/object distinction, and `Js::isList` exists to express exactly that; whether `[]` should be a valid object depends on how `Js::isList([])` is defined, which I have not read. Next iteration starts there: read `Js::isList`, decide whether the fix is to admit `[]`, to admit stdClass, or both, and verify against the nested-schema guard that must not regress.",
+  "#1 'anyOf match returns early and skips every sibling constraint', #2 'invoke() writes toolCall onto the caller's own RunnableConfig' \u2014 DEFERRED unverified. #2 is another instance of the 'mutates the caller's object' family this loop has already refuted once on the image-prompt path, so it deserves execution before belief either way. #4 is partly self-declared inference the reviewer marks as such, which is good practice and not actionable. #5 'enum/const use strict comparison while integer accepts 3.0' is the falsy-vs-absent family's cousin and is worth a probe.",
+  "#3 ACCEPTED: type:object rejects {} AND stdClass; root cause Schema.php:495"
  ],
  "meta-llama/llama-4-maverick": [
   "All five probed; none reproduced.",
@@ -1062,5 +1065,8 @@
  ],
  "nex-agi/nex-n2.5-mini": [
   "NOT A REVIEW: TRUNCATED at the 24k reasoning cap"
+ ],
+ "sakana/fugu-max": [
+  "ok, 5 findings, untriaged - budget went to fable #3"
  ]
 }
