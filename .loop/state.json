@@ -1448,6 +1448,41 @@
    "chars": 1950,
    "findings": 5,
    "severity_hits": 5
+  },
+  "bytedance-seed/seed-2-1-turbo": {
+   "model": "bytedance-seed/seed-2-1-turbo",
+   "at": "2026-09-30T17:13:41",
+   "actual_model": "bytedance-seed/seed-2-1-turbo",
+   "usage": {
+    "prompt_tokens": 49828,
+    "completion_tokens": 19588,
+    "total_tokens": 69416,
+    "cost": 0.073884,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.073884,
+     "upstream_inference_prompt_cost": 0.024914,
+     "upstream_inference_completions_cost": 0.04897
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 18637,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 18637,
+   "status": "ok",
+   "file": ".loop/reviews/45-bytedance-seed__seed-2-1-turbo.md",
+   "chars": 3776,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1494,7 +1529,8 @@
   "anthropic/claude-haiku-4.5",
   "~openai/gpt-mini-latest",
   "x-ai/grok-build-0.1",
-  "openai/gpt-4o-mini-2024-07-18"
+  "openai/gpt-4o-mini-2024-07-18",
+  "bytedance-seed/seed-2-1-turbo"
  ],
  "next_index": 0
 }
