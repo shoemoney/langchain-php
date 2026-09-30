@@ -736,6 +736,16 @@
   "#2 contentBlocks() does not normalize single-block arrays \u2014 DEFERRED unverified. Upstream's `contentBlocks` getter (base.ts:324+) is the right comparison and it was open in front of me, but this iteration's budget ran out and I am not recording a verdict I did not reach. The port's text() on a plain string already returned 'hello', so the string branch is fine; the single-BLOCK-ARRAY branch is genuinely unexamined.",
   "#3 ContentBlock::data() lets extras overwrite required fields, #4 mergeStatus() invents 'success' when both inputs are unset, #5 updateId(null) leaves a null id in serialized kwargs \u2014 DEFERRED unverified, all three. #4 in particular is another falsy-vs-absent candidate and is the one I would probe first.",
   "#TRIAGE MECHANICS, a process note carried from last iteration: the previous `python3 - <<EOF` heredoc failed with \"can't find '__main__' module\" and silently wrote nothing. This iteration wrote /tmp/tri.py and ran it as a file, so the record is actually on disk. A triage step that fails quietly is worse than no triage step, because the loop's memory is the ledger.",
-  "#1 REJECTED: upstream base.ts:314-322 drops text-plain identically; 4 deferred"
+  "#1 REJECTED: upstream base.ts:314-322 drops text-plain identically; 4 deferred",
+  "#4 'mergeStatus() invents success when both inputs are unset' \u2014 REJECTED, and this is the most instructive rejection of the batch because upstream's own SOURCE is what tempts the reviewer. Executed the PHP across all five shapes:",
+  "#     mergeStatus(NULL,    NULL   ) = 'success'",
+  "#     mergeStatus('success', NULL  ) = 'success'",
+  "#     mergeStatus(NULL,    'error') = 'error'",
+  "#     mergeStatus('success','success') = 'success'",
+  "#     mergeStatus('error',  'success') = 'error'",
+  "#Upstream `_mergeStatus` (base.ts:171-179) does the SAME THING: `if (left === \"error\" || right === \"error\") return \"error\"; return \"success\";`. The port is a faithful copy, including the 'invent success' behaviour the finding objects to.",
+  "#THE TRAP, and it is a good one to have on record: upstream's SIGNATURE is `(left?: \"success\" | \"error\", right?: ...) => \"success\" | \"error\" | undefined`. The parameter types admit undefined and the return type even lists `undefined` \u2014 yet the body can never return it. A reviewer reads the type, sees `| undefined`, concludes the body must produce undefined, and reports the omission. The doc comment above it even says 'Else it will return success'. Acting on this finding would have INTRODUCED a divergence in the name of fixing one.",
+  "#GENERALISATION worth carrying: where a port mirrors a function whose TYPE and BODY disagree, the body wins and the type is upstream's problem, not the port's. Two iterations running, two fidelity rejections of the same family, both found by probing first and comparing second \u2014 and both would have shipped a regression if the probe had been treated as the verdict.",
+  "#4 REJECTED: upstream base.ts:171-179 is byte-identical, incl. 'invent success'"
  ]
 }
