@@ -2290,6 +2290,41 @@
    "chars": 4365,
    "findings": 5,
    "severity_hits": 5
+  },
+  "openai/o4-mini": {
+   "model": "openai/o4-mini",
+   "at": "2026-09-30T01:01:56",
+   "actual_model": "openai/o4-mini",
+   "usage": {
+    "prompt_tokens": 27739,
+    "completion_tokens": 8055,
+    "total_tokens": 35794,
+    "cost": 0.0659549,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0659549,
+     "upstream_inference_prompt_cost": 0.0305129,
+     "upstream_inference_completions_cost": 0.035442
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 7360,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 7360,
+   "status": "ok",
+   "file": ".loop/reviews/74-openai__o4-mini.md",
+   "chars": 2777,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2425,7 +2460,8 @@
   "thinkingmachines/inkling:free",
   "google/gemini-3.1-pro-preview",
   "google/gemini-3.1-pro-preview-customtools",
-  "deepseek/deepseek-v4-flash-vision-exp"
+  "deepseek/deepseek-v4-flash-vision-exp",
+  "openai/o4-mini"
  ],
  "next_index": 0
 }

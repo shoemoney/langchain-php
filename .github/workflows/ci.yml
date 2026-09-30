@@ -80,7 +80,14 @@ jobs:
         # Without it the run only printed a text summary, clover.xml was never
         # written, and the upload silently carried nothing — a job that looks
         # like it reports coverage and reports none.
-        run: ./vendor/bin/phpunit --testsuite unit --coverage-text --coverage-clover clover.xml
+        # BOTH suites. The integration tests exercise the HTTP and SSE seams —
+        # the request body that leaves and the bytes that come back — which is
+        # exactly where this port's release-blocking defects lived, and none of
+        # it is reachable from `tests/Unit`. Measuring only the unit suite
+        # reported a coverage figure that excluded the code most likely to break.
+        run: >-
+          ./vendor/bin/phpunit --testsuite unit --testsuite integration
+          --coverage-text --coverage-clover clover.xml
 
       - uses: actions/upload-artifact@v4
         with:
