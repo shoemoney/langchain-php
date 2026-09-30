@@ -19,7 +19,8 @@
   "#5 SseParser final-frame offset (marked INFERENCE by the reviewer) \u2014 matches the SseParser note already recorded: no observable failure in 4,000 differential cases.",
   "#7 handleLLMEnd skipped on a mid-stream error after the first chunk \u2014 NEEDS CHECK next round.",
   "#8 tool validation allows extra keys \u2014 DEFERRED; JSON Schema default is permissive, matching @cfworker behaviour. Verify against upstream before changing.",
-  "#11 tool_choice not validated at bind time \u2014 DEFERRED; validated at invocationParams, which is where upstream does it."
+  "#11 tool_choice not validated at bind time \u2014 DEFERRED; validated at invocationParams, which is where upstream does it.",
+  "5 findings, all DEFERRED-UNVERIFIED (no budget to execute); #5 allOf/items short-circuit is the probe target"
  ],
  "perceptron/perceptron-mk1.5": [
   "Harness now sends an abridged packet for small-context models; review collected."
@@ -1451,5 +1452,10 @@
  ],
  "probe-170": [
   "RETRACTED iter-169 blocker: ctor is POSITIONAL and works; my probe used a JS-style config array"
+ ],
+ "claude-haiku-4.5-171": [
+  "#REVIEWER anthropic/claude-haiku-4.5 -> ok, 5 findings. NONE EXECUTED THIS ITERATION and I am not going to pretend otherwise: all five are DEFERRED-UNVERIFIED, because the budget went to the reviewer slot plus one upstream read that did not resolve, and a triage note that claims evidence I do not have is the same failure as iteration 169 in reverse. The five are #1 Schema rejects valid positional-array types (MAJOR), #2 ToolRuntime reads tool_call_id from two sources without dedup (MINOR), #3 Schema unwrap loses nested errors on a circular reference (MAJOR), #4 StructuredTool validation message redacts model-facing context (MINOR), #5 Schema validator skips the items check when an allOf branch succeeds on an empty object (MAJOR). #5 is the one to probe first: \"allOf succeeded so skip items\" is precisely the shape of a short-circuit that hides a second obligation, and this repo has three separate short-circuit defects of that family already.",
+  "#THE ASSOC-BLOCK RESIDUE FROM 170 IS STILL UNRESOLVED, and the reason is that I guessed the upstream file AGAIN. `grep -n 'class PromptTemplate' libs/langchain-core/src/prompts/base.ts` and the serialization-branch grep both returned NOTHING, so the class is not where I assumed, and I stopped rather than hunting the tree with a budget I did not have. So the question \"does upstream accept a bare assoc block, or only a MessagePromptTemplateInterface[]\" is still open, which means the PHP signature `string|array` may be WIDER than upstream on purpose and the TypeError I measured may be the faithful behaviour for an input upstream does not support. Nothing should be \"fixed\" on that branch until someone reads the real file. This is the third time in this loop that naming a path from memory has been the whole cost of an iteration, and the hard rule already says it: READ it.",
+  "#WHAT I AM DELIBERATELY NOT DOING, stated plainly rather than buried: I am not accepting any of the three MAJOR Schema findings on severity alone. A severity label is a claim about impact, not evidence that the defect exists, and iterations 168 and 170 both produced confident severities attached to things that were not true - one from a model, one from me. Schema is the single most heavily tested class in this port, so the prior that a MAJOR finding against it is real is lower than it looks, and the prior that it is a misread of PHP-vs-TS semantics is higher: a TS reviewer reading a PHP `array` will see \"positional array\" as a valid type shape, which is exactly finding #1's phrasing and is a category error rather than a defect."
  ]
 }

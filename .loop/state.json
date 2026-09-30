@@ -1310,6 +1310,41 @@
    "chars": 3456,
    "findings": 5,
    "severity_hits": 5
+  },
+  "anthropic/claude-haiku-4.5": {
+   "model": "anthropic/claude-haiku-4.5",
+   "at": "2026-09-30T16:47:48",
+   "actual_model": "anthropic/claude-haiku-4.5",
+   "usage": {
+    "prompt_tokens": 50443,
+    "completion_tokens": 2780,
+    "total_tokens": 53223,
+    "cost": 0.064343,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.064343,
+     "upstream_inference_prompt_cost": 0.050443,
+     "upstream_inference_completions_cost": 0.0139
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 1467,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 1467,
+   "status": "ok",
+   "file": ".loop/reviews/41-anthropic__claude-haiku-4.5.md",
+   "chars": 5051,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1352,7 +1387,8 @@
   "z-ai/glm-4.6v",
   "perplexity/sonar",
   "z-ai/glm-5.3-flashx",
-  "mistralai/mistral-large-2512"
+  "mistralai/mistral-large-2512",
+  "anthropic/claude-haiku-4.5"
  ],
  "next_index": 0
 }
