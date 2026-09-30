@@ -570,11 +570,23 @@ abstract class BaseChatModel extends BaseLanguageModel
      * `LLMResult` carries. A provider that wants a different shape (a
      * provider-specific aggregate, a string join) overrides this.
      *
-     * This docblock used to say the opposite — that the base "returns an empty
-     * array, which means a batch's token usage is discarded" — while the body
-     * summed. Documentation that describes behaviour the code beneath it does not
-     * have is worse than no documentation: a caller reading it would believe
-     * batch usage totals do not exist and go build their own accounting.
+     * HISTORY — none of this describes the behaviour above, which is current:
+     *
+     *     This docblock used to say the opposite — that the base "returns an empty
+     *     array, which means a batch's token usage is discarded" — while the body
+     *     summed.
+     *
+     * Documentation that describes behaviour the code beneath it does not have is
+     * worse than no documentation: a caller reading it would believe batch usage
+     * totals do not exist and go build their own accounting.
+     *
+     * Fenced, and deliberately quoted rather than paraphrased. An earlier
+     * revision of this fix corrected the TEXT while leaving the old claim quoted
+     * in the past tense, which is exactly the shape that gets skimmed as current:
+     * the sentence is complete, confident, and about the method a reader is
+     * looking at. `combineLLMOutput()` now sums, and `testBatchTokenUsageIsSummed
+     * NotDiscarded` asserts the totals, so the claim is pinned by a test rather
+     * than by this comment.
      *
      * @param list<array<string, mixed>> $llmOutputs One entry per prompt.
      *

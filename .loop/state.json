@@ -323,6 +323,15 @@
    "chars": 2225,
    "findings": 5,
    "severity_hits": 5
+  },
+  "prism-ml/ternary-bonsai-2-27b": {
+   "model": "prism-ml/ternary-bonsai-2-27b",
+   "at": "2026-09-30T09:32:20",
+   "actual_model": null,
+   "usage": null,
+   "finish_reason": null,
+   "reasoning_tokens": 0,
+   "status": "empty"
   }
  },
  "order": [
@@ -335,7 +344,8 @@
   "unbiased/pareto",
   "~anthropic/claude-opus-latest",
   "~openai/gpt-luna-latest",
-  "amazon/nova-pro-v1"
+  "amazon/nova-pro-v1",
+  "prism-ml/ternary-bonsai-2-27b"
  ],
  "next_index": 0
 }
