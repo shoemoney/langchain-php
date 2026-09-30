@@ -218,4 +218,4 @@ papered over. Each is pinned by a test so the boundary stays visible.
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **2158** |
+| **Total so far** | | **2168** |

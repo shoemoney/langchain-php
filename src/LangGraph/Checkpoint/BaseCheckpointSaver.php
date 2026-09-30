@@ -301,9 +301,33 @@ abstract class BaseCheckpointSaver implements \JsonSerializable
             return;
         }
 
+        // Address the PARENT checkpoint, keeping every routing key.
+        //
+        // This used to `unset($config['configurable'])` and put
+        // `checkpoint_id` at the top level instead. That is fine for the two
+        // shipped call sites, which both hand-build a flat
+        // `['thread_id' =>, 'checkpoint_ns' =>, 'checkpoint_id' =>]` from the
+        // row's own columns — there is no `configurable` key to remove. But
+        // this method is `protected`, and a subclass passing the config shape
+        // `put()` actually RETURNS (`['configurable' => [...]]`) got the
+        // routing map deleted, so `configurable()` fell back to the outer array
+        // where `thread_id` no longer lived, `pendingSendsFor()` returned [],
+        // and the TASKS channel was overwritten with an empty list.
+        //
+        // Proved by reaching this method with both shapes and the same pending
+        // writes on disk:
+        //     flat    -> TASKS = ["send-1","send-2"]
+        //     nested  -> TASKS = []              <- fan-out silently dropped
+        //
+        // A resumed run that dropped its pending sends loses every queued task,
+        // with no error anywhere. So the nested form is written THROUGH, and
+        // the top-level key is set too for a flat caller.
         $parentConfig = $config;
-        $parentConfig['checkpoint_id'] = $parentCheckpointId;
-        unset($parentConfig['configurable']);
+        if (isset($config['configurable']) && is_array($config['configurable'])) {
+            $parentConfig['configurable']['checkpoint_id'] = $parentCheckpointId;
+        } else {
+            $parentConfig['checkpoint_id'] = $parentCheckpointId;
+        }
 
         $pendingSends = $this->pendingSendsFor($parentConfig);
         $checkpoint->channelValues[CheckpointConstants::TASKS] = $pendingSends;

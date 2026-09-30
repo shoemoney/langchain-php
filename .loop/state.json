@@ -1817,6 +1817,76 @@
    "chars": 3221,
    "findings": 5,
    "severity_hits": 5
+  },
+  "openrouter/free": {
+   "model": "openrouter/free",
+   "at": "2026-09-29T21:55:43",
+   "actual_model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+   "usage": {
+    "prompt_tokens": 30888,
+    "completion_tokens": 22499,
+    "total_tokens": 53387,
+    "cost": 0,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0,
+     "upstream_inference_prompt_cost": 0,
+     "upstream_inference_completions_cost": 0
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 19975,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 19975,
+   "status": "incomplete",
+   "file": ".loop/reviews/58-openrouter__free.md",
+   "chars": 79275,
+   "findings": 0,
+   "severity_hits": 1
+  },
+  "google/gemini-3.5-flash": {
+   "model": "google/gemini-3.5-flash",
+   "at": "2026-09-29T22:05:27",
+   "actual_model": "google/gemini-3.5-flash",
+   "usage": {
+    "prompt_tokens": 31539,
+    "completion_tokens": 11649,
+    "total_tokens": 43188,
+    "cost": 0.1521495,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.1521495,
+     "upstream_inference_prompt_cost": 0.0473085,
+     "upstream_inference_completions_cost": 0.104841
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 10595,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 10595,
+   "status": "ok",
+   "file": ".loop/reviews/59-google__gemini-3.5-flash.md",
+   "chars": 4195,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1933,7 +2003,9 @@
   "z-ai/glm-5.3-flashx",
   "~anthropic/claude-opus-latest",
   "z-ai/glm-5.3-flash",
-  "google/gemini-3.1-flash-lite-preview"
+  "google/gemini-3.1-flash-lite-preview",
+  "openrouter/free",
+  "google/gemini-3.5-flash"
  ],
  "next_index": 0
 }

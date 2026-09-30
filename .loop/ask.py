@@ -34,6 +34,11 @@ EVIDENCE RULES — this is where reviews most often go wrong:
   exact expression, the exact `throw`, the exact key name. An unline-numbered
   quote is verifiable; an invented line number is not.
 * If you do cite a line number, count it in the snippet you were given.
+* Quote code only if it appears VERBATIM in the packet. Quoting something you
+  reconstructed from memory is worse than citing nothing: a code block reads as
+  checked, and a reviewer will confirm the finding against it without noticing
+  the quote was never in the source. One review did exactly this, claiming a
+  duplicated docblock that does not exist in the file.
 * Evidence you cannot see in the packet is a guess. Leave the finding out.
 
 This is a PORT, not a product: suggesting a feature upstream does not have is a
@@ -133,6 +138,18 @@ heading number and nothing between them:
 """
 
 
+# Endpoints that cannot produce a useful review: routers with no identity
+# behind them, safety classifiers, and the decision model. `openrouter/free`
+# cost one iteration — 553 seconds for ZERO findings, because whatever answered
+# was not a model we can hold to a position. advisory.py already excluded these;
+# the two lists living in different files is how they drifted apart, so the
+# roster is now filtered as well and this is the third line of defence.
+NOT_A_REVIEWER = (
+    "typesafe/jev", "openrouter/auto", "openrouter/free",
+    "safety", "guard", "lyria", "multi-agent",
+)
+
+
 def load_state():
     if os.path.exists(STATE):
         return json.load(open(STATE))
@@ -227,8 +244,15 @@ def main():
 
     if "--model" in args:
         model = args[args.index("--model") + 1]
+        if any(k in model for k in NOT_A_REVIEWER):
+            print(f"{model} is a router or classifier, not a reviewer — refusing to spend an iteration on it.")
+            return
     else:
-        pending = [m for m in roster if m["id"] not in state["asked"]]
+        pending = [
+            m for m in roster
+            if m["id"] not in state["asked"]
+            and not any(k in m["id"] for k in NOT_A_REVIEWER)
+        ]
         if not pending:
             print("every reviewer in the roster has been asked.")
             return

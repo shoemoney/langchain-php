@@ -566,42 +566,6 @@
   "price": "0.0000011"
  },
  {
-  "id": "openrouter/auto",
-  "name": "Auto Router",
-  "in": [
-   "text",
-   "image",
-   "audio",
-   "file",
-   "video"
-  ],
-  "ctx": 2000000,
-  "price": "-1"
- },
- {
-  "id": "openrouter/auto-beta",
-  "name": "Auto Router (Beta)",
-  "in": [
-   "text",
-   "image",
-   "audio",
-   "file",
-   "video"
-  ],
-  "ctx": 2000000,
-  "price": "-1"
- },
- {
-  "id": "openrouter/free",
-  "name": "Free Models Router",
-  "in": [
-   "text",
-   "image"
-  ],
-  "ctx": 200000,
-  "price": "0"
- },
- {
   "id": "perceptron/perceptron-mk1.5",
   "name": "Perceptron: Perceptron Mk1.5",
   "in": [
@@ -811,19 +775,6 @@
   "price": "0"
  },
  {
-  "id": "typesafe/jev-router",
-  "name": "TypeSafe: Jev Router",
-  "in": [
-   "audio",
-   "file",
-   "image",
-   "text",
-   "video"
-  ],
-  "ctx": 1000000,
-  "price": "-1"
- },
- {
   "id": "unbiased/pareto",
   "name": "Pareto",
   "in": [
@@ -832,17 +783,6 @@
   ],
   "ctx": 262144,
   "price": "0.0000025"
- },
- {
-  "id": "x-ai/grok-4.20-multi-agent",
-  "name": "SpaceXAI: Grok 4.20 Multi-Agent",
-  "in": [
-   "text",
-   "image",
-   "file"
-  ],
-  "ctx": 2000000,
-  "price": "0.00000125"
  },
  {
   "id": "x-ai/grok-build-0.1",

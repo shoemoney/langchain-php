@@ -60,7 +60,15 @@ class SqliteSaver extends PregelMemorySaver
      */
     public static function fromConnString(string $connString): self
     {
-        return new self(new \PDO('sqlite:' . $connString, null, null, [
+        // A caller who writes a full DSN — `sqlite:/path/to.db`, which is what
+        // PDO's own documentation shows and what anyone copying a PDO
+        // connection string will pass — used to get the prefix a second time
+        // and `PDOException: unable to open database file`, with the doubled
+        // string as the only clue. Verified against PDO directly: a doubled
+        // prefix fails to open.
+        $dsn = str_starts_with($connString, 'sqlite:') ? $connString : 'sqlite:' . $connString;
+
+        return new self(new \PDO($dsn, null, null, [
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
             \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
         ]));
