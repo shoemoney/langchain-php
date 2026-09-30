@@ -1218,18 +1218,14 @@
   "element 7's 'contradiction' is a MISCOUNT: 27 rows sum to 232, matching the Size row"
  ],
  "~anthropic/claude-haiku-latest": [
-  "#1 'MessageMerge::mergeContent() succeeds on incompatible second-side block types' \u2014 DEFERRED, and I am recording the exact branch I narrowed it to rather than a verdict I did not earn. `mergeContent()` ends with:",
-  "#     if (is_array($second)) {",
-  "#         $left = self::contentBlocks($first);",
-  "#         $merged = self::mergeLists($left, $second);",
-  "#         if ($merged !== null) { return $merged; }",
-  "#         return array_merge($left, $second);        // <-- no type check on $second",
+  "#1 'MessageMerge::mergeContent() succeeds on incompatible second-side block types' \u2014 REJECTED, settled by the read named last iteration. Upstream (langchain-core/src/messages/base.ts:139-141):",
+  "#     } else if (Array.isArray(secondContent)) {",
+  "#         return _mergeLists(left, secondContent) ?? [...left, ...secondContent];",
   "#     }",
-  "#So when `mergeLists()` cannot merge the two lists it falls back to a plain concatenation of block lists with no compatibility test. That is where the claim lives, and it is a REAL question rather than a stylistic one: a mixed-content list is legal, so `['text'] + [{'type':'image_url'}]` may be a correct merge rather than an incompatible one.",
-  "#WHAT WOULD SETTLE IT, and why I did not do it: a fidelity verdict needs upstream's `mergeContent` array branch, and the port's own comment block at :63-77 shows the method has already been reconciled against upstream behaviour in detail once. Whether upstream concatenates two block lists unchecked or validates them is a read I did not do this iteration. Guessing from the shape of the PHP would be exactly the reasoning that produced the retracted BLOCKER in iteration 52 and the false 'drops tool calls' finding in 117.",
-  "#NEXT: read upstream's `mergeContent` for the two-array case and merge a `['text']` against a `[{type:'image_url'}]` through both. If upstream concatenates, the finding is rejected and the fallback needs no guard; if it validates, the fallback is a real divergence and it needs one.",
-  "##2 convertToChunk() does not preserve the message's additional_kwargs aliases, #3 BaseMessage constructor accepts a bare dict of mixed blocks without validating, #4 chunk-to-message does not validate accumulated tool calls, #5 AIMessageChunk concat does not preserve tool_call_id from ToolMessageChunk \u2014 DEFERRED unverified. #4 and #5 are both about CONCAT losing a field, which is the same class as the `convertToChunk` tool-call drop that turned out to be a false finding in iteration 117, so both need execution against a real message before they are believed.",
-  "#WORTH NOTING ABOUT THIS REVIEW: all five findings are in message merge algebra and the package focus is the same area, so the reviewer's attention is landing where the loop's own recent work has been. It is a different model from the last three, and it produced no repeats of anything fixed \u2014 the fencing is still holding across roster re-burns.",
-  "#1 DEFERRED: narrowed to the array_merge fallback at :105-106; needs upstream's mergeContent"
+  "#`_mergeLists(...) ?? [...left, ...secondContent]` \u2014 upstream falls back to plain concatenation of the two block lists with NO compatibility test, which is exactly what the port does with `mergeLists(...)` returning null and then `array_merge($left, $second)`. The spread `[...left, ...second]` and PHP's `array_merge` on two lists are the same operation. The port is faithful and the finding describes upstream's own behaviour.",
+  "#WHAT THE READ WAS WORTH, and it is the whole argument for not guessing: I deferred this rather than reasoning from the PHP's shape, and a guess would most likely have gone the other way. The fallback LOOKS like a missing guard \u2014 a bare `array_merge` with no type check is exactly the kind of line a reviewer flags and a hurried maintainer 'fixes'. Upstream has the identical line. Adding a compatibility check here would have been a divergence introduced by the act of fixing a non-bug, and it would have looked impeccably careful in the commit message.",
+  "#2 convertToChunk() additional_kwargs aliases, #3 BaseMessage constructor accepting unvalidated mixed blocks, #4 chunk-to-message not validating accumulated tool calls, #5 AIMessageChunk concat not preserving tool_call_id \u2014 DEFERRED unverified. #4 and #5 remain the pair most likely to be real, because 'concat drops a field' is a class this loop has both found (iteration 122's post-registration check) and falsely reported (iteration 117), so neither direction can be assumed from the family name.",
+  "#NO ADVISORY RAN, and I am naming the omission rather than letting the cadence lapse silently as it did in iteration 100: the budget went to this read because it settles a finding the ledger had open, and an advisory can be taken at the next multiple of three. Five iterations now have had the honest-shape trade recorded \u2014 defer or reject on evidence \u2014 and this is the first one where the evidence was the upstream file rather than the port's own code.",
+  "#1 REJECTED: upstream base.ts:139-141 does the identical unchecked-concatenation fallback"
  ]
 }
