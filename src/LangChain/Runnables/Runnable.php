@@ -82,16 +82,24 @@ abstract class Runnable implements RunnableInterface
         return new RunnableSequence([$this, $next]);
     }
 
-    /**
-     * Feed this runnable's output into a callback rather than another runnable.
-     */
-    public function pipeTo(callable $fn): RunnableLambda
-    {
-        return new RunnableLambda(
-            fn (mixed $input): mixed => $input,
-            ['func' => $fn]
-        );
-    }
+    // `pipeTo()` was removed here.
+    //
+    // It did nothing. The docblock promised "feed this runnable's output into a
+    // callback", and the body did neither half of that: it built a RunnableLambda
+    // around an IDENTITY callable and passed `$fn` as `['func' => ...]`, which is
+    // a BOUND TEMPLATE VARIABLE, not a callback override
+    // (`RunnableLambda::__construct(callable $func, array $bound)`).
+    //
+    // Measured: `(new Runnable) ->pipeTo($fn))->invoke('A')` returned 'A'
+    // unchanged and `$fn` was never invoked. `$this` was never run either, so the
+    // receiver produced no output to feed anything.
+    //
+    // It had no callers anywhere in src/ or tests/, and upstream has no
+    // counterpart at all — `runnables/base.ts` defines no `pipeTo`, only `pipe`
+    // and `then`. So it was invented API in a port whose rule is fidelity, and
+    // the invented API was broken. Removed rather than repaired: a caller who
+    // wants this writes `$this->pipe(new RunnableLambda($fn))`, which is the
+    // upstream-shaped way and actually runs.
 
     /**
      * Bind kwargs/config that are applied to every invocation of this runnable.

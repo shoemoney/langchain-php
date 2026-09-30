@@ -2869,6 +2869,41 @@
    "chars": 2297,
    "findings": 3,
    "severity_hits": 3
+  },
+  "~anthropic/claude-sonnet-latest": {
+   "model": "~anthropic/claude-sonnet-latest",
+   "at": "2026-09-30T04:14:04",
+   "actual_model": "anthropic/claude-sonnet-5.5",
+   "usage": {
+    "prompt_tokens": 46473,
+    "completion_tokens": 4178,
+    "total_tokens": 50651,
+    "cost": 0.134726,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.134726,
+     "upstream_inference_prompt_cost": 0.092946,
+     "upstream_inference_completions_cost": 0.04178
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 2557,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 2557,
+   "status": "ok",
+   "file": ".loop/reviews/93-~anthropic__claude-sonnet-latest.md",
+   "chars": 4283,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -3023,7 +3058,8 @@
   "~z-ai/glm-flash-latest",
   "~moonshotai/kimi-latest",
   "~x-ai/grok-latest",
-  "~anthropic/claude-haiku-latest"
+  "~anthropic/claude-haiku-latest",
+  "~anthropic/claude-sonnet-latest"
  ],
  "next_index": 0
 }

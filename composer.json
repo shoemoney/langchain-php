@@ -40,8 +40,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "LangChain\\Tests\\": "tests/Unit/",
-            "LangGraph\\Tests\\": "tests/Unit/LangGraph/"
+            "LangChain\\Tests\\": "tests/Unit/"
         }
     },
     "scripts": {
