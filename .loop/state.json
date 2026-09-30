@@ -2410,6 +2410,41 @@
    "finish_reason": null,
    "reasoning_tokens": 0,
    "status": "empty"
+  },
+  "qwen/qwen3.8-27b:free": {
+   "model": "qwen/qwen3.8-27b:free",
+   "at": "2026-09-30T02:00:33",
+   "actual_model": "qwen/qwen3.8-27b:free",
+   "usage": {
+    "prompt_tokens": 45090,
+    "completion_tokens": 17837,
+    "total_tokens": 62927,
+    "cost": 0,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0,
+     "upstream_inference_prompt_cost": 0,
+     "upstream_inference_completions_cost": 0
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 16745,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 16745,
+   "status": "ok",
+   "file": ".loop/reviews/79-qwen__qwen3.8-27b_free.md",
+   "chars": 4394,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2550,7 +2585,8 @@
   "dots-studio/dots-3-note-preview:free",
   "qwen/qwen3.8-flash",
   "google/gemini-3.6-flash",
-  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "qwen/qwen3.8-27b:free"
  ],
  "next_index": 0
 }

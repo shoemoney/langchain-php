@@ -731,27 +731,6 @@ final class Algorithm
                 return null;
             }
 
-            // A task that already produced a non-error write this step is
-            // done; re-preparing it would schedule the work twice.
-            if ($pendingWrites !== null && $pendingWrites !== []) {
-                $checkpointNamespace = self::childNamespace($parentNamespace, $name);
-                $probeId = CheckpointFunctions::uuid5(
-                    (string) json_encode([
-                        $checkpointNamespace,
-                        (string) $step,
-                        $name,
-                        Constants::PULL,
-                        $name,
-                    ]),
-                    $checkpoint->id
-                );
-
-                $index = $extra->indexFor($pendingWrites);
-                if ($index->hasSuccessfulWrite($probeId)) {
-                    return null;
-                }
-            }
-
             $seen = $checkpoint->versionsSeen[$name] ?? [];
 
             // The first trigger that both has a value and has advanced.
@@ -779,6 +758,22 @@ final class Algorithm
             }
 
             $checkpointNamespace = self::childNamespace($parentNamespace, $name);
+
+            // The task id, built ONCE and used for both the "already done"
+            // probe and the task itself.
+            //
+            // These were two separate expressions that had drifted. The probe
+            // used `$name` as the last path element while the real id used
+            // `$trigger` — and in a StateGraph those differ, because a trigger is
+            // `branch:to:<node>` and the bare node name is not. So the guard
+            // asked whether a task id that could never be issued had succeeded:
+            // dead code, silently. It only stayed harmless because nothing
+            // re-scheduled a node in the same superstep; the moment something
+            // did — a resume, or a channel consumed without re-versioning — the
+            // node would have re-executed and applied its writes twice.
+            //
+            // Building the id once removes the possibility of the two drifting
+            // again, which is a stronger guarantee than matching them by hand.
             $taskId = CheckpointFunctions::uuid5(
                 (string) json_encode([
                     $checkpointNamespace,
@@ -789,6 +784,15 @@ final class Algorithm
                 ]),
                 $checkpoint->id
             );
+
+            // A task that already produced a non-error write this step is done;
+            // re-preparing it would schedule the work twice. Checked AFTER the
+            // trigger is resolved, because the id depends on it.
+            if ($pendingWrites !== null && $pendingWrites !== []) {
+                if ($extra->indexFor($pendingWrites)->hasSuccessfulWrite($taskId)) {
+                    return null;
+                }
+            }
             $taskCheckpointNamespace = $checkpointNamespace . Constants::CHECKPOINT_NAMESPACE_END . $taskId;
 
             $metadata = array_merge([

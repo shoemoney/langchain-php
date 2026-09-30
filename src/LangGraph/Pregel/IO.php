@@ -133,11 +133,20 @@ final class IO
      *    which is the scheduler's queue.
      *  - a `resume` becomes a write to `RESUME`, which the scratchpad picks up.
      *    A map keyed by task-id hashes is fanned out per task, *appending* to
-     *    the MOST RECENT resume that task already has, and not all of them.
-     *    Upstream truncates the same way (`io.ts:108`, a `.slice(0, 1)`), so
-     *    this is deliberate fidelity rather than an oversight — a task's queued
-     *    resume values are replaced, not accumulated. It was previously
-     *    documented here as the opposite, which is what invited a reviewer to
+     *    the FIRST resume that task already has, and not to all of them.
+     *
+     *    FIRST, not most recent: `array_slice($existing, 0, 1)` keeps index 0,
+     *    which is the OLDEST queued value, and upstream truncates identically at
+     *    `io.ts:108` — `.slice(0, 1)` — so a task's queued resume values are
+     *    replaced rather than accumulated, keeping the earliest and adding the
+     *    new one after it.
+     *
+     *    This wording previously said MOST RECENT, which is the opposite of what
+     *    the code does. That is a trap rather than a typo: a future editor
+     *    "correcting" the CODE to match the comment — taking the last element
+     *    instead of the first — would introduce a real divergence from
+     *    upstream's truncation semantics while looking like a fix. It also
+     *    invited a reviewer to report it.
      *    read the code as a bug.
      *  - an `update` becomes writes to the named channels.
      *
