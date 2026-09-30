@@ -164,5 +164,12 @@
   "file": ".loop/advisory/ternary-bonsai-2-27b.md",
   "chars": 9958,
   "cost": 0.0078
+ },
+ "unbiased/pareto": {
+  "status": "ok",
+  "at": "2026-09-30T18:18:59.796174+00:00",
+  "file": ".loop/advisory/pareto.md",
+  "chars": 27337,
+  "cost": 0.2
  }
 }

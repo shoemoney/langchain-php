@@ -366,18 +366,31 @@ def main():
     ctx = next((m.get("ctx") or 0 for m in roster if m["id"] == model), 0)
     if _which:
         ctx = min(ctx or 90_000, 90_000)
+
+    # The architecture diagram costs ~1.5k tokens whatever else happens, and the
+    # text budget below never accounted for it. A 16k-context model was sent a
+    # trimmed packet AND the image and still 400'd, and a model whose roster `ctx`
+    # reads large while its real endpoint limit is 16,384 skipped the trim
+    # entirely — 31,451 tokens requested. The image is context like any other,
+    # so it is charged against the same window, and dropped outright when the
+    # window is too small to hold it and the review honestly.
+    IMAGE_TOKENS = 1_600
+    PROMPT_TOKENS = 6_100          # measured: reka reported 6,006 text tokens
+    effective = max(0, (ctx or 90_000) - IMAGE_TOKENS - PROMPT_TOKENS)
+
     if ctx and ctx < 90_000:
         # Deliberately conservative: reka reported 11,168 text tokens for a
         # 40k-char packet (a ~3.6 ratio, as expected) and still 400'd against
         # its own stated 16,384 limit, so its accounting over-reserves. Budget
         # for roughly half the context rather than all of it.
-        budget_chars = max(3_000, int((ctx - 4_000) * 1.4))
+        budget_chars = max(1_500, int(effective * 1.4))
         head = packet[:budget_chars]
-        content = [
-            {"type": "text", "text": PROMPT},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{png}"}},
-            {"type": "text", "text": f"\n\n# Review packet (abridged for this model's context window)\n\n{head}"},
-        ]
+        content = [{"type": "text", "text": PROMPT}]
+        if effective >= 2_000:
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{png}"}})
+        content.append(
+            {"type": "text", "text": f"\n\n# Review packet (abridged for this model's context window)\n\n{head}"}
+        )
         print(f"    (context {ctx:,} tokens — packet trimmed to ~{budget_chars:,} chars)", flush=True)
 
     try:
