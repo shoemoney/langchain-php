@@ -185,5 +185,12 @@
   "file": ".loop/advisory/grok-build-0-1.md",
   "chars": 10977,
   "cost": 0.0372
+ },
+ "anthropic/claude-opus-5.5": {
+  "status": "ok",
+  "at": "2026-09-30T18:52:30.009403+00:00",
+  "file": ".loop/advisory/claude-opus-5-5.md",
+  "chars": 12594,
+  "cost": 0.2723
  }
 }
