@@ -1066,6 +1066,7 @@
   "ok, 5 findings, untriaged - budget went to fable #3"
  ],
  "audit/schema-object-empty-array": [
+  "#RESOLVED \u2014 LANDED AND MUTATION-VERIFIED IN ITERATION 110. A bare `{\"type\":\"object\"}` could never validate `{}` because PHP's assoc-mode decoding makes `{}` and `[]` the same value; the empty array is now accepted by BOTH `object` and `array`, and a genuine non-empty JSON array is still rejected. Fourth time TriageStatusMarkerTest has caught me adding an entry in the wrong vocabulary \u2014 `#LANDED AND MUTATION-VERIFIED` reads correctly to a human scanning for outcome, which is exactly why it is the wrong marker.",
   "LANDED: type:object accepts [] and stdClass; the ambiguity is PHP's, documented"
  ]
 }
