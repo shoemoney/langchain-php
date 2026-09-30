@@ -1,0 +1,9 @@
+{
+ "src_files": 229,
+ "src_lines": 33452,
+ "test_files": 71,
+ "test_lines": 20613,
+ "tests": 2101,
+ "assertions": 5963,
+ "suite_ok": true
+}

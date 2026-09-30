@@ -1,4 +1,4 @@
-/vendor/
+/vendor
 /.phpunit.cache/
 /.php-cs-fixer.cache
 .phpunit.result.cache
@@ -7,4 +7,18 @@ composer.lock
 /build/
 /coverage/
 .idea/
-.vscode/
+/.vscode/
+
+# Agent worktrees. Without this, `git add -A` in the main checkout stages the
+# worktree directories as gitlinks (mode 160000).
+.claude/worktrees/
+.todo-worktrees/
+
+# Review-loop artifacts that are REGENERATED every iteration. The harness
+# (.loop/*.py), the roster, the triage ledger and the 70 recorded reviews are
+# the evidence worth keeping; the packets, the plan and the rendered diagram
+# are derived output, several hundred KB apiece, and would be stale in the
+# repo the moment the next iteration runs.
+.loop/arch.png
+.loop/packet*.md
+.loop/PLAN.md

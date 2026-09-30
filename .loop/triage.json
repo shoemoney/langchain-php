@@ -1,0 +1,317 @@
+{
+ "google/gemini-3.8-flash": [
+  "#1 stall guard truncating a live stream \u2014 ACCEPTED. Count-based bound replaced with a 30s wall-clock bound; both behaviours pinned (GuzzleHttpClientTest).",
+  "#2 RunnableBinding option precedence \u2014 REJECTED against upstream. `_mergeConfig(options, this.kwargs)` puts kwargs last and `mergeConfigs` lets later overwrite, so kwargs winning IS upstream. The reviewer's inference came from a self-contradictory comment; comment rewritten, code untouched.",
+  "#3 `invocationParams() + convert()` union \u2014 ACCEPTED. Converted messages/system now assigned explicitly, matching ChatOpenAI, so a future model parameter named `messages` cannot discard the conversation.",
+  "#4 usage-only chunk lost the response id \u2014 ACCEPTED. The fold kept the last chunk's id, so a streamed call reported `run-\u2026` instead of `chatcmpl-\u2026`. Id now carried on the usage chunk.",
+  "#5 `array_all()` is PHP 8.4+ \u2014 ACCEPTED, most serious. composer.json declares >=8.2 and CI runs 8.2/8.3/8.4, so this was a hard fatal on two of three CI jobs, masked locally by PHP 8.5. Replaced with loops, plus a new guard test that fails on any post-floor function."
+ ],
+ "anthropic/claude-haiku-4.5": [
+  "#1 unknown content blocks overwrite each other \u2014 DEFERRED (round-2/next round).",
+  "#2 ChatOpenAI sends empty tools array on bindTools([]) \u2014 ALREADY FIXED earlier this session (drops the key); reviewer saw a stale packet.",
+  "#5 SseParser final-frame offset (marked INFERENCE by the reviewer) \u2014 matches the SseParser note already recorded: no observable failure in 4,000 differential cases.",
+  "#7 handleLLMEnd skipped on a mid-stream error after the first chunk \u2014 NEEDS CHECK next round.",
+  "#8 tool validation allows extra keys \u2014 DEFERRED; JSON Schema default is permissive, matching @cfworker behaviour. Verify against upstream before changing.",
+  "#11 tool_choice not validated at bind time \u2014 DEFERRED; validated at invocationParams, which is where upstream does it."
+ ],
+ "perceptron/perceptron-mk1.5": [
+  "Harness now sends an abridged packet for small-context models; review collected."
+ ],
+ "sakana/fugu-ultra-v2": [
+  "#1 `content_block_start` read from `content` not `content_block` \u2014 ACCEPTED, most serious of the batch. Every streamed Anthropic tool call was silently dropped. It survived because my own test fixture used the same wrong key, so the test agreed with the bug. Fixture corrected and the test now discriminates.",
+  "#2 batch run-manager attribution + missing handleLLMError \u2014 PARTLY ACCEPTED. handleLLMError on the eager path is real and mutation-verified. The run-manager index change is upstream-faithful (`runManagers?.[i]`) but NOT independently observable: handleLLMEnd already used the right index. Kept for fidelity, not claimed as a caught bug.",
+  "#3 non-leading SystemMessage sent as role:system \u2014 DEFERRED; that is upstream's own behaviour (it keeps a non-leading system message in position).",
+  "#4 combineLLMOutput discards usage + wrong docblock \u2014 ACCEPTED. Now sums recursively; a top-level-only sum would have reported the FIRST prompt's numbers as the batch total.",
+  "#5 stopSequences vs stop spelled three ways across three places \u2014 ACCEPTED. All three spellings now work bound, per-call and constructor."
+ ],
+ "thinkingmachines/inkling": [
+  "All three findings were ALREADY FIXED earlier this session (bind() no-op, HttpResponse header contract, RunnableParallel scalar input) \u2014 read from the packet's own bug-history tables. Prompt now warns against re-reporting those."
+ ],
+ "amazon/nova-lite-v1": [
+  "Four of five were abstract or already done ('add more tests', 'refactor to positional args' \u2014 done, 'improve documentation consistency', 'improve error handling'). Per the port's calibration rule these are not findings. No code taken."
+ ],
+ "openai/o4-mini-high": [
+  "#1 port createReactAgent/ToolNode and #2 the Responses API \u2014 REJECTED as out of scope: both are known, documented, unported upstream subsystems, not defects. Already the tracked next step in PORT_STATUS.md.",
+  "#3 toolCallToWire should reject an empty tool name \u2014 ACCEPTED-pending; matches upstream's `convertLangChainToolCallToOpenAI`.",
+  "#4 forward RunnableConfig to RunnableLambda callbacks \u2014 ACCEPTED; matches upstream's `(input, config)` lambda signature and is a known documented divergence.",
+  "#5 accept the PHP-facing `stopSequences` key \u2014 ACCEPTED and fixed in this round."
+ ],
+ "openai/gpt-6-astra-pro": [
+  "#1 Runnable::map() discards the receiver \u2014 ACCEPTED. Upstream has no `Runnable.map()` at all (grep: 0 occurrences in base.ts), so this was an invented convenience that silently returned an empty map. Removed; RunnableParallel::add() docblock corrected.",
+  "#2 Anthropic drops assistant block content when tool calls exist \u2014 ACCEPTED, confirmed by probe: `content` came back as a bare tool_use block, prose deleted. textBlocks() now passes blocks through.",
+  "#3 wire-spelled bindings losing to constructor values \u2014 REJECTED, superseded: all three `stop` spellings now work bound/per-call/ctor (this round, verified).",
+  "#4 SSE error payloads treated as successful output \u2014 ACCEPTED, confirmed by probe: a mid-stream `{\"error\":\u2026}` was swallowed and the caller just saw the stream end. Both clients now raise.",
+  "#5 Anthropic tool-result folding mutates caller-owned history \u2014 ACCEPTED, REAL: foldToolMessages() mutates the previous HumanMessage in place, which is a message the CALLER built. Next iteration to fix by copying.",
+  "#5 caller-history mutation \u2014 FIXED this iteration. Probe: a caller-owned HumanMessage gained a tool_result block it never had, which then leaks an Anthropic-shaped block into any later request from the same history. Now constructed rather than appended in place. Mutation-verified."
+ ],
+ "z-ai/glm-4.5v": [
+  "#1 missing finally in stream() leaks trace runs \u2014 ACCEPTED, confirmed. Generator abandonment skipped the trailing handleLLMEnd entirely.",
+  "#2 orphaned run managers on batch failure \u2014 NOT REPRODUCED. Probe: 3 prompts, prompt 2 fails, 0 runs left open. handleChatModelStart is called once for the whole batch, so there are no per-prompt managers to orphan.",
+  "#3 wrong run manager for stampMessageId \u2014 PARTLY REJECTED. Upstream deliberately uses runManagers.at(0) for the id stamp (base.ts:893); matching it. The handleLLMError gap (real) was fixed this session.",
+  "#4 streaming usage key mismatch \u2014 DEFERRED; usage flows and folds correctly in tests.",
+  "#5 postStream retries a non-idempotent request \u2014 REJECTED with reasoning: the retry only fires BEFORE the first byte is yielded, so nothing has been delivered and no duplicate is possible. A failure after delivery propagates instead.",
+  "#5 postStream idempotency \u2014 remains REJECTED, same reasoning as last iteration."
+ ],
+ "stealth/space-bunny-alpha": [
+  "Rescued on a later second pass. Two accepted, three rejected \u2014 the two accepted are the most consequential validation gaps the loop has found.",
+  "#1 allOf schemas are never validated \u2014 ACCEPTED. check() handled anyOf and const but not allOf, so a tool declared through allOf constrained nothing; violating arguments reached the body. Mutation-verified (2 failures on revert).",
+  "#2 property constraints skipped when type is omitted \u2014 ACCEPTED. `$type === null` returned before properties/required/additionalProperties were read, and those keywords are independent of type in JSON Schema. Fixing it surfaced a third: an empty array is a LIST to PHP but a `{}` OBJECT to json_decode, so the list reading skipped `required` entirely. That is now handled too, separately mutation-verified (3 and 1 failures respectively).",
+  "#3 unknown schema types silently disable rejection \u2014 REJECTED on a probe: a bogus top-level type ('strng') still has its properties validated, so the claim does not hold.",
+  "#4 result-format errors leave tool traces open / #5 empty per-call bags cannot override tool defaults \u2014 REJECTED: not reproduced, or a design question rather than a defect."
+ ],
+ "z-ai/glm-5v-turbo": [
+  "#1 double handleLLMError on stream failure \u2014 ACCEPTED, and it is a regression I introduced last iteration. Probe with a counting handler: mid-stream failure gave handleLLMError=2 (RunCollectorCallbackHandler only kept the last, which is why the earlier probe showed one event and hid it). Fixed by marking the run accounted-for in the catch. Mutation-verified.",
+  "#2 snake_case constructor keys discarded from kwargs \u2014 ACCEPTED, worse than reported: `new ChatOpenAI(['max_tokens'=>99])` was dropped COMPLETELY (absent from kwargs and never applied). Three layers had drifted alias lists. Replaced with one canonicalise() per client. Mutation-verified (5 failures on revert).",
+  "#3 streaming catches only HttpException \u2014 DEFERRED with reason: GuzzleHttpClient wraps both the request and the drain, so the shipped transport cannot leak anything else, and HttpClient documents HttpException as the contract. Catching bare Throwable would relabel TypeError and friends as HTTP failures, which is worse than the gap.",
+  "Only 3 of 5 findings returned (status=incomplete). Recorded as-is; the missing two were never solicited a second time.",
+  "#3 streaming catches only HttpException, leaving bare transport exceptions unretried and unwrapped \u2014 ACCEPTED and CLEARED. Probed: a custom transport raising a bare LogicException escaped the STREAM path raw. Fixing that exposed a second instance on the EAGER path that the original probe had missed, so all four paths (2 clients x eager/stream) now wrap. Not retried, deliberately: only a status says whether a failure was transient. Both mutations verified.",
+  "#4 docs contradict the code: PORT_STATUS claimed 1904 tests and HANDOFF 2096 while the suite ran 2099 \u2014 ACCEPTED and CLEARED. Both are the document a reader trusts precisely because they are not code, and an understated ledger is worse than none. Ledger + HANDOFF synced (2099/5953) and tests/Unit/DocsMatchRealityTest.php now parses phpunit --list-tests and bounds both claims to +/-2% so the drift cannot recur.",
+  "#5 every markdown claim was unverified; PORT_STATUS per-subsystem rows tallied tests by hand and had rotted (messages claimed 47 vs 87 actual, channels 62 vs 75) \u2014 ACCEPTED and CLEARED. Root cause is structural: a hand-maintained tally in a table that changes every iteration is unguardable, so the 3 tallies were DELETED rather than corrected. PORT_STATUS's job is what is ported; the guarded 'Total so far' is the count. HANDOFF's Tests and Size rows synced to 2101/5963, 229 src, 71 test files, and DocsMatchRealityTest now guards the file counts EXACTLY (a data provider can add tests without adding a file, but a file count has no such excuse) and also fails when the row is absent, not only when it is wrong."
+ ],
+ "amazon/nova-2-lite-v1": [
+  "#1 supportsToolBinding false positives \u2014 REJECTED, does not reproduce. Probe: ChatOpenAI=true, ChatAnthropic=true, FakeChatModel=false. Correct.",
+  "#2 foldToolMessages discards original content \u2014 REJECTED, does not reproduce. Probe on a 2-block tool_result+text message: 2 blocks in, 3 out, all preserved in order.",
+  "#3 ambiguous invocationParams precedence \u2014 REJECTED on fidelity. Upstream passes kwargs last to a merge where later wins, so kwargs winning is upstream's behaviour; already documented in PORT_STATUS.",
+  "#4 RunnableParallel passes scalars to branches \u2014 REJECTED on fidelity, and already corrected: the type check was removed deliberately last session because upstream RunnableMap.invoke applies none (base.ts:2300-2312).",
+  "#5 unhandled mid-stream SSE errors \u2014 ALREADY FIXED in iteration 1 (stream error payloads now raise in both clients)."
+ ],
+ "anthropic/claude-opus-5.5": [
+  "#1 streamed responses never carry stop_reason \u2014 REJECTED on fidelity. Upstream carries stop_reason NOWHERE on an Anthropic message: chat_models.ts has no assignment and utils/message_outputs.ts never sets it; it appears only in utils/stream_events.ts:65, which is the Events API. The port additionally carries it on the EAGER path, a harmless superset. Adding it to the stream would invent behaviour upstream does not have.",
+  "#2 non-text blocks overwrite each other \u2014 REJECTED, does not reproduce. Distinct block types land under distinct additional_kwargs keys (probe: ['thinking']), so nothing is overwritten.",
+  "#3 multi-block content flattened to one string \u2014 ACCEPTED, real divergence from upstream. Fixed to match anthropicResponseToChatMessages exactly. Mutation-verified (4 failures on revert).",
+  "#4 topK rejected only in the constructor \u2014 ACCEPTED, and it falsified a claim in PORT_STATUS that I wrote LAST iteration ('refused under both spellings'). The guard now sits where all three layers converge. Mutation-verified twice: removing the non-constructor checks gives 4 failures; removing the wire-spelling canonicalisation gives 2.",
+  "#5 streamed usage may double-count (reviewer flagged as inference) \u2014 REJECTED after checking upstream. Upstream's message_start contributes buildUsageMetadata(usage)=25+1 and message_delta hard-codes input_tokens:0 with output_tokens=data.usage.output_tokens=19; the fold yields 25/20. My port produces byte-identical contributions and the same 25/20. Faithful, not a double-count bug."
+ ],
+ "openai/gpt-4o-2024-11-20": [
+  "#1 inconsistent key normalisation across layers \u2014 REJECTED, fixed in the previous iteration. Re-probed: max_tokens/maxTokens/top_p/topP all resolve to 42 through ctor, bound and per-call. The reviewer saw a packet built before the fix landed.",
+  "#2 silent failures on unsupported parameters \u2014 REJECTED, same cause. Re-probed: topK refused at all three layers.",
+  "#3 lack of comprehensive end-to-end tests \u2014 REJECTED as ungradable ('add more tests' in the abstract, which this project's own rule excludes). The concrete gaps it implies were closed last iteration: tests/Integration/ now drives both clients through a full Guzzle stack and CI runs it.",
+  "#4 ambiguous error handling in streaming \u2014 ACCEPTED as a documentation gap. The retry boundary WAS documented, but only in a method-level comment a reader reaches after reading the code; the class docblock said nothing. Stated at class level in both clients, and the PORT_STATUS row that had been deleted as a false claim is now restored and accurate.",
+  "#5 inadequate JSON Schema validation \u2014 REJECTED as a feature request (integrate opis/json-schema). Validating a schema *before* use is new capability, not a fidelity fix; the port already validates VALUES against a schema via JsonSchemaValidator."
+ ],
+ "baidu/ernie-4.5-vl-424b-a47b": [
+  "Reviewer used ### headings, so the harness counted 0 findings and marked it 'incomplete'. Parser widened to #{2,4}; content was real and was triaged.",
+  "#1 streaming vs non-streaming tool call representation \u2014 REJECTED. The divergence is inherent and faithful: a chunk carries tool_call_chunks and `toMessage()`/parseToolCalls() promotes it, exactly as upstream's chunk-then-fold does.",
+  "#2 unsafe UTF-8 in SseParser \u2014 REJECTED, tested not argued. Split a multi-byte payload at ALL 33 single-byte boundaries: 0 corruptions. Separators are pure ASCII (continuation bytes are >= 0x80), so a separator cannot straddle a character, and the buffer already defers emission until an event is whole.",
+  "#3 missing required-parameter validation \u2014 ACCEPTED for `model`. Probe: model='' was sent verbatim and the provider 400s about the request rather than the constructor. Upstream's type system makes it required; PHP needs the explicit check. maxTokens=0 was NOT added: upstream has no such check and the provider owns that validation. Mutation-verified on both clients.",
+  "#4 recursive sumOutputs risks stack overflow \u2014 REJECTED, tested. 2000-prompt batch: correct totals, 19ms, no overflow. Recursion depth is the usage structure's nesting (2: llmOutput -> tokenUsage), not the batch size; the outer loop is iterative.",
+  "#5 inconsistent retry handling \u2014 REJECTED by reading the order. postStream checks `$retryable` on the HttpException BEFORE converting to OpenAIException, and the earlier `catch (OpenAIException)` only re-throws a failure already judged non-retryable. Jitter is deliberately absent (synchronous, single-threaded \u2014 no herd can form)."
+ ],
+ "amazon/nova-pro-v1": [
+  "#1 inconsistent empty tool lists in bindTools \u2014 REJECTED. Re-probed: bindTools([]) omits the tools key on both clients (fixed two iterations ago).",
+  "#2 missing required-parameter validation for ChatAnthropic \u2014 REJECTED, fixed last iteration (non-empty model name, both clients).",
+  "#3 inconsistent error handling in postStream \u2014 REJECTED, no specific failure named. Re-read the order: retryability is decided on the HttpException before conversion, and the OpenAIException catch only re-throws what is already judged non-retryable.",
+  "#4 undocumented backoff() \u2014 REJECTED, it is documented (a docblock explaining it is a seam so tests need not sleep).",
+  "#5 inconsistent array_filter for nulls \u2014 REJECTED as a refactor preference. No defect; 'extract a utility method' is not gradable."
+ ],
+ "fireworks/ember-1": [
+  "#1 bound strict stored but never read \u2014 PARTLY WRONG, and worth the check. It WAS read: `$kwargs['strict'] ?? $this->supportsStrictToolCalling` drove the rendered tool. The real (smaller) gap I found while verifying: a bound instance kept supportsStrictToolCalling null, so a CHAINED bind dropped the strictness. Fixed and mutation-verified. My first attempt at this fix silently failed to apply \u2014 the mutation check is what caught it.",
+  "#2 raw HttpException escapes post() on exhausted transport retries \u2014 ACCEPTED. Probe confirmed, and it was worse than reported: my first fix re-wrapped an OpenAIException raised by our own code, destroying the actionable 'set OPENAI_API_KEY' message. Now the client re-throws its own untouched and attaches the original as previous. Mutation-verified.",
+  "#3 batch abort leaves runs open \u2014 NOT REPRODUCED (second time). Probe: 3 prompts, #2 fails, 0 runs left open; handleChatModelStart is called once for the batch so there are no per-prompt managers.",
+  "#4 CI uploads clover.xml that is never generated \u2014 ACCEPTED. --coverage-text only, plus if-no-files-found: ignore, made an empty artifact look like coverage. Flag now generates it and the absence is an error. Mutation-verified via a new CiWorkflowTest (config defects are invisible to phpunit otherwise).",
+  "#5 $config->runId[0] string-offset (reviewer flagged as inference) \u2014 REJECTED. RunnableConfig::$runId is typed array; passing a string is a TypeError, so [0] is always an array access."
+ ],
+ "x-ai/grok-build-0.1": [
+  "#1 ChatAnthropic never rejects unsupported parameters \u2014 REJECTED. It emits everything in its alias map, so there is nothing to reject; the mechanism's absence is not a defect where no parameter is silently dropped. I did find a related fidelity gap while checking: upstream's getSamplingParams DROPS temperature/top_p/top_k when thinking is enabled or the model is adaptive-only (params.ts:148-151). The port does not model `thinking` at all, so there is nothing to condition on \u2014 that is a missing feature, not a defect.",
+  "#2 strict lost across chained bindTools \u2014 ACCEPTED. Same gap the OpenAI client had one iteration earlier; upstream passes strict through withConfig so it persists. Fixed and mutation-verified on Anthropic.",
+  "#3 RunnableParallel::batch passes identical config to every branch \u2014 REJECTED. Every branch gets config->forChild(\"map:key:$key\"), so the configs are derived per branch, not identical. (The $options half of the finding is the already-documented batchOptions gap.)",
+  "#4 usage-only chunks surfaced as separate empty messages \u2014 ACCEPTED, and upstream is decisive: completions.ts:450-454 captures `if (data.usage) usage = data.usage` then `if (!choice) continue` \u2014 it never yields. Our port yielded a phantom EMPTY message at the end of every streamed call. Now folded but not surfaced. Mutation-verified in BOTH directions (removing the filter fails 1; over-filtering all chunks fails 5).",
+  "#5 stampMessageId uses the batch root run manager \u2014 REJECTED on fidelity: upstream deliberately uses runManagers.at(0) there (base.ts:893)."
+ ],
+ "mistralai/ministral-3b-2512": [
+  "A 3B model: all five findings were plausible and all five were wrong on inspection. Recorded because the pattern matters \u2014 confidence is not evidence, and the smallest models in the roster are the least reliable verifiers.",
+  "#1 streamed tool-call args 'not decoded back' \u2014 REJECTED, and its fix would BREAK streaming. Probe: three fragments fold to '{\"city\":\"Austin\"}' and parseToolCalls() yields the decoded call. The reviewer's proposed `json_decode` per fragment returns null for every mid-stream fragment (verified: json_decode('{\"cit') === null). Decoding must happen after folding, which is where it happens.",
+  "#2 empty tool list silently dropped \u2014 REJECTED. Deliberate and documented: providers REJECT `tools: []` (the port 400s), so omitting the key is the fix, not the bug. Verified two iterations ago.",
+  "#3 inconsistent stream error handling \u2014 REJECTED, no specific failure; retry order verified by reading it and by probe.",
+  "#4 tool call id format validation \u2014 REJECTED on fidelity. The port already refuses a missing or non-string id, matching upstream exactly (json_output_tools_parsers.ts:93). A `/^[a-zA-Z0-9_-]{1,100}$/` regex would reject legitimate provider ids; the format is not contractual.",
+  "#5 usage tracking across separate chunks \u2014 REJECTED. The fold sums them, and the Anthropic stream case was measured against upstream (25/20) three iterations ago."
+ ],
+ "openai/gpt-chat-latest": [
+  "#1 silently corrupting tool-call arguments \u2014 ACCEPTED, and a FIDELITY divergence, not a preference. Probe: a circular tool argument was sent as {\"ok\":\"fine\",\"self\":null}. Upstream's JSON.stringify THROWS on a circular structure (json_output_tools_parsers.ts:100). Mutation-verified (3 failures on revert).",
+  "#2 request JSON that cannot be encoded \u2014 ACCEPTED for the cast. (string) json_encode(false) is ''. MUTATION-VERIFICATION INCOMPLETE and I will not claim otherwise: reverting the cast leaves the suite green, because the tool-argument encode throws first and no circular value can reach the body encode without passing through convertMessage. The cast removal is defence-in-depth against a path I could not construct, not a bug I demonstrated.",
+  "#3 Anthropic transport failures \u2014 ACCEPTED and fixed last iteration.",
+  "#4 port-status accounting / #5 running-PHP-version test \u2014 REJECTED as non-defects; PORT_STATUS is generated from measurements and the version guard already asserts the floor and scans for newer functions."
+ ],
+ "anthropic/claude-sonnet-5.5": [
+  "#1 spurious error on a clean early exit \u2014 ACCEPTED, and it corrected a decision I made two iterations ago. I had a finally reporting abandonment as handleLLMError; that put 'Stream abandoned by the consumer' plus a stack trace into error dashboards for what is usually a deliberate early exit. It now ends the run with the partial result. Mutation-verified in BOTH directions (error-revert fails 1; removing the finally fails 1).",
+  "#2 generateMessages stamps ids and reports usage from the wrong run \u2014 REJECTED. Probe: two prompts in one batch report totalTokens 2 then 7 \u2014 each its own, not the batch total of 9. Run ids are distinct (an 8-char prefix truncation in my own probe made them look identical; the full uuids differ). Upstream deliberately stamps the id from runManagers.at(0).",
+  "#3 usage in response_metadata double-counted or mangled by the merge \u2014 REJECTED, and the merge is exactly what makes streaming usage work. Probe: 5/1/6 + 0/4/4 folds to 5/5/10, which is the point \u2014 message_start carries input, message_delta carries output, and the fold adds them.",
+  "#4 tool_choice guard is order-dependent \u2014 REJECTED. Probe: a choice naming an offered tool is accepted; no tools is refused; the wrong tool is refused. No ordering the finding describes produces a different outcome.",
+  "#5 batch() ignores options / RunnableLambda drops config \u2014 REJECTED as already-documented, not new. batchOptions is stated on RunnableInterface::batch() with its reason; RunnableLambda's missing config parameter is a signature change recorded in the same table."
+ ],
+ "meta/muse-glimmer-30b": [
+  "#1 postStream decodes SSE without checking HTTP status \u2014 REJECTED. GuzzleHttpClient::postStream() throws on a non-2xx status before yielding anything, so an error body is never handed to the SSE decoder. (Noted for the ledger: the HttpClient contract says implementations must RETURN non-2xx rather than throw, and the stream path throws \u2014 a contract inconsistency worth a note, not a defect.)",
+  "#2 tool_choice validated against un-normalised tools \u2014 REJECTED. Probe: a bound choice naming an offered tool is accepted under BOTH spellings, and the guard still refuses an unoffered one (verified two iterations ago).",
+  "#3 SseParser separator offset \u2014 REJECTED as already-triaged. This is the one item in the ledger documented as having NO observable failure: a 4,000-case differential run found zero divergence, and the fix is correct by construction. It is recorded as such rather than claimed as a caught bug.",
+  "#4 finally reports a run end even after a caught error \u2014 REJECTED, and this is the double-report bug I fixed two iterations ago, so I checked it directly. Probe: a mid-stream failure gives errors=1 ends=0. The catch marks the run accounted-for before the finally runs.",
+  "#5 bound parallelToolCalls dropped via the wire spelling \u2014 REJECTED. Probe: parallelToolCalls and parallel_tool_calls BOTH reach the request. The alias table canonicalises the wire form before the lookup."
+ ],
+ "z-ai/glm-5.3-flashx": [
+  "#5 isMetadataOnly ignores additional_kwargs \u2014 ACCEPTED, and it is a regression from my own fix last iteration. Probe: a refusal-only response surfaced ZERO chunks \u2014 the only thing the model said was invisible. additional_kwargs now counts as content. Mutation-verified in BOTH directions (revert fails 2; over-suppress fails 1).",
+  "#1 streaming path has no empty-response guard \u2014 REJECTED on fidelity. aggregateStream() already throws 'Received empty response from chat model call.' and upstream's stream() does not throw either; the throw is only in _generateUncached, which this mirrors.",
+  "#3 bindTools writes a null strict into kwargs \u2014 DEFERRED as cosmetic: a null value in kwargs is not read (the reader is `$kwargs['strict'] ?? ...`), so it cannot mask a value. Worth a filter for tidiness, no behaviour behind it.",
+  "#2 defaultHeaders docblock / can override the pinned version \u2014 ACCEPTED as a doc correction: the stream-path contract for HttpClient is now stated explicitly (post() RETURNS a non-2xx, postStream() RAISES). The ability to override anthropic-version via defaultHeaders is intentional, being the documented way to pin a different API version.",
+  "#4 stream-establishment failure loses the original exception \u2014 CLEARED THIS ITERATION. Both clients attached `previous` on the eager path and not on the stream path, so a network failure named its cause for one provider and not the other. Mutation-verified separately on each client (each revert fails exactly its own parity case).",
+  "#3 bindTools writes a null strict into kwargs \u2014 CLEARED THIS ITERATION. It was inert (nothing reads a null) but appeared in every serialised trace record. Now written only when set; the chained-bind inheritance it carries is unchanged and still tested.",
+  "#4 stream-establishment failure loses the original exception \u2014 ALREADY FIXED in iteration 30 (previous attached on both stream paths). Closed.",
+  "#3 bindTools writes a null strict into kwargs \u2014 ALREADY FIXED in iteration 30 (written only when set). Closed.",
+  "#5 isBinaryString misclassifies text as binary \u2014 REJECTED, closed. Probed all six cases: plain text, accented, multibyte arrow, newline, tab and even a NUL byte are all binary=false; only genuinely invalid UTF-8 (\\xff\\xfe) is true. The rule is 'is this valid UTF-8', which is the right test for text-versus-bytes, not a heuristic that needs fixing.",
+  "#6 SseParser drops a complete-but-unterminated event \u2014 REJECTED, closed. Probed: feeding 'data: {\"a\":1}' with no trailing blank line and calling flush() returns [{\"a\":1}]. The event is recovered.",
+  "#8 the three src/ orphans are dead code \u2014 DEFERRED with a reason, not a defect: BaseToolkit, ToolRuntime and FakeTool are referenced by nothing because ToolNode (the consumer) is an unported subsystem already documented as prebuilt in PORT_STATUS. Deleting them would delete the only ported half of a documented pair. Recorded rather than acted on."
+ ],
+ "anthropic/claude-fable-5.1": [
+  "#2 every OpenAI delta carries model_name/model_provider, so the fold concatenates them \u2014 ACCEPTED. Probe: 3 deltas -> model_name 'gpt-4ogpt-4ogpt-4o'. model_provider was already in REPLACE_KEYS; model_name was not, and upstream declares it as a named (identity) member of ResponseMetadata beside an open index signature. Mutation-verified; the revert diff shows the corruption directly.",
+  "#3 per-call tools bypass conversion \u2014 ACCEPTED, and serious. Probe: a StructuredTool passed per-call was serialised as {\"lc\":1,\"type\":\"constructor\",...} and sent to the provider as the tool definition. bindTools() converted; invocationParams() did not. Mutation-verified.",
+  "#1 withStructuredOutput mis-wraps a schema that is already a function definition \u2014 REJECTED. The base implementation strips `name` (the parser's lookup key, not part of the schema) and builds the OpenAI envelope; a schema carrying a nested `function` key is not a shape the base handles or claims to, and the provider clients both translate the envelope correctly (verified repeatedly).",
+  "#4 handleLLMNewToken receives a different chunk type per provider \u2014 REJECTED as inherent and faithful. Upstream passes the provider's own chunk; the port mirrors that, and a shared shape would be a divergence, not a fix.",
+  "#5 streaming failures discard the transport cause \u2014 REJECTED, fixed earlier this iteration: both clients now attach `previous` on the stream-establishment path, pinned by TransportCauseParityTest on both paths."
+ ],
+ "meta-llama/llama-4-maverick": [
+  "All five probed; none reproduced.",
+  "#1 no input validation in withStructuredOutput \u2014 REJECTED on fidelity. Probe: an empty schema builds a chain with no error. Upstream does not validate the schema's shape either, and a schema is developer input, not runtime data.",
+  "#2 uncaught exception in postStream \u2014 REJECTED as a contract matter. The SHIPPED Guzzle transport raises on non-2xx before yielding (verified repeatedly). A third-party HttpClient that RETURNS on the stream path violates the interface contract \u2014 and the client structurally cannot check it, since postStream yields raw bytes and never sees a status. The contract is now documented explicitly on the interface.",
+  "#3 null-pointer in eventToChunk \u2014 REJECTED. Probe: a missing, null, or wrongly-typed content_block all return null and are ignored; a non-numeric index coerces to 0 harmlessly. No null can be dereferenced.",
+  "#4 inconsistent empty-tool handling \u2014 REJECTED, deliberate and documented: providers REJECT tools:[], so the key is omitted.",
+  "#5 mergeConfig undocumented \u2014 REJECTED, and it is the second reviewer this session to claim a doc is missing when it is extensive. mergeConfig carries a 21-line docblock directly above it stating the precedence rule and why `$a + $b` keeps the left operand."
+ ],
+ "google/gemma-4-31b-it": [
+  "Rescued on the second pass. All five probed this round; none survived.",
+  "#1 bare JSON fences with preambles are ignored \u2014 REJECTED on a probe: a bare ```json fence, a fence with a prose preamble, a fence with no language tag, and plain JSON all parse. Only prose followed by UNFENCED json throws, which matches upstream (it needs a fence or bare JSON).",
+  "#3 newlines in multi-line strings are deleted \u2014 REJECTED, and it is correct JSON semantics: a RAW newline inside a JSON string is invalid JSON and correctly throws; the escaped \\n form parses and round-trips. Nothing is deleted.",
+  "#5 falsy values are skipped in JSON-Patch diffs \u2014 REJECTED on a probe: false->replace, null->remove, 0->replace, ''->replace. Every one is the correct RFC 6902 operation; none is skipped.",
+  "#4 truncated escapes lose the backslash \u2014 REJECTED: upstream emits `u${hex}` for a short escape too (json.ts:88), so the backslash loss is upstream's own behaviour. The POSITION advance on that path WAS a real bug and was fixed this round.",
+  "#2 surrogate pairs \u2014 DEFERRED permanently as the port's documented divergence (a lone surrogate has no valid UTF-8 encoding; a complete astral character round-trips correctly)."
+ ],
+ "qwen/qwen3-vl-235b-a22b-thinking": [
+  "First review of the OUTPUT PARSER layer \u2014 a packet-rotation change made it visible. All five probed; none reproduced.",
+  "#1 error messages leak raw input \u2014 REJECTED on fidelity. Upstream's StructuredOutputParser does exactly this: `Failed to parse. Text: \"${text}\". Error: ${e}` AND passes `text` as the exception's llmOutput (structured.ts:129-130). Removing the text would be a divergence, and redaction is a feature rather than a fidelity fix.",
+  "#2 PartialJsonParser reports UTF-8 code points, upstream UTF-16 \u2014 REJECTED. Upstream exposes no position/index at all (no _index or charAt in json.ts), so there is no upstream position semantic to match; these offsets appear only in an error message the port constructs itself.",
+  "#3 diff mode undocumented \u2014 REJECTED, it is documented. BaseCumulativeTransformOutputParser:19-20 states verbatim that diff mode 'emits an RFC 6902 patch instead of the full value, which is what you want over a wire'.",
+  "#4 the @template T is unused \u2014 REJECTED as a house convention, not a defect. `@template T` / `@extends BaseTransformOutputParser<T>` is how this port expresses a generic runnable; PHP erases generics at runtime by design and the whole codebase does it.",
+  "#5 concatenated error messages are hard to parse \u2014 REJECTED. Upstream produces a single interpolated message too, so a structured array would be a divergence."
+ ],
+ "x-ai/grok-4.20-multi-agent": [
+  "First review of the TOOLS layer. Three accepted, two rejected.",
+  "#3 validatesOnlyStrings lacks anyOf handling \u2014 ACCEPTED. Probe: a schema of {\"anyOf\":[{\"type\":\"string\"}]} ACCEPTS a bare string (errors() === []) but reported false for the string path, while the equivalent allOf spelling reported true. The tool would be handed the structured path and see {\"input\":...}. Mutation-verified (5 failures on revert).",
+  "#1 dead $input property on StructuredTool \u2014 ACCEPTED, and I CANNOT mutation-verify it, stated plainly: a property that is written and never read is unobservable by construction, so no test can fail on its return. Removed on the reviewer's evidence plus a direct grep (one hit, the declaration).",
+  "#2 pointless assignment to $configurableState in ToolRuntime::fromConfig \u2014 ACCEPTED on the same terms: the local is assigned and used in the same expression, which is unobservable. Removed; the call is now a plain cast.",
+  "#5 ToolRuntime::fromConfig incomplete vs its constructor \u2014 REJECTED as not-a-defect, but documented where it now lives. RunnableConfig carries NO store or writer field (verified: the class declares neither), so fromConfig has nothing to read; they are constructor-only for the LangGraph integration, and a comment at the call site now says so instead of leaving the gap to be rediscovered.",
+  "#4 duplicate/outdated docblocks on RunnableInterface::batch() \u2014 REJECTED: batch() has one docblock, added three iterations ago, stating exactly what batchOptions is and why it is ignored. Nothing to de-duplicate."
+ ],
+ "unbiased/pareto": [
+  "First review of the COMPOSITION layer. Two accepted, three rejected.",
+  "#1 RunnableSequence::stream() drops a legitimate null final output \u2014 ACCEPTED. Probe: a two-step chain ending in null returns NULL from invoke() but stream() emitted only the intermediate chunk. Upstream uses an explicit `finalOutput === undefined` sentinel (base.ts:2126) so a JS null survives; PHP's single null cannot express that, so the gate is gone entirely. Mutation-verified.",
+  "#2 RunnableSequence::stream() ignores $names \u2014 trace labels are dead data \u2014 ACCEPTED. Grep: `$this->names` is written by the constructor and extended by pipe(), and read NOWHERE. Upstream tags every step `seq:step:N` at five sites, so a trace attributes each run to the step that produced it; this port traced an LLM chain as one flat run. Implemented; mutation-verified on both the invoke and stream paths, with and without a caller config.",
+  "#3 pipeTo() wraps the callable in an identity lambda \u2014 REJECTED. There is no upstream `pipeTo`: upstream's `pipe()` takes a runnable directly, and RunnableLambda exists precisely to make a callable runnable. The wrapper is the port's way of expressing that, not a divergence in semantics.",
+  "#4 RunnableBranch::when() accepts mixed but invokes unconditionally \u2014 REJECTED. `when()` calls `coerceToRunnable($runnable)` at registration, so a bare callable becomes a RunnableLambda there; the parameter is a convenience, and the coercion is unconditional BY DESIGN, not by omission.",
+  "#5 mergeConfig bound-kwargs-beat-call-time contradicts upstream \u2014 REJECTED, and this is the fourth time it has been raised. Upstream calls `_mergeConfig(options, this.kwargs)` (base.ts:1387): the kwargs go LAST, and mergeConfigs lets a later config overwrite an earlier one. The kwargs winning IS upstream. The docblock says so; a reviewer has now inferred the opposite from it twice."
+ ],
+ "mistralai/ministral-8b-2512": [
+  "First review of the TRACING layer. One accepted, four rejected.",
+  "#5 Run::toArray() does not preserve actions \u2014 ACCEPTED. Grep showed actions IS live (BaseTracer:687 writes, ConsoleCallbackHandler:245/250 reads), so it is not dead \u2014 but it was absent from the serialised form, meaning a persisted run lost every agent step while the constructor still advertised the field. Upstream's Run carries it as a public field. Mutation-verified (2 failures on revert).",
+  "#1 endTrace() silently drops orphaned child runs \u2014 REJECTED, and this is the design. endTrace hands a run UP to its still-open parent (BaseTracer:97) and persists only the root; the class docblock spells out why: a chain that calls a model and a tool has three runs, and persisting each would produce three siblings and lose the causality. Not a drop \u2014 the nesting.",
+  "#2 BaseRunManager::getChild() incorrectly seeds handlers \u2014 REJECTED with a line-for-line match against upstream. manager.ts:302-312 is identical: setHandlers(this.inheritableHandlers), addTags, addMetadata, then if (tag) addTags([tag], false). The port even has a docblock noting it seeds from inheritableHandlers rather than the full set. The reviewer is describing the design as a bug.",
+  "#3 CallbackManager::configure() does not validate handler compatibility \u2014 REJECTED as a preference. Upstream does not validate either, and a handler declares what it implements through `implements()`, already documented in this ledger.",
+  "#4 callback hooks are not properly typed \u2014 REJECTED as a PHP language fact, already documented: generic method signatures are erased at runtime, which is why BaseCallbackHandler declares concrete no-op hooks."
+ ],
+ "minimax/minimax-01": [
+  "First review of the TEXT SPLITTER layer. All five probed; none reproduced. The model also put each title on the line AFTER the heading, which the harness read as a generic 'Title' \u2014 the prompt now forbids that explicitly.",
+  "#1 mergeSplits catches and swallows a joinDocs exception \u2014 REJECTED: there is no try/catch around joinDocs anywhere in TextSplitter.php (grep for try/catch returns three hits, none near it). The reviewer described a construct that does not exist.",
+  "#2 warnOversizedChunk is untested \u2014 REJECTED as ungradable in the abstract ('this method has no test'). A test asserting a trigger_error side effect is worth having, but it is not a defect and nothing observable is wrong.",
+  "#3 splitOnSeparator mishandles UTF-8 in $separator \u2014 REJECTED, and my first probe of it was itself wrong. There IS a `preg_split() === false` guard with a documented fallback to explode(); the suggested fix (throw) would break the splitter on exactly the lossy-transport input the fallback exists for. Chased with bin2hex after json_encode made it look like the text was being lost: the bytes are preserved exactly (6120b1312063 == the input).",
+  "#4 RecursiveCharacterTextSplitter recursion undocumented \u2014 REJECTED as a doc preference.",
+  "#5 fromLanguage throws on an unknown language \u2014 REJECTED: an unknown language is a caller error, and failing loudly beats silently splitting on a default the caller did not ask for."
+ ],
+ "z-ai/glm-4.6v": [
+  "One accepted, four rejected.",
+  "#2 abandoned stream trace reporting \u2014 ACCEPTED as a design improvement to a fix from an earlier round. Ending the run plainly said 'completed' when the consumer had stopped; erroring said 'failed' when nothing failed. It now ends with the partial output AND extra['abandoned']=true, so both facts survive. Mutation-verified.",
+  "#1 GuzzleHttpClient stream errors escape the try \u2014 REJECTED, the code already does the opposite. The read loop is at GuzzleHttpClient.php:52, inside the try opened at line 11, with the catches at 74/76 wrapping it. That was fixed several iterations ago; the reviewer described the pre-fix shape.",
+  "#3 malformed SSE payload handling \u2014 REJECTED. A payload that is not JSON raises a provider exception naming the payload; a mid-stream error object raises too; both are pinned by tests. 'Handling' here would mean the silence this already avoids.",
+  "#4 strict mode unhandled in withStructuredOutput \u2014 REJECTED: it IS handled, explicitly, at BaseChatModel with a 'strict mode is not supported for this model by default' throw, and the test is in UnsupportedParameterTest.",
+  "#5 batch() options inconsistency \u2014 REJECTED as already-documented, not new: RunnableInterface::batch() states what batchOptions is and why the base implementation ignores it."
+ ],
+ "openai/gpt-4o-mini-2024-07-18": [
+  "All five rejected. The clearest example this loop has seen of a review that is entirely 'improve X' with nothing behind it.",
+  "#1 improve error handling in HTTP requests / does not give clear feedback on 4xx \u2014 REJECTED on a probe. A 400 surfaces as OpenAIException carrying status 400, the provider's message, its CODE (context_length_exceeded) and the offending PARAM (max_tokens). Nothing is silent; the opposite of the claim.",
+  "#2 validate required parameters in invocationParams \u2014 REJECTED. `model` IS validated (empty and whitespace-only both throw, pinned in UnsupportedParameterTest). The suggestion also asks to make max_tokens required, which upstream does not \u2014 adding that constraint would reject valid calls.",
+  "#3 streamlined tool conversion / #4 consistent parameter naming / #5 improve public-method docs \u2014 REJECTED as ungradable preferences with no defect, which this project's own rule excludes.",
+  "Also the first review to run against the prompt's new THIRD TRAP clause: none of its findings came from reading a comment as present-tense behaviour."
+ ],
+ "thinkingmachines/inkling-small": [
+  "First review of the MESSAGES layer. Two accepted, three rejected \u2014 and one of the two closes a divergence that was documented as deliberately unfixed before the loop began.",
+  "#2 parseToolCalls assumes args is a string \u2014 ACCEPTED. Probe: a chunk with decoded args raised 'trim(): Argument #1 must be of type string, array given'; an int did the same. That is a crash aborting stream reconstruction, not a bad tool call. Routed to the existing invalid list. Mutation-verified (the revert reproduces both TypeErrors).",
+  "#1 RunnableLambda ignores the invocation config \u2014 ACCEPTED, closing a documented divergence. The config is now passed when reflection says the callable can take it, so a 1-param lambda is unchanged. Mutation-verified on the 2-param and variadic cases.",
+  "#3 mergeDicts throws on a type mismatch without distinguishing the cause \u2014 REJECTED as a message-quality preference; a TypeError from mixing an array into a string field is already unambiguous about which field.",
+  "#4 looksLikeFieldMap misclassifies block lists containing 'content' \u2014 REJECTED, not reproducible without a case; the method's contract is documented and the port's tests cover the shapes it must distinguish.",
+  "#5 batch() documents $options as ignored but does not enforce \u2014 REJECTED: it is documented ON the interface as ignored, with the reason. 'Enforcing' it would mean implementing returnExceptions, which is a feature, not a fix."
+ ],
+ "bytedance/ui-tars-1.5-7b": [
+  "Returned one finding (status: incomplete), and it is a pure maintainability request \u2014 'refactor compile() into smaller functions, add tests, document it better' \u2014 which this project's own rule excludes as ungradable.",
+  "The one concrete behavioural claim inside it (a conditional edge returning null, or naming a target that does not exist) was probed rather than dismissed: a null path terminates the branch cleanly with the accumulated state, and an unknown TARGET is accepted (the branch simply takes no route). Neither crashes. An unknown edge SOURCE is rejected \u2014 and earlier than upstream, at edge-registration (StateGraph.php:184/218) rather than at compile() (graph.ts:609), so the same guarantee is enforced more eagerly."
+ ],
+ "moonshotai/kimi-k3": [
+  "First review of the LANGGRAPH ENGINE. One accepted, four rejected \u2014 and the accepted one was a docblock, not the code a reviewer believed was broken.",
+  "#1 mapCommand drops all but the first prior resume \u2014 REJECTED on fidelity, after reading the IMPLEMENTATION (not the test, which has no prior writes and cannot distinguish). io.ts:104-110 maps the pending RESUME writes and applies .slice(0, 1), keeping index 0; the port's array_slice($existing, 0, 1) is that line. ACCEPTED IN PART: the method's docblock claimed resume values ACCUMULATE, which is what made the faithful code read as silent data loss. Corrected.",
+  "#2 tautological array_keys($resume) === array_keys($resume) \u2014 ACCEPTED. True for every input, guarding nothing, and sitting beside the hash check it appeared to protect. Removed; the two remaining conditions are exactly upstream's Object.keys(resume).length && .every(isXXH3). The hash check is now pinned by a test that fails when it is removed.",
+  "#3 transform() docblock describes the wrong upstream method / #4 duplicated @param on batch() / #5 comparePathSegments diverges from JS mixed comparison (reviewer marked it an inference) \u2014 REJECTED: prose nits with no reachable behaviour, and an inference the reviewer itself declined to stand behind.",
+  "Note: my first two test runs of #2 failed on my own mistakes (wrong namespace, then wrapping named args in an array for a positional constructor), and a third failed because I asserted the resume was truncated to the MOST RECENT rather than the FIRST. The port was right each time."
+ ],
+ "mistralai/mistral-small-2603": [
+  "The last review of the 53-model roster. One accepted, four rejected.",
+  "#1 savers store invalid namespace strings \u2014 ACCEPTED. (string) on an array yields the literal 'Array' with a conversion warning, colliding with a real namespace of that name; eight sites, and the warning alone fails the suite under failOnWarning. One helper now reads it. Mutation-verified: the revert produces 9 failures plus the 'Array to string conversion' warning, exactly as predicted.",
+  "#2 putWrites replaces ALL of a task's writes when any channel is special \u2014 REJECTED on fidelity, decisively. Upstream makes the choice per CALL: 'const allSpecial = writes.every(([channel]) => channel in WRITES_IDX_MAP); INSERT ${allSpecial ? OR REPLACE : OR IGNORE}' (checkpoint-sqlite/src/index.ts:470-472), and its comment says the same thing the port's does. The port's allSpecialChannels($writes) plus a per-call statement IS that. The suggested split into two statements would be a divergence.",
+  "#3 getDeltaChannelHistory empty-channel-list edge case / #4 fragile string comparison for JSON metadata / #5 MemorySaver::list() does not short-circuit on an empty namespace list \u2014 REJECTED: none reproduced, and each is a design preference rather than a reachable defect.",
+  "The roster is now complete: 53/53 asked."
+ ],
+ "openai/gpt-6.1-sol-pro": [
+  "The first review of the PROMPTS layer, and the first from a model that appeared in the live roster only after this sweep's roster refresh. One accepted, four rejected.",
+  "#2 a required history rejects a valid empty conversation \u2014 ACCEPTED, and it is the falsy-vs-truthy class. Upstream guards with !input (chat.ts:144) where an EMPTY ARRAY IS TRUTHY in JS; PHP's [] is falsy, so the same expression threw. A required MessagesPlaceholder therefore refused the first turn of every conversation. Mutation-verified.",
+  "#1 image rendering permanently overwrites reusable messages \u2014 REJECTED on fidelity, line for line. Upstream does `message.content = formattedMessageContent; return message;` (chat.ts:1056-1057) with an explicit no-param-reassign suppression on the inner block mutation (chat.ts:1050) \u2014 it mutates deliberately. Probed: substitution works (A then B), and the template carries A forward exactly as upstream's would.",
+  "#3 factory-inferred variables include bound partials / #4 the string factory loses its Mustache configuration / #5 scalar prompt invocation discards the value \u2014 REJECTED: none reproduced against the port's own behaviour, and each is a shape question rather than a demonstrated defect."
+ ],
+ "stepfun/step-3.7-flash": [
+  "Rescued on the SECOND PASS after the first attempt truncated. One accepted, four rejected.",
+  "#1 PartialJsonParser leaves the position behind on a truncated hex escape \u2014 ACCEPTED, and my own first probe was wrong about it (I put a closing quote inside the hex window, so it legitimately threw). Re-probed with a genuinely truncated fragment: upstream accepts 0-4 hex digits and advances pos in BOTH branches (json.ts:89); the port advanced only in the four-digit branch, so '\"a\\\\u12' produced 'au1212' where upstream gives 'au122'. Mutation-verified \u2014 the revert shows exactly that corruption.",
+  "#3 getFormatInstructions emits literal double braces (called BLOCKER) \u2014 REJECTED. The reviewer's theory is that PHP string interpolation is at fault; upstream structured.ts:89 ships the IDENTICAL '{{\"properties\": ...}}' text. It looks broken and is not a port divergence.",
+  "#2 parseNumber accepts invalid numeric literals / #4 duplicate @param on batch / #5 transform docstring \u2014 REJECTED: not reproduced, or prose only.",
+  "#2 parseNumber accepts invalid numeric literals \u2014 REJECTED on a probe plus a line-for-line read: the port's parseNumber is identical to upstream's (leading-zero rejection at the same branch, json.ts:128-133), and the one permissive case (`1.`) follows from upstream's optional fraction group. No action."
+ ],
+ "google/gemini-3.8-flash (SELF-REVIEW)": [
+  "The loop asked a reviewer to audit the loop's OWN changes \u2014 40 files no one but the author had read. All five findings rejected, which is the point of doing it.",
+  "#1 per-call and bound tools are dropped by invocationParams \u2014 REJECTED on a probe: all three paths deliver (a StructuredTool per call, a bound tool, and a native provider-shaped array). The reviewer cited lines 248-251, which are lcNamespace() and getName(), not the parameter assembly.",
+  "#2 stream throws a TypeError when runId is null \u2014 REJECTED on a probe. With no callbacks there is no run manager, so the guard `$runManager === null` returns early and the message keeps the provider's own id ('x' eager, '1' streamed). The reviewer's premise \u2014 that runId itself evaluates to null \u2014 does not hold.",
+  "#3 SqliteSaver::list generates invalid SQL on an empty metadata filter \u2014 REJECTED on a probe: {k:v}, {k:''} and [] all return the checkpoint. An empty filter map adds no WHERE clause, and an empty string value is a valid json_quote comparison.",
+  "#4 mergeDicts drops incoming false and 0 on replacement keys \u2014 REJECTED, with the reviewer's mechanism wrong: on a replace key a falsy value THROWS the type-collision guard rather than being dropped, because upstream types ResponseMetadata's named fields as `string | undefined`. The `!== '' && !== null` guard that keeps the previous value is deliberate \u2014 a later empty delta must not blank an id. Non-replace keys still concatenate and sum, which is correct.",
+  "#5 StructuredTool::execute silences generator exceptions during cancellation \u2014 DEFERRED: not verified, and the surrounding code is a pre-fix original rather than a loop change."
+ ],
+ "google/gemini-3.8-flash (TEST-AUDIT, run 2 \u2014 with source)": [
+  "#3 non-list sequential arrays are lost in mergeDicts \u2014 ACCEPTED IN PART, and the finding points at a real upstream-vs-port difference with the wrong symptom. The symptom is a THROW, not a silent loss: merging a dense list with a sparse array raises 'field[k] already exists... with a different type'. Upstream's guard is Array.isArray(left) !== Array.isArray(right) (base.ts:505-511) \u2014 array-ness \u2014 and in JS a sparse array is still an array, so upstream never throws there. The port's nearest analogue, Js::isList, is stricter. Kept (throwing beats silently merging two different shapes) and now documented as a divergence.",
+  "#1 Anthropic http client property access in a test / #5 SseParser truncation on split UTF-8 \u2014 DEFERRED; the split-UTF-8 case is already covered by an existing multi-byte split test and the other is a test-style point.",
+  "#2 checkpoint namespace cast collisions \u2014 REJECTED as a re-report of a fix landed in iteration 24; the reviewer had the test file but evidently not the helper it exercises.",
+  "#5 SseParser::flush yields invalid UTF-8 on a mid-character cut \u2014 ACCEPTED. Probed by truncating a completed event at every byte offset: cut@14 yielded an invalid payload. flush() now validates UTF-8 and drops the unrecoverable case, while a COMPLETE unterminated event is still flushed (the case flush exists for). Mutation-verified; the revert prints the corrupt bytes (7b2274223a2268c3).",
+  "#1 Anthropic http client property access in a test \u2014 REJECTED on inspection: all four ->httpClient->requests reads are on models built with an injected FakeHttpClient, so the property is never null where it is read. The reviewer's concern about 'uninitialised state' does not apply to those call sites."
+ ],
+ "z-ai/glm-4.6v (HIGH-RISK AUDIT)": [
+  "A focused packet: only the surface where a wrong answer is not an exception but a RESUMED GRAPH CONTINUING FROM A STATE NOBODY INTENDED. One BLOCKER accepted, and it is the most consequential defect the loop has found.",
+  "#2 comparePathSegments may produce non-deterministic ordering \u2014 ACCEPTED. Upstream compares raw path values with </> (algo.ts:289); path segments are task indices, so JS orders 9 before 10. The port used strcmp, and '10' < '9' lexicographically, so the tenth concurrent task folded before the ninth and its write won. Silent, deterministic, and only visible past ten tasks per superstep. Mutation-verified (3 failures on revert, including the end-to-end 12-task ordering test).",
+  "#1 resume replacement may not match upstream / #3 write conflict resolution is inverted \u2014 REJECTED, both re-reports of upstream questions already settled by reading the source: io.ts:104-110 applies .slice(0, 1) to prior resumes, and the sqlite saver chooses OR REPLACE vs OR IGNORE per CALL via writes.every(...) (checkpoint-sqlite/src/index.ts:470).",
+  "#4 list merging on missing indexes / #5 tool-call argument silent failure \u2014 DEFERRED pending probes; the argument path is the one fixed and tested in iteration 26."
+ ],
+ "anthropic/claude-sonnet-5.5 (HIGH-RISK AUDIT 2 \u2014 serde)": [
+  "A second high-risk audit, on the SERIALISATION path rather than write ordering. One accepted \u2014 and it is a refinement of a decision this project had already made.",
+  "#1 an empty map collapses to a list in the checkpoint \u2014 ACCEPTED IN PART, and the distinction is the value. PORT_STATUS already recorded 'an empty map serialises as []', with the reason that forcing {} 'would corrupt genuinely-empty LIST channel values'. That reason is sound for channel_values, which can hold a list \u2014 but channel_versions and versions_seen are read as [$name] => ... by EVERY consumer and are never lists, so the ambiguity does not apply to them. A fresh checkpoint wrote channel_versions: [] where a JS reader finds an object. Those two fields (and the inner versions_seen maps) now serialise as {}; channel_values is deliberately untouched. Mutation-verified, and the pre-existing CheckpointTypesTest was updated to assert through the JSON rather than the PHP array, since asserting the array type was pinning the old wire shape.",
+  "#2 Set and Map records are never written so the decoder branches are dead / #3 object serialisation drops the class / #5 silent defaults in fromArray \u2014 DEFERRED pending probes.",
+  "#4 binary detection is a heuristic \u2014 DEFERRED; lowest severity and the port documents its byte-string choice.",
+  "#3 object serialisation drops the class so objects come back as arrays \u2014 ACCEPTED, and the probe made it concrete: an object with a PRIVATE property serialised as type=json and came back as [], and a Serializable came back [] as well. The write is silent and the loss surfaces several graph runs later. Now refused, naming the class and the lost properties. My first guard placement was wrong (it checked $out === [] BEFORE the walk populated it, so plain stdClass was rejected too); moving it after the walk fixed that. Mutation-verified (2 failures on revert).",
+  "#2 Set and Map records are never written so the decoder branches are dead / #5 silent defaults in fromArray and versionsOf \u2014 DEFERRED pending probes.",
+  "#5 silent defaults in Checkpoint::fromArray and versionsOf \u2014 ACCEPTED. Probed: a record whose channel_values is the string 'CORRUPT' loaded as an EMPTY checkpoint, and a missing id became ''. The graph then resumes from blank state with no error at load time \u2014 the exact twin of the write-side loss fixed last round. Corrupt records and versions beyond this build are now refused; an ABSENT record and a record without a version still load, because a saver asking about an empty thread must keep working and an older format must stay readable. Mutation-verified (5 failures on revert).",
+  "#2 Set/Map records are never written so the decoder branches are dead \u2014 DEFERRED. The finding is factually right that the port never EMITS them, but that is the documented one-way choice (a PHP array is already both the set and the map); the proposed fix \u2014 detect key collisions and return null \u2014 would add a silent-null path to a case that is currently loud about being unsupported."
+ ],
+ "z-ai/glm-5.3-flashx (HIGH-RISK AUDIT 3 \u2014 tools)": [
+  "A third high-risk audit, on tool invocation. All five rejected \u2014 three on direct upstream reads, two deferred. The tool path is faithful.",
+  "#4 a two-element content-block list is destructured as a (content, artifact) tuple \u2014 REJECTED on fidelity. Upstream does exactly this: `if (Array.isArray(result) && result.length === 2) [content, artifact] = result` (tools/index.ts:338-341). A genuine upstream ambiguity, faithfully ported; disambiguating would be a divergence.",
+  "#5 the artifact is dropped when there is no tool_call_id \u2014 REJECTED on fidelity. Upstream's _formatToolOutput is `if (toolCallId && !isDirectToolOutput(content)) { ...new ToolMessage... }` and otherwise returns content (tools/index.ts:1049). The port's `if ($toolCallId === null || isDirectToolOutput($content)) return $content;` is the same line.",
+  "#1/#2/#3 rejected last iteration on upstream reads (identical error string; Zod reasoning does not apply to a JSON-Schema port; validatesOnlyStrings never recognises that shape).",
+  "Net: 5/5 rejected, the tool path verified faithful end to end."
+ ]
+}
