@@ -168,9 +168,21 @@ final class OptionPathMatrixTest extends TestCase
                     if (trim($event) === '') {
                         continue;
                     }
-                    if (str_starts_with($event, 'data:')) {
-                        yield $event . "\n\n";
-                    }
+                    // Yield the WHOLE event block, not just those whose FIRST
+                    // line is `data:`. That filter looked harmless and was
+                    // fatal: OpenAI SSE is bare `data:` lines, but Anthropic SSE
+                    // leads with `event: message_start`, so EVERY Anthropic
+                    // event was dropped and the "streaming" rows streamed
+                    // nothing. The test was named stream, called stream(), and
+                    // never received a chunk.
+                    // Yield the WHOLE event block, not just those whose FIRST
+                    // line is `data:`. That filter looked harmless and was
+                    // fatal: OpenAI SSE is bare `data:` lines, but Anthropic SSE
+                    // leads with `event: message_start`, so EVERY Anthropic
+                    // event was dropped and the "streaming" rows streamed
+                    // nothing. The test was named stream, called stream(), and
+                    // never received a chunk.
+                    yield $event . "\n\n";
                 }
             }
         };
@@ -180,6 +192,63 @@ final class OptionPathMatrixTest extends TestCase
      * The tool must reach the wire identically, whichever route configured it
      * and whichever way the call is made.
      */
+    /**
+     * The regression for the empty-response contract.
+     *
+     * Asserting the streamed text above is NOT enough: a stream that yields
+     * something satisfies it whether or not the empty case throws. This is the
+     * test that actually pins the contract, and the matrix could never have
+     * supplied it.
+     *
+     * Upstream throws on BOTH paths — chat_models.ts:750 guards the streaming
+     * loop with `if (!sawEvent) throw new Error("Received empty response from
+     * chat model call.")`, :825 guards eager aggregation the same way. The
+     * port's stream() used to call handleLLMEnd with an empty result and
+     * RETURN, so one condition answered cleanly from stream() and threw from
+     * invoke(), and a tracer saw an end event on one path and an error on the
+     * other.
+     */
+    #[DataProvider('emptyStreamSources')]
+    public function testAStreamThatProducesNothingThrows(string $label, \Closure $make): void
+    {
+        $empty = new class implements HttpClient {
+            public function post(string $u, array $h, string $b, array $q = [], ?float $t = null): HttpResponse
+            {
+                return new HttpResponse(200, [], '');
+            }
+
+            public function postStream(string $u, array $h, string $b, array $q = [], ?float $t = null): \Generator
+            {
+                // A well-formed stream that simply carries no text, not a
+                // malformed one. The path is asked to answer and cannot.
+                if (false) {
+                    yield '';
+                }
+
+                return;
+            }
+        };
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Received empty response from chat model call.');
+
+        foreach ($make($this, $empty)->stream([new HumanMessage('hi')]) as $ignored) {
+            // Consume the stream; the throw is expected before completion.
+        }
+    }
+
+    public static function emptyStreamSources(): array
+    {
+        // Derived from the SAME sources() the matrix uses, so every tool route
+        // is covered and a source cannot be added without being covered here.
+        $rows = [];
+        foreach (self::sources() as $name => [$class, $make]) {
+            $rows[$name] = [$name, $make];
+        }
+
+        return $rows;
+    }
+
     #[DataProvider('matrix')]
     public function testEveryRouteSendsTheSameToolDefinition(
         string $class,
@@ -193,8 +262,15 @@ final class OptionPathMatrixTest extends TestCase
         if ($mode === 'eager') {
             $model->invoke([new HumanMessage('hi')]);
         } else {
-            foreach ($model->stream([new HumanMessage('hi')]) as $ignored) {
+            $content = '';
+            foreach ($model->stream([new HumanMessage('hi')]) as $pair) {
+                $content .= (string) ($pair[1]->content ?? '');
             }
+            self::assertSame(
+                'ok',
+                $content,
+                sprintf('%s / %s: streaming produced %d chars, expected the fixture text', $class, $mode, strlen($content)),
+            );
         }
 
         self::assertNotEmpty($http->bodies, 'no request was sent');

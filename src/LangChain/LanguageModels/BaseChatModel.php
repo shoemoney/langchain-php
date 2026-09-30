@@ -441,13 +441,27 @@ abstract class BaseChatModel extends BaseLanguageModel
                 yield [self::CHANNEL_DEFAULT, $chunk->message];
             }
 
-            $ended = true;
-
+            // An empty stream is an ERROR here exactly as it is on the eager
+            // path. Upstream says so in both places: chat_models.ts:750 guards
+            // the streaming loop with `if (!sawEvent) throw new Error("Received
+            // empty response from chat model call.")`, and :825 guards the
+            // eager aggregation with `if (aggregated === undefined) throw`.
+            //
+            // This branch used to call handleLLMEnd with an empty result and
+            // RETURN, so one condition produced a clean empty answer from
+            // stream() and an exception from invoke(), and a tracer saw an end
+            // event on one path and an error on the other.
+            //
+            // It survived two reverts because the matrix fixture masked it from
+            // both sides — a delta with no block, and a recorder that dropped
+            // every Anthropic event, both hidden by this silent return. The
+            // throw precedes `$ended` so the catch below records the failure
+            // through handleLLMError rather than ending the run cleanly.
             if ($aggregated === null) {
-                $runManager?->handleLLMEnd(new LLMResult([[]], []));
-
-                return;
+                throw new \RuntimeException('Received empty response from chat model call.');
             }
+
+            $ended = true;
 
             $runManager?->handleLLMEnd(new LLMResult(
                 [[new ChatGeneration($aggregated->message, $aggregated->text, $aggregated->generationInfo)]],
