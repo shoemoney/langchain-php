@@ -117,8 +117,33 @@ final class FixesAreDocumentedTest extends TestCase
             . ' && git show --name-only --pretty=format: HEAD 2>/dev/null ' . escapeshellarg($hash)
         );
 
-        foreach (explode("\n", $files) as $f) {
-            if (str_starts_with(trim($f), 'src/')) {
+        $paths = array_values(array_filter(array_map('trim', explode("\n", $files))));
+
+        // A shallow clone has no parent to diff against, so `git show` diffs
+        // against the EMPTY tree and returns the entire repository — measured at
+        // 419 files, every one of the 229 under src/. That does not mean the
+        // commit touched src/; it means the question cannot be answered, and
+        // answering "yes" silently exempts nothing.
+        //
+        // Rather than guess, treat an implausible list as no information and let
+        // the commit be judged on its subject. Same principle as the history
+        // assertion above: prove you can see what you need, or say you cannot.
+        $srcCount = count(array_filter($paths, static fn (string $p): bool => str_starts_with($p, 'src/')));
+        if ($paths !== [] && $srcCount > 50) {
+            // A whole-tree listing, not a diff. Guessing either way is wrong:
+            // returning true demands a ledger row for commits that only touched
+            // the harness and fails the build on them, which is exactly what
+            // happened once already. Returning false exempts every port fix,
+            // which is worse and quieter. So the guard stops and says so.
+            self::fail(
+                'git show returned ' . count($paths) . ' files (' . $srcCount . ' under src/), which is a '
+                . 'whole-tree listing rather than a commit diff — the checkout is shallow. '
+                . 'CI must use fetch-depth: 0 for this guard to work; see .github/workflows/ci.yml.',
+            );
+        }
+
+        foreach ($paths as $f) {
+            if (str_starts_with($f, 'src/')) {
                 return true;
             }
         }

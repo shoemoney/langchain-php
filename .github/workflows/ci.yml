@@ -18,6 +18,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history on purpose. `FixesAreDocumentedTest` walks `git log`, and
+          # a depth-1 clone breaks it twice over: `git log main` fails outright
+          # on a detached HEAD, and `git show --name-only` diffs against the
+          # EMPTY tree, so it lists all 419 files and reports every commit as
+          # having touched src/. A shallow checkout does not merely weaken the
+          # guard, it inverts it.
+          fetch-depth: 0
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -49,6 +57,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history on purpose. `FixesAreDocumentedTest` walks `git log`, and
+          # a depth-1 clone breaks it twice over: `git log main` fails outright
+          # on a detached HEAD, and `git show --name-only` diffs against the
+          # EMPTY tree, so it lists all 419 files and reports every commit as
+          # having touched src/. A shallow checkout does not merely weaken the
+          # guard, it inverts it.
+          fetch-depth: 0
 
       - uses: shivammathur/setup-php@v2
         with:
