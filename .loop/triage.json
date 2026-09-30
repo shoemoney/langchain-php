@@ -1051,7 +1051,8 @@
   "no longer repeats stepConfig (comment fix worked); DID repeat the pre-55 stream behaviour from a bottom-closed entry"
  ],
  "advisory/gemma-4-26b-a4b-it-free": [
-  "NOT A REVIEW: http_429 (third advisory rate-limit: iters 75, 82, 99)"
+  "NOT A REVIEW: http_429 (third advisory rate-limit: iters 75, 82, 99)",
+  "NOT A REVIEW: http_429 \u2014 measured transient, NOT free-tier and NOT small-ctx"
  ],
  "milestone/iteration-100": [
   "#MILESTONE, recorded because a hundred iterations is a point at which the shape of the work is worth naming rather than assuming. Measured at iteration 100: 2315 tests / 6406 assertions green, 230 source files, 107 test files, PHP 8.2/8.3/8.4 plus coverage in CI, v0.1.0 cut and main pushed every iteration.",
@@ -1254,5 +1255,19 @@
   "#THE ADVISORY ALSO CLAIMS 'the \u00a76 OpenAI row contradicts the \u00a76 Anthropic row'. That is DEFERRED and I want the reason on the record: it would be a claim about two long prose rows, and I have no budget to read both and say precisely what contradicts what. 'These two rows contradict' is the shape of claim that has been right (the 106/107 runName pair, iteration 125) and wrong (the taxonomy, iterations 119/123) in roughly equal measure, so it needs the read.",
   "#ELEMENTS 2 (public-api), 3 (composition), 5 (fidelity) and 6 (test-strategy, 'sound, with specific blind spots') were NOT AUDITED. Element 6's blind spots are the most interesting thing in the file and the one I would take next: a list of what the suite cannot see is a to-do list, unlike a verdict, which is only a signal.",
   "#7 ACCEPTED: \u00a76 had a 2-cell row under a 3-column header; both doc guards passed regardless"
+ ],
+ "audit/advisory-429-root-cause": [
+  "#OPEN \u2014 THE 429s ARE TRANSIENT RATE LIMITS, AND BOTH OF MY HYPOTHESES WERE WRONG. Four advisory/ask failures are recorded and I formed two explanations in one go; measured, neither survives.",
+  "#    dots-studio/dots-3-note-preview:free   ctx=512000",
+  "#    inclusionai/ling-3.0-flash-vl           ctx=262144",
+  "#    minimax/minimax-m3                     ctx=1048576",
+  "#    nex-agi/nex-n2.5-mini                   ctx=262144",
+  "#    rekaai/reka-edge                        ctx=16384",
+  "#    stepfun/step-3.7-flash                  ctx=262144",
+  "#HYPOTHESIS 1, 'the free tier is rate-limited': FALSE. Only ONE of the six is `:free`; the other five are paid models, and the roster carries 6 free-tier entries of 75 while only 1 of them failed. Tier does not predict failure.",
+  "#HYPOTHESIS 2, 'it is the small context': ALMOST ENTIRELY FALSE. Five of six failing models have a LARGE roster ctx (262144, 512000, 1048576). Only `rekaai/reka-edge` at 16384 is genuinely small \u2014 and that one was the real, deterministic case the iteration-130 fix addressed. The roster holds 3 models under 90k and only 1 of them failed.",
+  "#WHAT IS LEFT IS THE UNEXCITING ANSWER, which is also the correct one: an HTTP 429 is a RATE LIMIT, a transient condition of the provider at that moment, not a property of the model. The models are not too small and not too free; they were busy. That is what the status code means, and I should have read the code before building two theories on top of it.",
+  "#THE HARNESS BEHAVIOUR THAT IS ACTUALLY WRONG, and it is the one worth fixing: a 429 marks the model as ASKED in `.loop/state.json` even though no review happened. That is the second time (iteration 129's 400) that an errored call has been recorded as a completed one, and it is a bookkeeping field lying about an event. The correct behaviour for a 429 specifically is a RETRY of the same model, because unlike a 400 or a 404 the model is fine and the provider was briefly unwilling \u2014 which means today's four lost advisory slots were all recoverable for the cost of a second call.",
+  "#NOT FIXED: no budget left to add retry-on-429 with backoff, and doing it without testing against a live 429 would be the unverified-harness-change pattern this loop keeps flagging in itself. The finding is recorded so the next iteration inherits a measured root cause rather than a theory \u2014 which is the difference this loop has been paying for in reverts, false findings and 429s counted as coverage."
  ]
 }
