@@ -775,5 +775,9 @@
   "#The reviewer's evidence line was accurate but the conclusion does not follow; a value ABOVE PHP_INT_MAX would be needed to show anything, and json_decode turns those into floats, so the two would still agree on the common range. Rejected with a measurement rather than an argument.",
   "#4 'Embedded backticks truncate fenced JSON' \u2014 DEFERRED unverified. The quoted regex `/^```(?:json)?\\s*([\\s\\S]*?)```/` is non-greedy and does look fragile against a backtick inside the payload, but nothing was executed and I am not recording a verdict I did not reach.",
   "#1 ACCEPTED+FIXED (reversed str_starts_with args); #3 REJECTED on measurement; #2/#5 confirmed, queued"
+ ],
+ "audit/falsy-escape-fffd": [
+  "#FIXED, and this is the project's own signature bug class arriving in its purest possible form. `mb_chr($code, 'UTF-8') ?: \"\\u{FFFD}\"` looks like a safe fallback and is not, because `\"0\"` is FALSY in PHP. `mb_chr(0x30)` returns the one-character string `\"0\"`, the `?:` reads that as failure, and U+FFFD comes out instead. Measured before the fix: `{\"a\": \"x\\u0030y\"}` -> `{\"a\":\"x\\ufffdy\"}`. The escape for the digit ZERO decoded to a replacement character \u2014 the falsy-vs-absent mistake with the literal digit zero as its subject, which is almost too neat. `\\u0000` was the same trap one layer down and now decodes to NUL. The same shape guarded the astral reassembly, so a supplementary-plane character could have been replaced too. mb_chr returns `string|false`, so all three sites now go through `encodeCodePoint()` with `=== false`. MUTATION-VERIFIED: restore the `?:` fallback -> 1 failure (RED), restore the fix -> OK (GREEN).",
+  "FIXED: '0' is falsy, so ?: turned mb_chr(0x30) into U+FFFD"
  ]
 }

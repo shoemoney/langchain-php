@@ -103,4 +103,34 @@ final class PartialJsonTruncationTest extends TestCase
             'literal before a string' => ['{"a": true, "b": "x"}', ['a' => true, 'b' => 'x']],
         ];
     }
+
+    /**
+     * An escape for a FALSY character must decode to that character.
+     *
+     * `mb_chr($code) ?: "\u{FFFD}"` looks like a safe fallback and is not: `"0"`
+     * is FALSY in PHP, so `mb_chr(0x30)` returned the one-character string `"0"`,
+     * the `?:` read that as failure, and U+FFFD came out instead. Measured:
+     *
+     *     {"a": "x\u0030y"}  ->  {"a":"x\ufffdy"}
+     *
+     * The digit zero is the character this defect is named after, and `\u0000`
+     * is the same trap one layer down. mb_chr returns `string|false`, so the only
+     * correct test is `=== false`.
+     *
+     * @param string $json
+     */
+    #[DataProvider('falsyEscapes')]
+    public function testAFalsyCharacterEscapesDecodesToThatCharacter(string $json, string $expected): void
+    {
+        $this->assertSame($expected, (new PartialJsonParser($json))->parse()['a']);
+    }
+
+    public static function falsyEscapes(): array
+    {
+        return [
+            'zero' => ['{"a": "x\u0030y"}', 'x0y'],
+            'nul' => ['{"a": "nul=\u0000end"}', "nul=\x00end"],
+            'ordinary letter unaffected' => ['{"a": "A\u0041B"}', 'AAB'],
+        ];
+    }
 }

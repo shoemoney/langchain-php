@@ -187,6 +187,28 @@ final class PartialJsonParser
         return $result;
     }
 
+    /**
+     * Encode a code point, falling back to U+FFFD only when mbstring REFUSES it.
+     *
+     * The obvious `mb_chr($code, 'UTF-8') ?: "\u{FFFD}"` is wrong, and wrong in
+     * the most PHP way possible: `"0"` is FALSY. So `mb_chr(0x30)` returns the
+     * one-character string `"0"`, the `?:` reads that as failure, and every
+     * escape for a literal zero — plus `\u0000`, NUL, which is equally falsy in
+     * spirit — decoded to U+FFFD. Measured before the fix:
+     *
+     *     {"a": "x\u0030y"}  ->  {"a":"x\ufffdy"}
+     *
+     * The same shape guarded the astral reassembly, so a supplementary-plane
+     * character whose encoding was falsy would have been replaced too. mb_chr
+     * returns `string|false`, so the only correct test is `=== false`.
+     */
+    private static function encodeCodePoint(int $code): string
+    {
+        $char = mb_chr($code, 'UTF-8');
+
+        return $char === false ? "\u{FFFD}" : $char;
+    }
+
     private function parseUnicodeEscape(): string
     {
         $hex = mb_substr($this->buffer, $this->pos + 1, 4, 'UTF-8');
@@ -243,7 +265,7 @@ final class PartialJsonParser
 
                     $scalar = 0x10000 + (($high - 0xD800) << 10) + ($code - 0xDC00);
 
-                    return mb_chr($scalar, 'UTF-8') ?: "\u{FFFD}";
+                    return self::encodeCodePoint($scalar);
                 }
 
                 // A plain BMP escape. Anything left pending was a high surrogate
@@ -251,10 +273,10 @@ final class PartialJsonParser
                 if ($this->pendingHighSurrogate !== null) {
                     $this->pendingHighSurrogate = null;
 
-                    return "\u{FFFD}" . (mb_chr($code, 'UTF-8') ?: "\u{FFFD}");
+                    return "\u{FFFD}" . self::encodeCodePoint($code);
                 }
 
-                return mb_chr($code, 'UTF-8') ?: "\u{FFFD}";
+                return self::encodeCodePoint($code);
             }
 
             // Fewer than four digits: emit the raw text WITH ITS BACKSLASH.
