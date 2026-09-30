@@ -25,10 +25,10 @@ use LangChain\Schema\PromptValue;
  *
  * The default implementations are meaningful rather than abstract, because
  * most runnables only need to override one: `stream` yields a single
- * `default`-channel chunk carrying the `invoke` result, and `batch` is a plain
- * sequential `array_map` over `invoke` — PHP is synchronous, so there is no
- * concurrency to cap. (`batch()`'s own docblock said so; this one claimed the
- * opposite, in the same file.)
+ * `default`-channel chunk carrying the `invoke` result, and `batch` maps inputs
+ * to results sequentially — PHP is synchronous, so there is no concurrency to
+ * cap. The wording here previously promised a cap that the method's own
+ * docblock rules out; it now agrees with it.
  */
 interface RunnableInterface
 {

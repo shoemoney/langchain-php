@@ -1887,6 +1887,47 @@
    "chars": 4195,
    "findings": 5,
    "severity_hits": 5
+  },
+  "google/gemma-4-26b-a4b-it:free": {
+   "model": "google/gemma-4-26b-a4b-it:free",
+   "at": "2026-09-29T22:20:07",
+   "status": "http_429",
+   "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Google AI Studio\",\"is_byok\":false,\"provider_error_code\":\"429\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hi"
+  },
+  "qwen/qwen3.7-flash": {
+   "model": "qwen/qwen3.7-flash",
+   "at": "2026-09-29T22:20:17",
+   "actual_model": "qwen/qwen3.7-flash",
+   "usage": {
+    "prompt_tokens": 29074,
+    "completion_tokens": 12728,
+    "total_tokens": 41802,
+    "cost": 0.00252686,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.00252686,
+     "upstream_inference_prompt_cost": 0.00087222,
+     "upstream_inference_completions_cost": 0.00165464
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 12006,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 12006,
+   "status": "ok",
+   "file": ".loop/reviews/61-qwen__qwen3.7-flash.md",
+   "chars": 3209,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2005,7 +2046,9 @@
   "z-ai/glm-5.3-flash",
   "google/gemini-3.1-flash-lite-preview",
   "openrouter/free",
-  "google/gemini-3.5-flash"
+  "google/gemini-3.5-flash",
+  "google/gemma-4-26b-a4b-it:free",
+  "qwen/qwen3.7-flash"
  ],
  "next_index": 0
 }
