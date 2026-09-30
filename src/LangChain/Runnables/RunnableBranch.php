@@ -61,7 +61,9 @@ class RunnableBranch extends Runnable
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
         foreach ($this->branches as [$condition, $runnable]) {
-            if ($condition($input)) {
+            // See conditionMatches(): upstream invokes each condition WITH the
+            // caller's config (branch.ts:152-161).
+            if ($this->conditionMatches($condition, $input, $config)) {
                 return $runnable->invoke($input, $config);
             }
         }
@@ -73,6 +75,62 @@ class RunnableBranch extends Runnable
         throw new \RuntimeException(
             'No branch matched and no default branch was set on RunnableBranch.'
         );
+    }
+
+    /**
+     * Evaluate one branch condition WITH the caller's config.
+     *
+     * Upstream coerces each condition to a RunnableLike and invokes it as
+     * `condition.invoke(input, patchConfig(config, {callbacks:
+     * runManager?.getChild(`condition:${i + 1}`)}))` (branch.ts:152-161) — so a
+     * condition sees the run config, and one that is itself a chain can emit
+     * callbacks under its own child tag.
+     *
+     * This port stored conditions as plain callables and called them as
+     * `$condition($input)`, so a condition could never observe the config: it
+     * could not read tags, metadata or `configurable`, and could not take part
+     * in tracing. That is the divergence this fixes.
+     *
+     * PHP conditions are callables rather than RunnableLikes, so the faithful
+     * equivalent of `invoke(input, config)` is passing the config as the second
+     * argument — but only to conditions that DECLARE it. A one-argument
+     * condition is still called with one argument, exactly as before, so every
+     * existing condition keeps working and none has to be rewritten. Arity comes
+     * from reflection rather than a guess, and a variadic condition gets both.
+     *
+     * The child callback tags upstream also applies are deliberately NOT
+     * reproduced: they belong to tracing, which this port does not yet thread
+     * through branches. Recorded as a known non-exact behaviour rather than
+     * half-built.
+     *
+     * @param callable(mixed, ?RunnableConfig=): mixed $condition
+     */
+    private function conditionMatches(callable $condition, mixed $input, ?RunnableConfig $config): bool
+    {
+        $reflection = $this->reflectCondition($condition);
+
+        if ($reflection === null || $reflection->isVariadic() || $reflection->getNumberOfParameters() >= 2) {
+            return (bool) $condition($input, $config);
+        }
+
+        return (bool) $condition($input);
+    }
+
+    private function reflectCondition(callable $condition): ?\ReflectionFunctionAbstract
+    {
+        if ($condition instanceof \Closure) {
+            return new \ReflectionFunction($condition);
+        }
+
+        if (is_array($condition)) {
+            return new \ReflectionMethod($condition[0], (string) $condition[1]);
+        }
+
+        if (is_string($condition) && str_contains($condition, '::')) {
+            return new \ReflectionMethod($condition);
+        }
+
+        return new \ReflectionFunction($condition);
     }
 
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array

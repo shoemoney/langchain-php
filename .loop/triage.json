@@ -702,7 +702,8 @@
   "#AND THE PART THAT WAS NEVER WRONG. Upstream also forwards the previous step's LAST chunk (`finalOutput`) as the next step's input, so the reviewer's headline 'forwards only the LAST chunk of the first step downstream' describes UPSTREAM BEHAVIOUR, not a defect. That phrase should not have read as a BLOCKER at all, and I accepted the severity before reading upstream's loop.",
   "#THE LESSON, and it is the fixture rule biting a third time but from the other direction. Twice before, a fixture MIRRORED a bug and hid it. This time a fixture INVENTED a bug and I promoted it to the highest severity this loop has produced, then pinned it as next iteration's first job. A one-line read of RunnableLambda would have caught it before the write-up. The rule protects against fixtures that agree with the code; it equally protects against fixtures that DISAGREE with it.",
   "#NET: still one real, ACCEPTED divergence (downstream steps are invoked rather than streamed, so a streaming step in the middle of a chain emits nothing), still unfixed and still worth fixing \u2014 but it is MAJOR, not BLOCKER, and the ledger now says so instead of leaving a BLOCKER I cannot substantiate.",
-  "CORRECTED: Generator TypeError was my fixture; real divergence is MAJOR not BLOCKER"
+  "CORRECTED: Generator TypeError was my fixture; real divergence is MAJOR not BLOCKER",
+  "#5 ACCEPTED+FIXED: branch conditions now receive config, mutation-verified"
  ],
  "audit/sequence-stream-divergence": [
   "#STILL UNFIXED, and this iteration did not establish that it is OBSERVABLE. The code divergence is real and unchanged: RunnableSequence::stream() streams the first step and then INVOKES steps 2..n, yielding only their final value, while upstream streams every step and yields each step's own pairs.",

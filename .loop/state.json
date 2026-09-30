@@ -3184,6 +3184,41 @@
    "chars": 3738,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~openai/gpt-mini-latest": {
+   "model": "~openai/gpt-mini-latest",
+   "at": "2026-09-30T06:27:34",
+   "actual_model": "openai/gpt-5.4-mini",
+   "usage": {
+    "prompt_tokens": 40266,
+    "completion_tokens": 15636,
+    "total_tokens": 55902,
+    "cost": 0.1005615,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.1005615,
+     "upstream_inference_prompt_cost": 0.0301995,
+     "upstream_inference_completions_cost": 0.070362
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 14980,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 14980,
+   "status": "ok",
+   "file": ".loop/reviews/102-~openai__gpt-mini-latest.md",
+   "chars": 2707,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -3347,7 +3382,8 @@
   "~openai/gpt-terra-latest",
   "~google/gemini-pro-latest",
   "~anthropic/claude-fable-latest",
-  "perplexity/sonar-pro-search"
+  "perplexity/sonar-pro-search",
+  "~openai/gpt-mini-latest"
  ],
  "next_index": 0
 }

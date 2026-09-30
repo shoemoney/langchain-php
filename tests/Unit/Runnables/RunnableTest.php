@@ -429,4 +429,64 @@ final class RunnableTest extends TestCase
 
         $this->assertSame(5, $sequence->invoke(5));
     }
+
+    /**
+     * A branch condition must receive the caller's config.
+     *
+     * Upstream coerces each condition to a RunnableLike and invokes it as
+     * `condition.invoke(input, patchConfig(config, {callbacks:
+     * runManager?.getChild(`condition:${i + 1}`)}))` (branch.ts:152-161). This
+     * port called conditions as `$condition($input)`, so a condition could never
+     * observe the config — it could not read tags, metadata or `configurable`,
+     * and could not participate in tracing at all.
+     *
+     * The second test below is the important one: a one-argument condition must
+     * still be invoked with one argument, or the fix would break every existing
+     * condition in the library.
+     */
+    public function testABranchConditionReceivesTheCallersConfig(): void
+    {
+        $seen = null;
+        $capturing = static function ($input, $config) use (&$seen): bool {
+            $seen = $config;
+
+            return true;
+        };
+
+        $branch = new RunnableBranch([
+            [$capturing, RunnableLambda::from(static fn (): string => 'matched')],
+        ]);
+
+        $branch->invoke('in', new RunnableConfig(tags: ['probe']));
+
+        $this->assertInstanceOf(RunnableConfig::class, $seen);
+        $this->assertContains('probe', $seen->tags);
+    }
+
+    public function testAOneArgumentBranchConditionStillReceivesExactlyOneArgument(): void
+    {
+        $branch = new RunnableBranch([
+            [static fn (string $x): bool => $x === 'in', RunnableLambda::from(static fn (): string => 'legacy')],
+        ]);
+
+        $this->assertSame('legacy', $branch->invoke('in'));
+    }
+
+    public function testAVariadicBranchConditionReceivesTheConfig(): void
+    {
+        $count = 0;
+        $variadic = static function (...$args) use (&$count): bool {
+            $count = count($args);
+
+            return true;
+        };
+
+        $branch = new RunnableBranch([
+            [$variadic, RunnableLambda::from(static fn (): string => 'variadic')],
+        ]);
+
+        $branch->invoke('in', new RunnableConfig(tags: ['probe']));
+
+        $this->assertSame(2, $count);
+    }
 }
