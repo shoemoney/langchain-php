@@ -2103,6 +2103,41 @@
    "chars": 2805,
    "findings": 5,
    "severity_hits": 5
+  },
+  "qwen/qwen3.5-flash-02-23": {
+   "model": "qwen/qwen3.5-flash-02-23",
+   "at": "2026-09-30T00:12:47",
+   "actual_model": "qwen/qwen3.5-flash-02-23",
+   "usage": {
+    "prompt_tokens": 42536,
+    "completion_tokens": 4814,
+    "total_tokens": 47350,
+    "cost": 0.00401648,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.00401648,
+     "upstream_inference_prompt_cost": 0.00276484,
+     "upstream_inference_completions_cost": 0.00125164
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 4000,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 4000,
+   "status": "ok",
+   "file": ".loop/reviews/67-qwen__qwen3.5-flash-02-23.md",
+   "chars": 3641,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2230,7 +2265,9 @@
   "google/gemini-3-flash-preview",
   "qwen/qwen3.6-flash",
   "qwen/qwen3.6-flash",
-  "qwen/qwen3.6-flash"
+  "qwen/qwen3.6-flash",
+  "qwen/qwen3.5-flash-02-23",
+  "qwen/qwen3.5-flash-02-23"
  ],
  "next_index": 0
 }

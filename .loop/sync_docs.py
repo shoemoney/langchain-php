@@ -128,13 +128,22 @@ def main() -> None:
         sys.exit("PORT_STATUS.md has no '**Total so far**' row to update")
     status.write_text(s, encoding="utf-8")
 
-    test_files = sum(1 for _ in (ROOT / "tests").rglob("*.php"))
+    # BOTH counts. This previously updated only the test-file figure, so adding
+    # a src file left the Size row stale and DocsMatchRealityTest failed on a
+    # number the script was supposed to own.
+    def count(where: str) -> int:
+        return sum(1 for _ in (ROOT / where).rglob("*.php"))
+
+    test_files = count("tests")
+    src_files = count("src")
+
     hand = ROOT / "HANDOFF.md"
     s = hand.read_text(encoding="utf-8")
     s = re.sub(r"· \d+ test files", f"· {test_files} test files", s, count=1)
+    s = re.sub(r"\| Size \| \d+ src files", f"| Size | {src_files} src files", s, count=1)
     hand.write_text(s, encoding="utf-8")
 
-    print(f"  HANDOFF.md + PORT_STATUS.md synced to {tests} / {assertions}, {test_files} test files")
+    print(f"  HANDOFF.md + PORT_STATUS.md synced to {tests} / {assertions}, {src_files} src + {test_files} test files")
 
 
 if __name__ == "__main__":

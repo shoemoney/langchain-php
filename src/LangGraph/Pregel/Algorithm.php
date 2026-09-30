@@ -621,17 +621,21 @@ final class Algorithm
             $raw = $sends[$index];
             $packet = Send::fromMixed($raw);
             if ($packet === null) {
-                trigger_error(
-                    'Ignoring invalid packet ' . json_encode($raw) . ' in pending sends.',
-                    E_USER_WARNING
+                // Upstream warns and continues (algo.ts:860-861) with this exact
+                // message. `trigger_error(..., E_USER_WARNING)` is not that here:
+                // phpunit.xml sets `failOnWarning="true"`, so the notice became a
+                // TEST FAILURE and a recoverable condition could not be tested.
+                // Recorded instead — see LangChain\Utils\Notice.
+                \LangChain\Utils\Notice::record(
+                    'Ignoring invalid packet ' . json_encode($raw) . ' in pending sends.'
                 );
 
                 return null;
             }
             if (!isset($processes[$packet->node])) {
-                trigger_error(
-                    'Ignoring unknown node name ' . $packet->node . ' in pending sends.',
-                    E_USER_WARNING
+                // As above — upstream warns and continues (algo.ts:866-867).
+                \LangChain\Utils\Notice::record(
+                    'Ignoring unknown node name ' . $packet->node . ' in pending sends.'
                 );
 
                 return null;

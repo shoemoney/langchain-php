@@ -518,32 +518,29 @@ final class AlgorithmTest extends TestCase
 
         // A `Send` naming a node that does not exist is a user error, but it
         // must not take the whole run down with it — the packet is dropped and
-        // the run continues. The engine warns rather than throwing, so the
-        // warning is caught here and asserted on.
-        $warnings = [];
-        set_error_handler(static function (int $errno, string $message) use (&$warnings): bool {
-            $warnings[] = $message;
+        // the run continues. The engine records rather than throwing, matching
+        // upstream's `console.warn` (algo.ts:866-867).
+        //
+        // This used to install a `set_error_handler` purely to catch the
+        // E_USER_WARNING the engine raised on purpose, because phpunit.xml sets
+        // `failOnWarning="true"` and the notice would otherwise fail the suite.
+        // A test that has to trap the thing under test to let the suite pass is
+        // a test documenting a defect; the notice is now readable instead.
+        \LangChain\Utils\Notice::clear();
 
-            return true;
-        });
-
-        try {
-            $tasks = Algorithm::prepareNextTasks(
-                $checkpoint,
-                null,
-                [],
-                $channels,
-                new RunnableConfig(),
-                true,
-                new NextTaskExtraFields(step: 1, channels: $channels, processes: []),
-            );
-        } finally {
-            restore_error_handler();
-        }
+        $tasks = Algorithm::prepareNextTasks(
+            $checkpoint,
+            null,
+            [],
+            $channels,
+            new RunnableConfig(),
+            true,
+            new NextTaskExtraFields(step: 1, channels: $channels, processes: []),
+        );
 
         $this->assertSame([], $tasks);
-        $this->assertCount(1, $warnings);
-        $this->assertStringContainsString('ghost', $warnings[0]);
+        $this->assertCount(1, \LangChain\Utils\Notice::notices());
+        $this->assertStringContainsString('ghost', \LangChain\Utils\Notice::notices()[0]);
     }
 
     public function testTaskIdIsDeterministicForTheSameCheckpointAndStep(): void

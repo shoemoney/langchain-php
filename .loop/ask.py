@@ -201,11 +201,25 @@ def call(model, content, max_tokens=24000, temperature=0.2):
         "temperature": temperature,
     }
     # Reasoning models bill thinking against the same budget as the answer, and
-    # one that thinks for 6k tokens and gets cut off yields a review that looks
-    # finished and is not. Ask for a modest reasoning effort where supported.
-    effort = os.environ.get("LOOP_REASONING_EFFORT", "low")
-    if effort:
-        payload["reasoning"] = {"effort": effort}
+    # one that thinks for 24k and gets cut off yields NO review at all.
+    #
+    # This used to send `reasoning: {effort: "low"}`, which is measured to be
+    # IGNORED by these models: reasoning_tokens came back 0 and the deliberation
+    # arrived in the CONTENT as a "Thinking Process:" preamble. That is the
+    # budget being eaten where nothing counts it.
+    #
+    # Measured on qwen/qwen3.5-flash-02-23, asking for three colours:
+    #   no param          completion=215 reasoning=0    content='Thinking Process:...'
+    #   effort: low       completion=223 reasoning=0    content='Thinking Process:...'
+    #   max_tokens: 500   completion=200 reasoning=184  content='1. Red\n2. Blue\n3. Green'
+    #   both together     HTTP 400 Bad Request — the two forms are mutually exclusive
+    #
+    # So `max_tokens` is the form that bounds thinking, and sending both is a
+    # hard error rather than a silent preference. Overridable for a model that
+    # needs more room.
+    reason_max = os.environ.get("LOOP_REASONING_MAX_TOKENS", "4000")
+    if reason_max:
+        payload["reasoning"] = {"max_tokens": int(reason_max)}
     body = json.dumps(payload).encode()
     req = urllib.request.Request(ENDPOINT, data=body, headers={
         "Authorization": f"Bearer {KEY}",
