@@ -11,6 +11,8 @@ use LangChain\Tools\DynamicTool;
 use LangChain\Tools\Schema;
 use LangChain\Tools\StructuredTool;
 use LangChain\Tools\ToolException;
+use LangChain\Tools\ToolOutput;
+use LangChain\Tools\ToolUtils;
 use LangChain\Tracers\CallbackHandler;
 use LangChain\Utils\Testing\FakeTracer;
 use PHPUnit\Framework\Attributes\CoversClass;

@@ -25,10 +25,10 @@ know before you start.
 |---|---|
 | Path | `/Users/shoemoney/Projects/langchain-php` |
 | Repo | `github.com/shoemoney/langchain-php` (public) |
-| Branch | `main`, 10 commits (provider work uncommitted — see "Do not") |
+| Branch | `main`, pushed to `github.com/shoemoney/langchain-php` |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **2101 passing, 5963 assertions** |
-| Size | 229 src files / 33,452 lines · 71 test files / 20,613 lines |
+| Tests | **2103 passing, 5967 assertions** |
+| Size | 229 src files / 33,452 lines · 72 test files / 20,786 lines |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
 It is a separate project. It happens to contain two upstream TypeScript
