@@ -572,7 +572,16 @@ def main():
     png = base64.b64encode((LOOP / "arch.png").read_bytes()).decode()
     attach_png = True
 
-    if ctx and ctx < SMALL_CTX:
+    # An UNKNOWN window is not an unlimited one, and it is not `SMALL_CTX`
+    # either: a fallback of exactly SMALL_CTX fails the strict `<` below
+    # (90000 < 90000), which is a silent no-op. Handle "not known to be large"
+    # as its own branch — trim to the smallest budgeted window and drop the
+    # image outright, because the whole point is not to guess. Iteration 207.
+    if ctx <= 0:
+        attach_png = False
+        b = b[:1_500] + "\n\n_[model not in roster: brief truncated to the smallest budgeted window, image dropped]_"
+        print("    (context UNKNOWN - brief trimmed to ~1,500 chars, image dropped)", flush=True)
+    elif ctx < SMALL_CTX:
         effective = ctx - IMAGE_TOKENS - PROMPT_TOKENS
         budget = max(1_500, int(effective * 1.4))
         if len(b) > budget:
