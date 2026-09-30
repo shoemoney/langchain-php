@@ -126,18 +126,17 @@ could see it: `DocsMatchRealityTest` checks counts, not framing.
 Each row below is pinned by a test, so the boundary stays visible rather than being
 rediscovered as a surprise.
 
-**A third category, added because the first two were not enough.** The rows here are
-IMPOSIBLE-IN-PHP or DELIBERATE-CHOICE divergences: things PHP cannot express, and
-things this port chose differently on purpose. Both are settled — the upstream side has
-been read and the PHP side is pinned by a test.
+**What is NOT in this table, stated plainly so the taxonomy has no third entry.**
+A divergence this project has only HALF-verified — the upstream side not yet read,
+because the file is not in this checkout — is not one of the two kinds above and does
+not belong here. Several such findings exist in the triage ledger with their reasons
+recorded. Putting one here would place a guess beside a measurement with nothing to
+distinguish them, and the reader has no way to tell which is which. An earlier revision
+of this preamble named a "third category" and then said third-kind rows did not belong
+in the table, which is the same muddle from the other direction: it implied the table
+held three kinds while enumerating two.
 
-A row that has NOT been compared against upstream does not belong in this table under
-either of those labels, because the honest label is a third one: **UNVERIFIED AGAINST
-UPSTREAM**. Several findings in this loop's ledger have been "confirmed and deferred"
-purely because the upstream file was unreachable from the checkout, and a table with no
-place to record that will eventually list a guess beside a measurement and make the two
-look identical. If you add a row here, be able to say which of the three it is; if you
-cannot, it belongs in the triage ledger with its reason, not here.
+So: two kinds live here, both settled. Unverified lives in the ledger, with its reason.
 
 | Behaviour | Why | Where |
 |---|---|---|

@@ -150,5 +150,12 @@
   "file": ".loop/advisory/sonar.md",
   "chars": 12431,
   "cost": 0.0182
+ },
+ "stealth/space-bunny-alpha": {
+  "status": "ok",
+  "at": "2026-09-30T17:39:59.845564+00:00",
+  "file": ".loop/advisory/space-bunny-alpha.md",
+  "chars": 18832,
+  "cost": 0
  }
 }

@@ -1153,5 +1153,14 @@
  ],
  "minimax/minimax-m3": [
   "NOT A REVIEW: TRUNCATED at the 24k reasoning cap"
+ ],
+ "advisory/space-bunny-alpha": [
+  "#ELEMENT 7 (documentation) CAME BACK `broken` \u2014 the harshest verdict in the pass \u2014 AND IT WAS RIGHT, about a paragraph I had written FOUR ITERATIONS AGO. This is the fourth consecutive time this advisory has found a real problem in my own PORT_STATUS, and the second consecutive time the problem was one I introduced while trying to FIX the previous one.",
+  "#THE DEFECT, quoted from the advisory: the section first says there are 'Two kinds' of divergence, then calls 'A third category' the same impossible-or-deliberate pair, and later calls UNVERIFIED AGAINST UPSTREAM a third thing. It is right. Iteration 119 added a paragraph reading 'A third category, added because the first two were not enough' and then, three sentences later, said rows of that kind 'do not belong in this table under either of those labels'. That names a third member of the table while simultaneously excluding it \u2014 the table's central taxonomy enumerating three kinds and describing two.",
+  "#FIXED by removing the third category from the table's framing entirely, because it was never IN the table. The preamble now says plainly: two kinds live here, both settled; a half-verified divergence \u2014 upstream side unread because the file is not in this checkout \u2014 is not one of them, does not belong here, and lives in the triage ledger with its reason. The reasoning for the exclusion is kept, because 'putting a guess beside a measurement with nothing to distinguish them' is the actual hazard and a reader deserves to know it exists.",
+  "#THE PATTERN IS NOW MEASURED, NOT ANECDOTAL: iterations 108, 119 and 123 are all this advisory or a peer finding a real contradiction in a PORT_STATUS paragraph I had edited to fix the previous contradiction. Twice the fix for a framing problem INTRODUCED the next framing problem. Editing a taxonomy is not the same operation as editing a fact, and I have been treating them alike for twenty-odd iterations.",
+  "#THE CONCRETE LESSON, and it is about sequence rather than content: a document that defines categories should be written ONCE from the thing being categorised, not amended in response to each complaint about it. Both of the last two fixes started from the critic's wording rather than from the table's contents, and both produced a new incoherence. The check that would have caught this one is trivial and I did not run it: count the kinds the preamble claims against the kinds it enumerates.",
+  "#ELEMENTS 1-5, 6 AND 8 WERE NOT AUDITED. The advisory also proposes an architecture/journey gate in CI and a regenerated namespace inventory; both are directions rather than defects and neither was examined this iteration.",
+  "documentation=broken, and RIGHT: my own 2-vs-3 taxonomy muddle; fixed"
  ]
 }
