@@ -43,7 +43,9 @@ class RunnableSequence extends Runnable
         $runnables = [];
         $names = [];
         foreach ($steps as $step) {
-            if (is_array($step) && count($step) === 2 && is_string($step[0])) {
+            // See coerceToRunnable(): the list check is what stops a named
+            // two-key map from indexing a key 0 that does not exist.
+            if (is_array($step) && array_is_list($step) && count($step) === 2 && is_string($step[0])) {
                 $names[] = $step[0];
                 $runnables[] = coerceToRunnable($step[1]);
                 continue;

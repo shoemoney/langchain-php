@@ -18,7 +18,16 @@ function coerceToRunnable(mixed $thing, ?string $name = null): RunnableInterface
         return $thing;
     }
 
-    if (is_array($thing) && count($thing) === 2 && is_string($thing[0]) && (is_callable($thing[1]) || $thing[1] instanceof RunnableInterface)) {
+    // `array_is_list` matters here and its absence was a real defect: a NAMED
+    // two-key map such as ['a' => $one, 'b' => $one] has count 2 but no index 0,
+    // so `$thing[0]` raised `Warning: Undefined array key 0` from inside the
+    // type test, twice over — once here and once in RunnableSequence::from() —
+    // before the clean InvalidArgumentException. The `[name, runnable]` tuple is
+    // positional by definition, so the list check is the correct guard, not a
+    // workaround. Upstream has no equivalent hazard: a JS object has no
+    // positional indexing to guess at, and `coerceToRunnableLike` tests for
+    // `invoke`/`stream` and throws otherwise.
+    if (is_array($thing) && array_is_list($thing) && count($thing) === 2 && is_string($thing[0]) && (is_callable($thing[1]) || $thing[1] instanceof RunnableInterface)) {
         return RunnableLambda::from(
             static fn (mixed $input): mixed => coerceToRunnable($thing[1])->invoke($input),
             []

@@ -372,4 +372,61 @@ final class RunnableTest extends TestCase
         // into one final message.
         $this->assertSame(['Hel', 'lo', ''], $texts);
     }
+
+    /**
+     * A named two-key map must not be probed for a key 0 it does not have.
+     *
+     * The `[name, runnable]` tuple is positional by definition, so recognising it
+     * requires `count() === 2` AND a list. Checking only the count let a named
+     * map such as `['a' => $one, 'b' => $one]` reach `$thing[0]` inside the type
+     * test, which raised `Warning: Undefined array key 0` — twice, once here and
+     * once in `coerceToRunnable()` — before the clean InvalidArgumentException.
+     *
+     * PHPUnit turns that warning into a failure, so the assertion below covers
+     * the warning as well as the exception: pre-fix, this test dies on the
+     * warning rather than reaching the expectException.
+     */
+    public function testANamedTwoKeyMapThrowsCleanlyWithoutAKeyZeroWarning(): void
+    {
+        $one = new RunnableLambda(static fn (int $x): int => $x);
+
+        // PHPUnit REPORTS a warning rather than failing on one, so the first
+        // version of this test was green against the broken code — the
+        // mutation survived with "OK, but there were issues! ... Warnings: 2".
+        // A warning that does not fail is a warning nobody sees, so the handler
+        // below turns any diagnostic raised inside the call into an exception
+        // and lets the assertion below check that none was raised at all.
+        $diagnostics = [];
+        set_error_handler(static function (int $no, string $msg) use (&$diagnostics): bool {
+            $diagnostics[] = $msg;
+
+            return true;
+        });
+
+        try {
+            RunnableSequence::from(['p' => ['a' => $one, 'b' => $one]]);
+            $thrown = null;
+        } catch (\InvalidArgumentException $e) {
+            $thrown = $e;
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $diagnostics, 'a named map must not be probed for a key 0');
+        $this->assertInstanceOf(\InvalidArgumentException::class, $thrown);
+    }
+
+    /**
+     * The positional `[name, runnable]` tuple the guard exists to recognise must
+     * keep working — a list check that rejected every two-element array would
+     * "fix" the warning by breaking the feature.
+     */
+    public function testThePositionalNameRunnableTupleStillCoerces(): void
+    {
+        $one = new RunnableLambda(static fn (int $x): int => $x);
+
+        $sequence = RunnableSequence::from([['named', $one]]);
+
+        $this->assertSame(5, $sequence->invoke(5));
+    }
 }
