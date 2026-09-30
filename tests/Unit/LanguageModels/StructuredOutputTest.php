@@ -397,21 +397,20 @@ final class StructuredOutputTest extends TestCase
         //     the config slot.
         self::assertArrayNotHasKey('runName', $seen->options, 'the name must reach config, not options');
 
-        // (2) The name is STILL LOST downstream, and that is a SEPARATE open
-        //     defect: `RunnableSequence::stepConfig()` overwrites runName with
-        //     `seq:step:1`. Asserted explicitly so this test fails loudly when
-        //     stepConfig is fixed, instead of quietly passing over a known
-        //     defect. PORT_STATUS records it as an outstanding item.
-        self::assertSame('seq:step:1', $seen->runName, 'the sequence clobber is still open');
+        // (2) And the name SURVIVES the sequence. `stepConfig()` used to call
+        //     `forChild('seq:step:N')`, which assigns `run_name` and so destroyed
+        //     the name it was annotating; upstream puts the step tag in the child
+        //     CALLBACKS instead (base.ts:1982-1985). Now `forChild(null)` keeps
+        //     the caller's name and still establishes the parent/child run-id
+        //     relationship.
+        //
+        //     Two defects were STACKED here and this assertion only became
+        //     reachable after both were fixed: the bind slot was wrong (the name
+        //     went to `options`), and then `stepConfig()` clobbered whatever
+        //     arrived. Fixing the lower one first is what made the upper one
+        //     measurable — an earlier attempt at this change saw NULL, which is
+        //     what a preserved-but-absent name looks like.
+        self::assertSame('pull_person', $seen->runName, 'the sequence must not clobber the run name it was given');
 
-        // What is STILL WRONG, and what this test was written to find: the name
-        // does not arrive as the step's runName. `RunnableSequence::stepConfig()`
-        // overwrites it with `seq:step:1`, which is the open defect recorded in
-        // PORT_STATUS as the highest-value item outstanding. Asserting the real
-        // name here would encode the fix as if it were done; asserting the
-        // clobbered value would make the defect permanent. So this asserts the
-        // bind slot — the part this iteration fixed — and leaves the clobber
-        // visible above for whoever closes it.
-        self::assertSame('seq:step:1', $seen->runName, 'the sequence clobber is still open');
     }
 }
