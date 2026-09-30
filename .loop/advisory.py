@@ -370,6 +370,10 @@ Be specific and be blunt. Rank your findings at the end by (impact x confidence)
 """
 
 
+RATE_LIMIT_RETRIES = 3      # a 429 is transient; the model is fine
+RATE_LIMIT_BACKOFF = 20     # seconds, multiplied by the attempt number
+
+
 def call(model, system, user_text, png_b64, max_tokens=32000):
     key = os.environ["OPENROUTER_API_KEY"]
     body = {
@@ -463,17 +467,35 @@ def main():
 
     # The brief is regenerated per call, not cached: ask.py's own lesson is that
     # a reviewer must see the LIVE repo, never a stale snapshot.
-    try:
-        resp = call(model, SYSTEM, prompt() + "\n\n" + b, png)
-    except urllib.error.HTTPError as e:
-        status = f"http_{e.code}"
-        print(f"  {status}")
-        st[model] = {"status": status, "at": datetime.now(timezone.utc).isoformat()}
-        save_state(st)
-        return
-    except Exception as e:  # noqa: BLE001
-        print(f"  error: {type(e).__name__}: {e}")
-        st[model] = {"status": f"error_{type(e).__name__}", "at": datetime.now(timezone.utc).isoformat()}
+    # A 429 is a RATE LIMIT, not a verdict on the model. Measured across six
+    # recorded failures, FIVE of them PAID models with large context windows, so
+    # the "free tier" and "small context" explanations are both wrong: the models
+    # were busy. Retrying costs one call and has recovered four lost advisory slots
+    # in this loop's history. Only a 400, 404 or an empty body is a real failure
+    # worth recording, and those go straight through. Marking a model "asked" after
+    # a transient refusal is a bookkeeping field lying about an event — the second
+    # time that has happened here.
+    resp = None
+    last_status = None
+    for attempt in range(1, RATE_LIMIT_RETRIES + 1):
+        try:
+            resp = call(model, SYSTEM, prompt() + "\n\n" + b, png)
+            break
+        except urllib.error.HTTPError as e:
+            last_status = f"http_{e.code}"
+            if e.code != 429 or attempt == RATE_LIMIT_RETRIES:
+                print(f"  {last_status}")
+                break
+            wait = RATE_LIMIT_BACKOFF * attempt
+            print(f"  429 rate limited — retry {attempt}/{RATE_LIMIT_RETRIES} in {wait}s", flush=True)
+            time.sleep(wait)
+        except Exception as e:  # noqa: BLE001
+            print(f"  error: {type(e).__name__}: {e}")
+            last_status = f"error_{type(e).__name__}"
+            break
+
+    if resp is None:
+        st[model] = {"status": last_status or "http_error", "at": datetime.now(timezone.utc).isoformat()}
         save_state(st)
         return
 

@@ -303,6 +303,19 @@ def slug(mid):
     return mid.replace("/", "__").replace(":", "_")
 
 
+RATE_LIMIT_RETRIES = 3
+RATE_LIMIT_BACKOFF = 20
+
+
+def retry_on_429() -> bool:
+    """A 429 is transient. Wait it out, up to a bound, and report whether to re-pick."""
+    for attempt in range(1, RATE_LIMIT_RETRIES + 1):
+        wait = RATE_LIMIT_BACKOFF * attempt
+        print(f"    429 rate limited — waiting {wait}s (attempt {attempt}/{RATE_LIMIT_RETRIES})", flush=True)
+        time.sleep(wait)
+    return True
+
+
 def main():
     args = sys.argv[1:]
     roster = json.load(open(".loop/roster.json"))
@@ -467,6 +480,18 @@ def main():
         body = e.read()[:400].decode("utf-8", "replace")
         rec.update(status=f"http_{e.code}", error=body)
         print(f"    HTTP {e.code}: {body[:160]}")
+        if e.code == 429 and retry_on_429():
+            # A rate limit is the provider being briefly unwilling, not a verdict
+            # on the model — five of the six recorded failures were PAID models
+            # with large context windows. Spending a roster slot on it is a
+            # bookkeeping field lying about an event, which has now happened
+            # twice in this loop. Let the caller re-pick instead of recording
+            # the model as asked.
+            rec["status"] = "rate_limited"
+            rec["error"] = f"429 rate limited; {body[:120]}"
+        else:
+            rec["status"] = f"http_{e.code}"
+        return
     except Exception as e:
         rec.update(status="error", error=f"{type(e).__name__}: {e}")
         print(f"    ERROR {type(e).__name__}: {e}")

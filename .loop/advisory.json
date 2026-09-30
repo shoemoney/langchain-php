@@ -192,5 +192,12 @@
   "file": ".loop/advisory/claude-opus-5-5.md",
   "chars": 12594,
   "cost": 0.2723
+ },
+ "moonshotai/kimi-k3": {
+  "status": "ok",
+  "at": "2026-09-30T19:22:34.155142+00:00",
+  "file": ".loop/advisory/kimi-k3.md",
+  "chars": 13463,
+  "cost": 0.2328
  }
 }
