@@ -51,5 +51,12 @@
   "file": ".loop/advisory/o4-mini-high.md",
   "chars": 6705,
   "cost": 0.0403
+ },
+ "fireworks/ember-1": {
+  "status": "ok",
+  "at": "2026-09-30T09:34:46.137426+00:00",
+  "file": ".loop/advisory/ember-1.md",
+  "chars": 14023,
+  "cost": 0.2167
  }
 }
