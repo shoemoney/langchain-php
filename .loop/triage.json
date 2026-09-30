@@ -1176,7 +1176,9 @@
   "documentation=broken, and RIGHT: my own 2-vs-3 taxonomy muddle; fixed"
  ],
  "audit/sqlite-list-only-checkpoint-id": [
-  "#OPEN \u2014 CONFIRMED BY READING, NOT FIXED. `SqliteSaver::list()` builds predicates for thread_id, checkpoint_ns and a `checkpoint_id < ?` cursor, and has NO onlyCheckpointId predicate, while `MemorySaver::list()` filters on it at :102/:121 \u2014 so the two savers answer the same call differently and the SQLite one returns the whole thread. The fix is one WHERE clause, deliberately unlanded: no budget left for the two-case test and its mutation.",
-  "CONFIRMED, NOT FIXED (no budget for the mutation matrix); #2/#3 are the next probes"
+  "#RESOLVED \u2014 LANDED AND MUTATION-VERIFIED IN ITERATION 127. `SqliteSaver::list()` now adds a `checkpoint_id = ?` predicate from `configurable['checkpoint_id']`, mirroring `MemorySaver::list()` (:102, :121), so the two savers answer the same call the same way. The whole-thread case is still covered by the existing spec tests, and the new test asserts BOTH: a checkpoint_id narrows to one row, and a list() without one still returns three.",
+  "#THE TEST READS ITS IDS BACK rather than passing them in, and that is the part worth keeping. The first version constructed `CheckpointId::uuid6(n)` and filtered on it, and got ZERO rows \u2014 because `put()` GENERATES its own ids and the ones handed in are not what is stored. A test written that way would have 'proved' the fix worked against ids that never existed in the table. The corrected test does a plain `list()`, takes a stored tuple's own `checkpoint_id`, and filters on that, so it asserts the property rather than my assumption about id storage. That is the seventh guessed-API failure's lesson applied before it cost anything this time: read what the system actually stores, not what you told it.",
+  "#MUTATION-VERIFIED: drop the predicate -> 1 failure (RED); restore the fix -> OK (1 test, 4 assertions) (GREEN).",
+  "RESOLVED: predicate added; mutation-verified; test reads stored ids not supplied ones"
  ]
 }

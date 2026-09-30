@@ -142,6 +142,17 @@ class SqliteSaver extends PregelMemorySaver
             $args[] = (string) $configurable['checkpoint_ns'];
         }
 
+        // `MemorySaver::list()` honours `configurable['checkpoint_id']` as an
+        // ONLY-this-checkpoint filter (MemorySaver.php:102, :121). This method did
+        // not: it had no predicate for it at all, so asking SQLite for one
+        // checkpoint's history returned the WHOLE thread. Two savers, one
+        // interface, different answers — and this is the production one.
+        $onlyCheckpointId = self::stringOrNull($configurable['checkpoint_id'] ?? null);
+        if ($onlyCheckpointId !== null) {
+            $where[] = 'checkpoint_id = ?';
+            $args[] = $onlyCheckpointId;
+        }
+
         $before = $listOptions->beforeCheckpointId();
         if ($before !== '') {
             $where[] = 'checkpoint_id < ?';
