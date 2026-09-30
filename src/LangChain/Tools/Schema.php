@@ -334,7 +334,19 @@ final class Schema
                 }
             }
 
-            return;
+        // FALL THROUGH rather than returning. `allOf` is a conjunction WITH its
+        // siblings, not a replacement for them, so once the clauses hold the
+        // sibling keywords must still be applied.
+        //
+        // Measured with
+        //   {type: object, properties: {a: {type: string}}, allOf: [{required: [b]}]}
+        // on {"a": 1, "b": "y"}: ACCEPTED, with `a` declared a string and
+        // holding an integer. The conjunction passed and the sibling
+        // `properties` check never ran — a fail-open, where the schema looks
+        // declared and the constraint is skipped entirely.
+        //
+        // Only allOf falls through. `anyOf` legitimately short-circuits: it is a
+        // disjunction, so once one branch holds there is nothing left to decide.
         }
 
         if (isset($schema['anyOf']) && is_array($schema['anyOf'])) {
@@ -379,7 +391,35 @@ final class Schema
         }
 
         $types = is_array($type) ? $type : [$type];
+
+        // An EMPTY argument object is ambiguous in PHP and not in JSON.
+        // `"arguments": "{}"` decodes to `[]`, which `Js::isList()` calls a
+        // list, so `matchesType([], 'object')` was false and the type check
+        // errored with "expected object, got array" — BEFORE the
+        // `checkSub()` disambiguation below, which exists precisely to resolve
+        // this and would have accepted it.
+        //
+        // Measured: a tool declared `Schema::object(['q' => Schema::string()])`
+        // with nothing required, invoked with no arguments, threw
+        // `ToolException: Received tool input did not match expected schema`. A
+        // zero-argument tool could never be called, and models really do send
+        // `{}`.
+        //
+        // So the ambiguity is resolved HERE as well as in `checkSub()`: when the
+        // value is `[]` and the schema declares object keywords, `object` is
+        // accepted on the same terms `checkSub()` already uses.
+        $emptyIsObject = $value === [] && (
+            array_key_exists('properties', $schema)
+            || array_key_exists('required', $schema)
+            || array_key_exists('additionalProperties', $schema)
+        );
+
         foreach ($types as $candidate) {
+            if ($candidate === 'object' && $emptyIsObject) {
+                $this->checkSub($value, $schema, $path, $errors);
+
+                return;
+            }
             if (is_string($candidate) && self::matchesType($value, $candidate)) {
                 $this->checkSub($value, $schema, $path, $errors);
 
@@ -456,7 +496,14 @@ final class Schema
             'array' => is_array($value) && \LangChain\Utils\Js::isList($value),
             'string' => is_string($value),
             'number' => is_int($value) || is_float($value),
-            'integer' => is_int($value),
+            // JSON Schema 2019-09 and later define `integer` as a number with a
+            // zero fractional part, and json_decode('3.0') yields a float.
+            // Measured: an integer-typed argument holding 3.0 was rejected with
+            // "expected integer, got number", though 3.0 IS an integer by the
+            // spec, and a model that writes 3.0 for an integer field has its
+            // whole tool call refused.
+            'integer' => is_int($value)
+                || (is_float($value) && is_finite($value) && $value === floor($value)),
             'boolean' => is_bool($value),
             'null' => $value === null,
             default => true,

@@ -211,17 +211,26 @@ abstract class StructuredTool extends BaseLangChain
             $toolCallId,
         );
 
+        // The whole post-execute path is guarded, not just `execute()`.
+        //
+        // `splitResult()` throws when a `content_and_artifact` tool does not
+        // return a two-tuple, and `ToolOutput::format()` can throw too. Both sat
+        // AFTER this try block, so either failure escaped with no
+        // `handleToolError` and no `handleToolEnd` — leaving the tool's run span
+        // open forever in any trace UI, which is the same shape as the batch-run
+        // leak fixed earlier and the reason that guard existed.
         try {
             $result = $this->execute($toolInput, $runManager, $config);
+
+            [$content, $artifact] = $this->splitResult($result);
+
+            $formatted = ToolOutput::format($content, $artifact, $toolCallId, $this->name, $this->metadata);
         } catch (\Throwable $e) {
             $runManager?->handleToolError($e);
 
             throw $e;
         }
 
-        [$content, $artifact] = $this->splitResult($result);
-
-        $formatted = ToolOutput::format($content, $artifact, $toolCallId, $this->name, $this->metadata);
         $runManager?->handleToolEnd($formatted);
 
         return $formatted;
@@ -350,6 +359,16 @@ abstract class StructuredTool extends BaseLangChain
         if ($merged->runName === null) {
             $combined->runName = $defaults->runName;
         }
+        // `ToolRuntime::fromConfig()` reads `$config->context`, and `context`
+        // was absent from this list — so a `defaultConfig` that set a runtime
+        // context (an agent id, a tenant, an injected client) silently lost it
+        // whenever the caller did not pass context on the per-call config, and
+        // the tool body saw null where its author had configured a value.
+        // Same class as the `kwargs`-recorded-but-never-read defects.
+        if ($merged->context === null) {
+            $combined->context = $defaults->context;
+        }
+
         if ($merged->configurable === []) {
             $combined->configurable = $defaults->configurable;
         }

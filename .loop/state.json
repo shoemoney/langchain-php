@@ -2255,6 +2255,41 @@
    "chars": 1868,
    "findings": 3,
    "severity_hits": 3
+  },
+  "deepseek/deepseek-v4-flash-vision-exp": {
+   "model": "deepseek/deepseek-v4-flash-vision-exp",
+   "at": "2026-09-30T00:48:51",
+   "actual_model": "deepseek/deepseek-v4-flash-vision-exp",
+   "usage": {
+    "prompt_tokens": 30881,
+    "completion_tokens": 10816,
+    "total_tokens": 41697,
+    "cost": 0.02786476,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.02786476,
+     "upstream_inference_prompt_cost": 0.01358764,
+     "upstream_inference_completions_cost": 0.01427712
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 9661,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 9661,
+   "status": "ok",
+   "file": ".loop/reviews/73-deepseek__deepseek-v4-flash-vision-exp.md",
+   "chars": 4365,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2389,7 +2424,8 @@
   "thinkingmachines/inkling-small:free",
   "thinkingmachines/inkling:free",
   "google/gemini-3.1-pro-preview",
-  "google/gemini-3.1-pro-preview-customtools"
+  "google/gemini-3.1-pro-preview-customtools",
+  "deepseek/deepseek-v4-flash-vision-exp"
  ],
  "next_index": 0
 }
