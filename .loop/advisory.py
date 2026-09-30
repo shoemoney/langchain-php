@@ -236,6 +236,21 @@ because a restatement reads like corroboration and is not. Corroboration only
 counts if you independently reached it from the source, and then you must say
 what the source shows.
 
+**THE PAST-TENSE TRAP — read this, it has already caught one review.** Sections
+5 and 6 are full of prose describing defects in the PAST tense, and that prose
+reads fluently as a description of present behaviour. An advisory reviewed the
+`BaseChatModel` empty-stream defect that had been fixed the day before and
+reported it in the present tense, with a file:line, as "stream() silently
+returns an empty result in some cases while throwing exceptions in others" —
+false on both counts: both paths threw, and the eager one always had.
+
+So: **a claim about what the code does NOW may only be backed by the code as it
+is NOW.** Before asserting any present-tense defect, quote the line you read and
+check it says what you claim. If your evidence is a sentence from section 5 or 6,
+you have found nothing — you have restated a fix note. Write "no new findings in
+this element" instead. That answer costs nothing and beats a confident
+restatement, because a restatement looks like corroboration and is not.
+
 ## 6. Known non-exact behaviours (from PORT_STATUS.md)
 {run("sed -n '/Known non-exact/,/^## /p' PORT_STATUS.md | head -40") or '(section not found)'}
 """

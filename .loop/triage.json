@@ -646,5 +646,16 @@
  ],
  "audit/anthropic-stream-aggregation-2": [
   "fixture repaired; change still blocked, reverted again"
+ ],
+ "advisory/openai/gpt-4o-2024-11-20": [
+  "#1 Layering, #2 Public API, #3 Composition: REJECTED, no defect named. 'Audit the 15 cross-package references', 'improve documentation for bindTools', 'strengthen tests' \u2014 all are suggestions with nothing to reproduce. bindTools in particular is fidelity-CORRECT: upstream chat_models.ts throws for an unimplemented bindTools too, so a PHP base class that throws is the faithful port, not a gap.",
+  "#4 Error Handling: REJECTED as ALREADY FIXED, and this one is worth the whole iteration. The advisory reported, present tense and with a file:line, that stream() 'silently returns an empty result in some cases while throwing exceptions in others' \u2014 the exact defect fixed one iteration earlier. Checked rather than assumed: grep for `aggregated === null` returns TWO sites, line 460 (streaming, now throws) and line 554 (eager, ALWAYS threw). Upstream chat_models.ts:825 confirms the eager throw. So both paths throw and the claim is false on both counts. It was not hallucination either \u2014 the brief's section 5 carried my own ledger row, which is written in the past tense ('used to call handleLLMEnd with an empty result'), and past-tense fix notes read fluently as present behaviour.",
+  "#5 Fidelity (stepConfig runName): ACCEPTED as real and ALREADY KNOWN \u2014 the same deferred item, with upstream base.ts:1982-1985 already on record. Not re-derived, not re-fixed this iteration; it needs the binding-to-model config instrument, which is still unbudgeted.",
+  "#7 Documentation 'stale ledger row in PORT_STATUS.md (line 123)': REJECTED, and line 123 is not stale \u2014 it is the current Anthropic block-structure row. DocsMatchRealityTest enforces the measured counts and passes. A line number with no content quoted and no mismatch named is not a finding.",
+  "#6 Test Strategy, #8 Dead Code: Sound, nothing to do. #A/#B traced two user journeys; recorded as unverified rather than asserted, per the standing rule that a traced journey is not an executed one.",
+  "#THE REAL FIX, and the reason this iteration was worth more than a triage: the harness itself let this happen. advisory.py already warned that section 5 is ALREADY FIXED, and the model still restated it \u2014 so a warning that can be overridden by fluent prose is not a guard. SYSTEM now carries a PAST-TENSE TRAP section naming this exact failure, the exact false claim, and the rule that a present-tense claim may only cite code as it is now. Verified by importing the module and asserting the text is in SYSTEM, not by assuming the edit landed."
+ ],
+ "advisory/gpt-4o-2024-11-20": [
+  "4/8 rejected; the empty-stream claim was the defect fixed last iteration"
  ]
 }

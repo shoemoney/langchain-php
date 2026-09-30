@@ -65,5 +65,12 @@
   "file": ".loop/advisory/gemma-4-31b-it.md",
   "chars": 6321,
   "cost": 0.0062
+ },
+ "openai/gpt-4o-2024-11-20": {
+  "status": "ok",
+  "at": "2026-09-30T10:14:45.124534+00:00",
+  "file": ".loop/advisory/gpt-4o-2024-11-20.md",
+  "chars": 5820,
+  "cost": 0.0423
  }
 }
