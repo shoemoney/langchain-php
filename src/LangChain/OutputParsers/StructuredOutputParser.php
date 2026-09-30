@@ -89,9 +89,9 @@ Thus, the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of
 Your output will be parsed and type-checked according to the provided schema instance, so make sure all fields in your output match the schema exactly and there are no trailing commas!
 
 Here is the JSON Schema instance your output must adhere to. Include the enclosing markdown codeblock:
-\`\`\`json
+```json
 " . $this->encodeSchema($this->schema) . "
-\`\`\`
+```
 ";
     }
 

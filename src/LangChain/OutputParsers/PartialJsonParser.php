@@ -23,6 +23,15 @@ final class PartialJsonParser
 {
     private int $pos = 0;
 
+    /**
+     * A high surrogate awaiting its low partner.
+     *
+     * JSON writes every astral character as a UTF-16 surrogate PAIR, so this is
+     * set on the first half and consumed on the second. See
+     * {@see self::parseUnicodeEscape()}.
+     */
+    private ?int $pendingHighSurrogate = null;
+
     private readonly int $length;
 
     public function __construct(private readonly string $buffer)
@@ -164,7 +173,60 @@ final class PartialJsonParser
             $this->pos += $hexLength;
 
             if ($hexLength === 4) {
-                return mb_chr((int) hexdec($hex), 'UTF-8');
+                $code = (int) hexdec($hex);
+
+                // Surrogate pairs: JSON encodes every ASTRAL character — every
+                // emoji, every CJK extension ideograph, every historic script —
+                // as two UTF-16 code units. So a single emoji arrives here as
+                // two escapes, high half then low half.
+                //
+                // Upstream does not deal with this, because it does not have
+                // to: `String.fromCharCode(parseInt(hex, 16))` (json.ts:86)
+                // returns the lone surrogate 0xD83D, JS strings hold surrogate
+                // code units natively, and the two halves together render as
+                // the emoji.
+                //
+                // PHP's mbstring is stricter and CORRECT: a surrogate is not a
+                // Unicode scalar value, so `mb_chr(0xD83D, 'UTF-8')` returns
+                // false — and this method is typed `string`, so a stream
+                // containing ANY emoji died with
+                //   TypeError: parseUnicodeEscape(): Return value must be of
+                //   type string, false returned
+                // measured on `new PartialJsonParser('"😀"')`.
+                //
+                // So the pair is reassembled into the scalar it stands for,
+                // which mbstring CAN encode and which is the character the
+                // caller asked for. A lone surrogate that never finds its
+                // partner becomes U+FFFD rather than fataling, because a stream
+                // cut mid-pair is the normal case here, not an error.
+                if ($code >= 0xD800 && $code <= 0xDBFF) {
+                    $this->pendingHighSurrogate = $code;
+
+                    return '';
+                }
+
+                if ($code >= 0xDC00 && $code <= 0xDFFF) {
+                    $high = $this->pendingHighSurrogate;
+                    $this->pendingHighSurrogate = null;
+
+                    if ($high === null) {
+                        return "\u{FFFD}";
+                    }
+
+                    $scalar = 0x10000 + (($high - 0xD800) << 10) + ($code - 0xDC00);
+
+                    return mb_chr($scalar, 'UTF-8') ?: "\u{FFFD}";
+                }
+
+                // A plain BMP escape. Anything left pending was a high surrogate
+                // that never got a partner.
+                if ($this->pendingHighSurrogate !== null) {
+                    $this->pendingHighSurrogate = null;
+
+                    return "\u{FFFD}" . (mb_chr($code, 'UTF-8') ?: "\u{FFFD}");
+                }
+
+                return mb_chr($code, 'UTF-8') ?: "\u{FFFD}";
             }
 
             // Fewer than four digits: emit the raw text. A stream cut mid-escape

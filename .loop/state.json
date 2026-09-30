@@ -2220,6 +2220,41 @@
    "chars": 2478,
    "findings": 4,
    "severity_hits": 4
+  },
+  "google/gemini-3.1-pro-preview-customtools": {
+   "model": "google/gemini-3.1-pro-preview-customtools",
+   "at": "2026-09-30T00:38:44",
+   "actual_model": "google/gemini-3.1-pro-preview-customtools",
+   "usage": {
+    "prompt_tokens": 28635,
+    "completion_tokens": 23525,
+    "total_tokens": 52160,
+    "cost": 0.33957,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.33957,
+     "upstream_inference_prompt_cost": 0.05727,
+     "upstream_inference_completions_cost": 0.2823
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 23037,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 23037,
+   "status": "incomplete",
+   "file": ".loop/reviews/72-google__gemini-3.1-pro-preview-customtools.md",
+   "chars": 1868,
+   "findings": 3,
+   "severity_hits": 3
   }
  },
  "order": [
@@ -2353,7 +2388,8 @@
   "xiaomi/mimo-v2.6-flash",
   "thinkingmachines/inkling-small:free",
   "thinkingmachines/inkling:free",
-  "google/gemini-3.1-pro-preview"
+  "google/gemini-3.1-pro-preview",
+  "google/gemini-3.1-pro-preview-customtools"
  ],
  "next_index": 0
 }
