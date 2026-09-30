@@ -149,6 +149,14 @@ final class OptionPathMatrixTest extends TestCase
                 $this->bodies[] = $body;
                 $sse = $this->streamBody ?? ($this->anthropic
                     ? "event: message_start\ndata: " . json_encode(['type' => 'message_start', 'message' => ['id' => 'x', 'model' => 'm', 'content' => [], 'usage' => ['input_tokens' => 1, 'output_tokens' => 0]]]) . "\n\n"
+                      // The block must be OPENED before it is written to. The
+                      // fixture emitted a bare content_block_delta, which is a
+                      // malformed event, so the parser correctly discarded it and
+                      // the stream produced nothing at all — and the
+                      // silent-empty branch in BaseChatModel::stream() swallowed
+                      // that, letting this row pass while asserting nothing
+                      // about streamed output.
+                      . "event: content_block_start\ndata: " . json_encode(['type' => 'content_block_start', 'index' => 0, 'content_block' => ['type' => 'text', 'text' => '']]) . "\n\n"
                       . "event: content_block_delta\ndata: " . json_encode(['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => 'ok']]) . "\n\n"
                       . "event: message_delta\ndata: " . json_encode(['type' => 'message_delta', 'delta' => ['stop_reason' => 'end_turn'], 'usage' => ['output_tokens' => 1]]) . "\n\n"
                       . "event: message_stop\ndata: " . json_encode(['type' => 'message_stop']) . "\n\n"
