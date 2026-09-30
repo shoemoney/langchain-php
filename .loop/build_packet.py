@@ -11,6 +11,7 @@ Deliberately built from the live repo every iteration, never hand-written: a
 packet that drifts from the code is worse than no packet.
 """
 import json, os, re, subprocess, sys, collections
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
@@ -65,6 +66,34 @@ def metrics():
         "assertions": int(m.group(2)) if m else 0,
         "suite_ok": bool(m),
     }
+
+
+def journey_inventory() -> str:
+    """
+    Name the end-to-end tests, not just count them.
+
+    An advisory concluded twice that the suite "does not prove the full user
+    journey" — a StateGraph running through real SQLite, tools bound and
+    schema-checked, wire bytes asserted. The suite proves all of it; the packet
+    simply never mentioned `tests/Integration/`, so a reviewer reading only the
+    brief had no way to know the journey exists. A brief that hides a capability
+    is not neutral: it makes the model report an absence that is not there.
+    """
+    rows = []
+    for path in sorted(Path("tests").rglob("*Test.php")):
+        if "Integration" not in path.parts:
+            continue
+        names = re.findall(r"public function (test\w+)", path.read_text())
+        rows.append((str(path), names))
+
+    if not rows:
+        return "_No integration suite found._"
+
+    out = ["| Test | Proves |", "|---|---|"]
+    for path, names in rows:
+        pretty = ", ".join("`" + n.replace("testA", "`testA") + "`" for n in names)
+        out.append(f"| `{path}` | {pretty or '(no test methods found)'} |")
+    return "\n".join(out)
 
 
 def test_inventory():
@@ -227,6 +256,11 @@ converted tests. NOT a wrapper around a Python service.
 ```
 {test_inventory()}
 ```
+
+## End-to-end journeys (the tests that bind subsystems together)
+
+{journey_inventory()}
+
 
 ## Project status and known divergences
 

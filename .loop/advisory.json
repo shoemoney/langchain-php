@@ -157,5 +157,12 @@
   "file": ".loop/advisory/space-bunny-alpha.md",
   "chars": 18832,
   "cost": 0
+ },
+ "prism-ml/ternary-bonsai-2-27b": {
+  "status": "ok",
+  "at": "2026-09-30T18:08:12.647759+00:00",
+  "file": ".loop/advisory/ternary-bonsai-2-27b.md",
+  "chars": 9958,
+  "cost": 0.0078
  }
 }
