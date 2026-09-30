@@ -168,7 +168,7 @@ final class MessageUtils
             // A FunctionMessage still throws, and that is FAITHFUL: upstream has no
             // "function" arm either and throws for one.
             $role = $m instanceof ChatMessage
-                ? $m->name ?? $m->type
+                ? $m->type
                 : match ($m->type) {
                     BaseMessage::ROLE_HUMAN => $humanPrefix,
                     BaseMessage::ROLE_AI => $aiPrefix,

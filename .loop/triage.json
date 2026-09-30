@@ -186,7 +186,8 @@
   "#3 bindTools writes a null strict into kwargs \u2014 ALREADY FIXED in iteration 30 (written only when set). Closed.",
   "#5 isBinaryString misclassifies text as binary \u2014 REJECTED, closed. Probed all six cases: plain text, accented, multibyte arrow, newline, tab and even a NUL byte are all binary=false; only genuinely invalid UTF-8 (\\xff\\xfe) is true. The rule is 'is this valid UTF-8', which is the right test for text-versus-bytes, not a heuristic that needs fixing.",
   "#6 SseParser drops a complete-but-unterminated event \u2014 REJECTED, closed. Probed: feeding 'data: {\"a\":1}' with no trailing blank line and calling flush() returns [{\"a\":1}]. The event is recovered.",
-  "#8 the three src/ orphans are dead code \u2014 DEFERRED with a reason, not a defect: BaseToolkit, ToolRuntime and FakeTool are referenced by nothing because ToolNode (the consumer) is an unported subsystem already documented as prebuilt in PORT_STATUS. Deleting them would delete the only ported half of a documented pair. Recorded rather than acted on."
+  "#8 the three src/ orphans are dead code \u2014 DEFERRED with a reason, not a defect: BaseToolkit, ToolRuntime and FakeTool are referenced by nothing because ToolNode (the consumer) is an unported subsystem already documented as prebuilt in PORT_STATUS. Deleting them would delete the only ported half of a documented pair. Recorded rather than acted on.",
+  "5 findings: named-ChatMessage half ACCEPTED+FIXED (my own bug), #1 mergeContent assoc second DEFERRED, #2 batch docblock REJECTED (15th)"
  ],
  "anthropic/claude-fable-5.1": [
   "#2 'invoke() writes toolCall onto the caller's own RunnableConfig' \u2014 REJECTED, and the strongest form of rejection available: THE CODE DOES NOT EXIST. `grep -rn 'toolCall' src/` returns only `toolCalls` on MESSAGES (AIMessage, Anthropic MessageOutputs) and `tool_call_id` in request builders; there is no `toolCall` property on a config anywhere in the tree. Two further greps confirm there is no dynamic property write either: `$config->{...}` returns nothing, and `$config->x = ` returns nothing outside the three legitimate assignment sites (runName, tags, metadata).",
@@ -1396,5 +1397,12 @@
  ],
  "advisory/ministral-14b-2512": [
   "cited stream() 2..n - sourced from MY OWN RESOLVED banner quoting it; banner now paraphrases"
+ ],
+ "kimi-165": [
+  "#PARTLY ACCEPTED - THE NAMED-CHAT-MESSAGE HALF IS A REAL DEFECT, AND IT WAS MINE, INTRODUCED THREE ITERATIONS AGO. `getBufferString()` rendered a named ChatMessage as \"alice: alice, c\" \u2014 the name twice. Measured before the fix. The cause was my own iteration-162 line: I wrote `? $m->name ?? $m->type` where upstream writes `role = (m as ChatMessage).role` (messages/utils.ts:390-391) and prepends the name SEPARATELY through `nameStr`. Now `$m->type`, so the output is \"user: alice, c\", matching upstream.",
+  "#MY REGRESSION COULD NOT HAVE CAUGHT IT, and that is the part worth keeping. The iteration-162 test asserted \"user: c\" and \"assistant: a\" \u2014 both UNNAMED messages. With no name, `$m->name` is null, the two expressions agree, and the two candidate implementations are indistinguishable. A test that covers only the case where the difference cannot show is a test that cannot see the bug, and this is the DEGENERATE-CASE RULE one level up: the branch that decides a choice is often the branch where the two options coincide, so the case that distinguishes them is the one you must write.",
+  "#THE FIX IS MUTATION-VERIFIED against the specific wrong version: restoring `$m->name ?? $m->type` makes the named-case assertion FAIL (RED), and the fix returns OK (GREEN).",
+  "##1 `mergeContent()` never normalises a single-block (assoc) `$second` is the shape deferred in iteration 133 and it is now claimed specifically: `array_merge($left, $second)` with an assoc `$second` produces a value with a different shape than a list of blocks. Still DEFERRED - one iteration has not been spent reading it, and the 133 deferral was for a reason (upstream's two-array branch) that this finding does not answer on its own.",
+  "##2 `batch()` two stacked docblocks \u2014 the FIFTEENTH sighting, and rejected on the iteration-148 evidence: the two blocks immediately preceding `batch()` are `stream()`'s docblock and `batch()`'s own, because a regex that counts `/** */` cannot tell a docblock belongs to the PREVIOUS method. #3 test-coverage ratio, #5 autoload-dev mapping only tests/Unit \u2014 DEFERRED unverified."
  ]
 }

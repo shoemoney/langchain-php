@@ -1240,6 +1240,41 @@
    "chars": 2809,
    "findings": 5,
    "severity_hits": 5
+  },
+  "z-ai/glm-5.3-flashx": {
+   "model": "z-ai/glm-5.3-flashx",
+   "at": "2026-09-30T16:11:46",
+   "actual_model": "z-ai/glm-5.3-flashx",
+   "usage": {
+    "prompt_tokens": 46337,
+    "completion_tokens": 5958,
+    "total_tokens": 52295,
+    "cost": 0.02459219,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.02459219,
+     "upstream_inference_prompt_cost": 0.01714469,
+     "upstream_inference_completions_cost": 0.0074475
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 4974,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 4974,
+   "status": "ok",
+   "file": ".loop/reviews/39-z-ai__glm-5.3-flashx.md",
+   "chars": 3899,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1280,7 +1315,8 @@
   "openai/gpt-chat-latest",
   "fireworks/ember-1",
   "z-ai/glm-4.6v",
-  "perplexity/sonar"
+  "perplexity/sonar",
+  "z-ai/glm-5.3-flashx"
  ],
  "next_index": 0
 }

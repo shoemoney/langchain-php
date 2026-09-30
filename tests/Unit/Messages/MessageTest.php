@@ -476,6 +476,14 @@ final class MessageTest extends TestCase
         $assistant = new \LangChain\Messages\ChatMessage(['role' => 'assistant', 'content' => 'a']);
         self::assertSame('assistant: a', \LangChain\Messages\MessageUtils::getBufferString([$assistant]));
 
+        // A NAMED chat message renders the role and the name SEPARATELY. An earlier
+        // version of the fix used `$m->name` for the role and produced
+        // "alice: alice, c"; this assertion is the one that would have caught it,
+        // and it is here because the unnamed case could not: with no name, role and
+        // name agree and the two forms are indistinguishable.
+        $named = new \LangChain\Messages\ChatMessage(['role' => 'user', 'content' => 'c', 'name' => 'alice']);
+        self::assertSame('user: alice, c', \LangChain\Messages\MessageUtils::getBufferString([$named]));
+
         $this->expectException(\InvalidArgumentException::class);
         \LangChain\Messages\MessageUtils::getBufferString([
             new \LangChain\Messages\FunctionMessage('fn', 'r'),
