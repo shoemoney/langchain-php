@@ -122,5 +122,12 @@
   "file": ".loop/advisory/nemotron-3-nano-omni-30b-a3b-reasoning-free.md",
   "chars": 7220,
   "cost": 0
+ },
+ "mistralai/ministral-14b-2512": {
+  "status": "ok",
+  "at": "2026-09-30T14:56:31.367419+00:00",
+  "file": ".loop/advisory/ministral-14b-2512.md",
+  "chars": 12372,
+  "cost": 0.0031
  }
 }

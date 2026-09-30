@@ -744,6 +744,7 @@
   "#5 ACCEPTED+FIXED: branch conditions now receive config, mutation-verified"
  ],
  "audit/sequence-stream-divergence": [
+  "#RESOLVED \u2014 LANDED AND MUTATION-VERIFIED IN ITERATION 55. Do not re-open: `RunnableSequence::stream()` streams EVERY step and carries each step's default-channel chunk forward as the next stepInput, matching upstream base.ts:2109-2126. The description below that \"invokes steps 2..n after the first, yielding only final values\" is the PRE-FIX behaviour and is wrong about the current code. Promoted to the FRONT of this entry this iteration: an advisory read the stale line and reported the fixed defect as outstanding, which is the same failure as iteration 60 and the fix-comment failure of iteration 90 \u2014 a resolution recorded at the BOTTOM of a note list is invisible to anything that skims, including me.",
   "#STILL UNFIXED, and this iteration did not establish that it is OBSERVABLE. The code divergence is real and unchanged: RunnableSequence::stream() streams the first step and then INVOKES steps 2..n, yielding only their final value, while upstream streams every step and yields each step's own pairs.",
   "#WHAT I DID ESTABLISH, which narrows it usefully. RunnableTest.php:56 pins that a RunnableLambda streams exactly ONE chunk \u2014 `[CHANNEL_DEFAULT, 6]` \u2014 because RunnableLambda has no stream() and inherits Runnable::stream(), which invoke()s and yields the result. So for any lambda step the divergence is INVISIBLE: one chunk in, one invoke, one final pair. The port's only genuinely incremental step is BaseChatModel.",
   "#SO THE DIVISENCE IS NARROWER THAN A BLOCKER AND SPECIFICALLY SCOPED: it can only manifest when a chat model sits at position 2..n of a sequence. That is the common `prompt | model | parser` shape, so it is not theoretical \u2014 but I did not demonstrate it, and last iteration's lesson is that an undemonstrated severity is how a phantom gets pinned as the next job.",
@@ -1008,5 +1009,8 @@
  ],
  "inclusionai/ling-3.0-flash-vl": [
   "NOT A REVIEW: TRUNCATED twice at the 24k reasoning cap"
+ ],
+ "advisory/mistral-14b-2512": [
+  "no longer repeats stepConfig (comment fix worked); DID repeat the pre-55 stream behaviour from a bottom-closed entry"
  ]
 }
