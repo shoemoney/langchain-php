@@ -793,5 +793,20 @@
   "#WHAT I AM DOING ABOUT IT, stated as a measurement rather than a promise: the brief now says the test-output line reflects the moment the packet was built and may not describe the current tree, so a failing assertion quoted as evidence must be re-run before it is treated as a verdict. That addresses the model side. The root cause is mine and is not fixed by prompt wording: I must check `composer test`'s EXIT CODE, not its last line, before committing. I have now failed that check twice and the remedy has to be procedural.",
   "#Elements 1 (Layering) and 2 (Public API) were NOT examined this iteration and are recorded as unverified. Four elements returned 'broken' on a red snapshot; I am not auditing the other four verdicts against evidence I have not gathered, and a count of harsh words is not a finding.",
   "4 'broken' verdicts were artifacts of my own red commit; both tests green now"
+ ],
+ "perplexity/sonar-pro": [
+  "#THREE REJECTED ON UPSTREAM EVIDENCE, and all three are the same family: a PHP idiom that looks wrong in isolation, where upstream does the identical thing. The reviewer's EVIDENCE quotes were accurate every time; only the conclusions were wrong.",
+  "#1 'mergeSplits() measures separators incorrectly' \u2014 REJECTED. Upstream text_splitter.ts:188-190:",
+  "#     const _len = await this.lengthFunction(d);",
+  "#     total + _len + currentDoc.length * separator.length > this.chunkSize",
+  "#Upstream multiplies by `currentDoc.length * separator.length` EXACTLY as the port's `count($currentDoc) * mb_strlen($separator, 'UTF-8')` does. The measurement is not a mistranslation; it is the algorithm.",
+  "#3 'Recursive splitting rejects fragments exactly equal to chunkSize' \u2014 REJECTED. Upstream text_splitter.ts:323: `if ((await this.lengthFunction(s)) < this.chunkSize)`. A strict `<`. The port tests the same strict `<`, so a fragment of exactly chunkSize is rejected upstream too. The reviewer read a `<` and assumed an off-by-one; it is the operator upstream chose.",
+  "#2 'keepSeparator uses a regex where the upstream operation is literal' \u2014 REJECTED. Upstream text_splitter.ts:58-73 does the opposite of literal when keepSeparator is set:",
+  "#     const regexEscapedSeparator = separator.replace(/[/\\-\\\\^$*+?.()|[\\]{}]/g, \"\\\\$&\");",
+  "#     splits = text.split(new RegExp(`(?=${regexEscapedSeparator})`));",
+  "#It is a LOOKAHEAD REGEX with an escaped separator. The port's `preg_split('/(?=' . preg_quote($separator, '/') . ')/u', $text)` is the faithful analogue \u2014 PHP needs the `u` modifier for UTF-8 and an escaped delimiter, neither of which the JS RegExp constructor requires. The finding asserts the opposite of what upstream does.",
+  "##4 'createDocuments() cannot reliably locate repeated or trimmed chunks' and #5 'TextLength::utf16CodeUnits() mishandles invalid UTF-8 without an explicit contract' \u2014 DEFERRED unverified. #4 is specific and plausible \u2014 offset-chunk location genuinely does break on repeated substrings, and `joinDocs()` applying `trim()` really would desynchronise the offsets \u2014 but nothing was executed and the port may already handle it. Not accepted on plausibility.",
+  "#THE PATTERN IS NOW FOUR DEEP and worth stating as a rule for this loop: a reviewer who quotes an accurate line of PORT code and then concludes 'upstream must do this differently' has not checked upstream. Four of the last several rejections (text-plain, mergeStatus, and these three) share one shape \u2014 the reviewer's evidence is a real port line, the upstream comparison was assumed rather than read. The fix is procedural on my side: open the upstream file BEFORE recording a verdict on any splitter, parser or accessor claim.",
+  "#1/#2/#3 REJECTED on upstream text_splitter.ts:188,323,58-73 \u2014 port is faithful"
  ]
 }

@@ -3254,6 +3254,41 @@
    "chars": 3354,
    "findings": 5,
    "severity_hits": 5
+  },
+  "perplexity/sonar-pro": {
+   "model": "perplexity/sonar-pro",
+   "at": "2026-09-30T07:03:24",
+   "actual_model": "perplexity/sonar-pro",
+   "usage": {
+    "prompt_tokens": 38374,
+    "completion_tokens": 719,
+    "total_tokens": 39093,
+    "cost": 0.13191,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.13191,
+     "upstream_inference_prompt_cost": 0.115122,
+     "upstream_inference_completions_cost": 0.016788
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/104-perplexity__sonar-pro.md",
+   "chars": 3317,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -3419,7 +3454,8 @@
   "~anthropic/claude-fable-latest",
   "perplexity/sonar-pro-search",
   "~openai/gpt-mini-latest",
-  "~openai/gpt-astra-latest"
+  "~openai/gpt-astra-latest",
+  "perplexity/sonar-pro"
  ],
  "next_index": 0
 }
