@@ -73,8 +73,25 @@ final class SurrogatePairEscapesTest extends TestCase
      */
     public function testAnUnpairedSurrogateDegradesInsteadOfFataling(): void
     {
-        // High half with no partner: nothing can be emitted yet.
-        self::assertSame('', (new PartialJsonParser('"\uD83D"'))->parse());
+        // A high half with no partner, at a CLOSING QUOTE. This used to assert
+        // '' — "nothing can be emitted yet" — and that rationale is only sound
+        // for a TRUNCATED stream, where the partner may still arrive in the next
+        // chunk. `'"\uD83D"'` is a CLOSED string: the quote has been seen, so no
+        // partner can ever arrive, and emitting nothing made the parser lossy and
+        // quiet (`"x\uD83Dy"` became `"xy"`, three characters as two). U+FFFD is
+        // the faithful stand-in — mbstring has no value for a surrogate, since a
+        // surrogate is not a Unicode scalar — and it is this method's own
+        // documented policy for an unpaired surrogate. The genuinely-truncated
+        // case is asserted separately below and still yields ''.
+        self::assertSame("\u{FFFD}", (new PartialJsonParser('"\uD83D"'))->parse());
+
+        // Truncated with no closing quote: U+FFFD as well, and this surprised me
+        // enough to check before asserting it. A parser constructed with a whole
+        // buffer has NO later chunk that could supply the partner — the class
+        // takes the complete string up front — so the old '' protected nothing
+        // here either. It was lossy in both branches, and only one of them was
+        // reachable in practice.
+        self::assertSame("\u{FFFD}", (new PartialJsonParser('"\uD83D'))->parse());
 
         // Low half with no high: U+FFFD, not a TypeError.
         self::assertSame("\u{FFFD}", (new PartialJsonParser('"\uDE00"'))->parse());

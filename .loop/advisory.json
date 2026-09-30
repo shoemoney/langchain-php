@@ -86,5 +86,12 @@
   "file": ".loop/advisory/deepseek-v4-1-flash.md",
   "chars": 10466,
   "cost": 0.0127
+ },
+ "mistralai/ministral-8b-2512": {
+  "status": "ok",
+  "at": "2026-09-30T11:56:21.987139+00:00",
+  "file": ".loop/advisory/ministral-8b-2512.md",
+  "chars": 13307,
+  "cost": 0.0022
  }
 }
