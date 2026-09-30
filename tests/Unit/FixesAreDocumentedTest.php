@@ -112,9 +112,15 @@ final class FixesAreDocumentedTest extends TestCase
     private static function touchesThePort(string $hash): bool
     {
         $root = dirname(__DIR__, 2);
+        // No revision range. `git show --name-only HEAD <hash>` is a DIFF
+        // BETWEEN HEAD AND <hash>, not that commit's own change — measured, it
+        // reported 13 files (2 under src/) for a commit that touched two test
+        // files and no source at all. Every commit therefore looked like it
+        // had touched src/, and three harness commits were wrongly required to
+        // carry a port ledger row.
         $files = (string) shell_exec(
             'cd ' . escapeshellarg($root)
-            . ' && git show --name-only --pretty=format: HEAD 2>/dev/null ' . escapeshellarg($hash)
+            . ' && git show --name-only --pretty=format: ' . escapeshellarg($hash) . ' 2>/dev/null'
         );
 
         $paths = array_values(array_filter(array_map('trim', explode("\n", $files))));
