@@ -351,6 +351,9 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:bf4ca3d -->
 | 466 | `wireCheckpoint()` stored empty maps as JSON arrays | duplicated across `MemorySaver` and `SqliteSaver`; the hand-written branch for `Pregel\Checkpoint\Checkpoint` omitted the object casts 362/368 put in `toArray()`, so `channel_versions` and every empty inner `versions_seen` map serialised as `[]` | casts applied in place, keeping the snake_case key set the reader (`Checkpoint::fromArray((array) $this->serde->loadsTyped(...))`) requires; guarded by `WireCheckpointEmptyMapShapeTest` on both savers, asserting the raw stored bytes | identical |
 
+<!-- fix:8437881 -->
+| 474 | `ChatMessageChunk::concat()` reset a custom role to `chat` | the role was never carried, so the constructor default won; upstream `chat.ts` carries `role: this.role` in `concat` (left-wins, as 436 settled for `id`), so a streamed `ChatMessage` with a non-default role silently became `chat` | `'role' => $this->type` added to the concat field map; guarded by `ChatMessageChunkConcatRoleTest` via `MessageUtils::convertToChunk()` | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
