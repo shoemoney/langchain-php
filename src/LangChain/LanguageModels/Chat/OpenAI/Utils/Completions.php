@@ -92,7 +92,21 @@ final class Completions
             return $param;
         }
 
-        $param['content'] = $message->content;
+        // Content can be an Anthropic-shaped BLOCK ARRAY, not just a string: a reply carrying a
+        // `thinking` block keeps its blocks (that is correct — the blocks belong to the message), and
+        // forwarding them verbatim put `{"type":"thinking"}` on an OpenAI-compatible wire, which has no
+        // such block type and answers 400. Upstream drops `thinking`/`reasoning` on the way out and
+        // keeps the text; `tool_use` is not dropped here because an assistant's tool calls travel in
+        // the `tool_calls` field below, not in `content`.
+        //
+        // This consumer was simply never exercised before iteration 345 corrected `contentOf()` to
+        // stop collapsing a multi-block reply to a string. Both sides were correct in isolation.
+        $param['content'] = is_array($message->content)
+            ? array_values(array_filter(
+                $message->content,
+                static fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'text',
+            ))
+            : $message->content;
 
         if ($message->name !== null && $message->name !== '') {
             $param['name'] = $message->name;
