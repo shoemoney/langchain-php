@@ -48,7 +48,7 @@
         "test:unit": "phpunit --testsuite unit",
         "test:integration": "phpunit --testsuite integration",
         "coverage": "phpunit --coverage-text --coverage-filter src",
-        "lint": "php-cs-fixer fix --dry-run --diff"
+        "lint": "php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php --using-cache=no"
     },
     "config": {
         "sort-packages": true,

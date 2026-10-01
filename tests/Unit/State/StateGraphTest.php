@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Tests\Unit\State;
 
-use LangChain\Runnables\RunnableConfig;
 use LangGraph\Channels\BinaryOperatorAggregate;
 use LangGraph\Channels\EphemeralValue;
 use LangGraph\Channels\LastValue;

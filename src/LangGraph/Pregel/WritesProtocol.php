@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
-use LangChain\Runnables\RunnableInterface;
 
 /**
  * The minimal shape `_applyWrites` needs from a task.

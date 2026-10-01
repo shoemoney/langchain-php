@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel\Checkpoint;
 
-use LangChain\Runnables\RunnableConfig;
 
 /**
  * A saved checkpoint together with the config that locates it.

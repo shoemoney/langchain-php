@@ -6,7 +6,6 @@ namespace LangGraph\Pregel;
 
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableInterface;
-use LangGraph\Channels\BaseChannel;
 
 /**
  * The writer a conditional edge contributes to its source node.

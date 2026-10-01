@@ -13,7 +13,6 @@ use LangChain\Runnables\RunnableLambda;
 use LangChain\Runnables\RunnableParallel;
 use LangChain\Runnables\RunnableSequence;
 use LangChain\Runnables\RunnableWithFallbacks;
-use LangChain\Schema\Document;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

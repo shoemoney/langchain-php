@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangChain\Prompts;
 
 use LangChain\OutputParsers\BaseOutputParser;
-use LangChain\Schema\PromptValue;
 
 /**
  * A plain string prompt.

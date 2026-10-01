@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
-use LangChain\Runnables\RunnableConfig;
-use LangChain\Runnables\RunnableInterface;
 
 /**
  * The per-step context {@see Algorithm::prepareNextTasks()} needs beyond the

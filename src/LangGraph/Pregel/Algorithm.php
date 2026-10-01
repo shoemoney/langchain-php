@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangGraph\Pregel;
 
 use LangChain\Runnables\RunnableConfig;
-use LangChain\Runnables\RunnableInterface;
 use LangGraph\Channels\BaseChannel;
 use LangGraph\Channels\ChannelRegistry;
 use LangGraph\Channels\Missing;

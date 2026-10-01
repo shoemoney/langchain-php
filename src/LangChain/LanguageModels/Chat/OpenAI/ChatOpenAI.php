@@ -12,7 +12,6 @@ use LangChain\LanguageModels\Outputs\ChatGenerationChunk;
 use LangChain\LanguageModels\Outputs\ChatResult;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
-use LangChain\Runnables\RunnableConfig;
 use LangChain\Tracers\CallbackManagerForLLMRun;
 use LangChain\Utils\Http\GuzzleHttpClient;
 use LangChain\Utils\Js;

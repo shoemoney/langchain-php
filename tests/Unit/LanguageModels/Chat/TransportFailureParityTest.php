@@ -8,7 +8,6 @@ use LangChain\LanguageModels\Chat\Anthropic\AnthropicException;
 use LangChain\LanguageModels\Chat\Anthropic\ChatAnthropic;
 use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
 use LangChain\LanguageModels\Chat\OpenAI\OpenAIException;
-use LangChain\LanguageModels\Chat\OpenAI\Utils\Completions;
 use LangChain\Utils\Http\HttpClient;
 use LangChain\Utils\Http\HttpException;
 use LangChain\Utils\Http\HttpResponse;

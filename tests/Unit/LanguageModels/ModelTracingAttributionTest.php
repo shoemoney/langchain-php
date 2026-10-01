@@ -6,12 +6,7 @@ namespace LangChain\Tests\Unit\LanguageModels;
 
 use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
-use LangChain\LanguageModels\Outputs\ChatGeneration;
-use LangChain\LanguageModels\Outputs\ChatResult;
-use LangChain\Messages\AIMessage;
-use LangChain\Messages\BaseMessage;
 use LangChain\Runnables\RunnableConfig;
-use LangChain\Tracers\CallbackManagerForLLMRun;
 use LangChain\Tracers\RunCollectorCallbackHandler;
 use LangChain\Utils\Testing\FakeHttpClient;
 use PHPUnit\Framework\Attributes\CoversClass;

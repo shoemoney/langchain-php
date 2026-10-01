@@ -7,6 +7,21 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    name: Lint (php-cs-fixer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      # `--config` is explicit on purpose: without it php-cs-fixer generates its own config,
+      # rewrites .gitignore, prints Success and exits 0 having linted nothing. Verified: a missing
+      # config now exits 16. `--using-cache=no` because the old cache encoded an undeclared rule set.
+      - run: composer lint
+
   test:
     name: PHP ${{ matrix.php }}
     runs-on: ubuntu-latest

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
-use LangGraph\Channels\Missing;
 
 /**
  * A `TaskPath` — the address of one task within a superstep.

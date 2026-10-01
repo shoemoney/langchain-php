@@ -94,7 +94,7 @@ final class OptionPathMatrixTest extends TestCase
         $bodies = [];
 
         foreach (['wire-spelled' => ['tool_choice' => $choice],
-                  'canonical'     => ['toolChoice' => $choice]] as $label => $field) {
+                  'canonical' => ['toolChoice' => $choice]] as $label => $field) {
             $http = new class implements HttpClient {
                 public ?array $body = null;
                 public function post(string $u, array $h, string $b, array $q = [], ?float $t = null): HttpResponse

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangChain\OutputParsers;
 
 use LangChain\Messages\BaseMessage;
-use LangChain\Runnables\RunnableConfig;
 
 /**
  * A streaming parser whose output accumulates across chunks.

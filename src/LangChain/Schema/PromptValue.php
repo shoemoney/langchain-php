@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangChain\Schema;
 
 use LangChain\Messages\BaseMessage;
-use LangChain\Messages\MessageUtils;
 
 /**
  * The normalised form of "a prompt", whatever it arrived as.

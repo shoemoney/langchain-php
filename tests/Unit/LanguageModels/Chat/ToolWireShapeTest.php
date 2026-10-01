@@ -9,7 +9,7 @@ use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
 use LangChain\Messages\HumanMessage;
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Tools\{DynamicStructuredTool, Schema};
-use LangChain\Utils\Http\{HttpClient, HttpException, HttpResponse};
+use LangChain\Utils\Http\{HttpClient, HttpResponse};
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

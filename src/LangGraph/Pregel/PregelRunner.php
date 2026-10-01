@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
-use LangGraph\Errors\GraphBubbleUp;
 use LangGraph\Errors\GraphInterrupt;
 use LangGraph\Errors\Guard;
 

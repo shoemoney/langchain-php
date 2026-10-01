@@ -10,7 +10,6 @@ use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageOutputs;
 use LangChain\LanguageModels\Outputs\ChatGeneration;
 use LangChain\LanguageModels\Outputs\ChatGenerationChunk;
 use LangChain\LanguageModels\Outputs\ChatResult;
-use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Tracers\CallbackManagerForLLMRun;
 use LangChain\Utils\Http\GuzzleHttpClient;

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangChain\Runnables;
 
-use LangChain\Utils\Promise;
 
 /**
  * Base implementation of {@see RunnableInterface}.

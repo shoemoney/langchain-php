@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Tests\Unit\Pregel;
 
-use LangGraph\Channels\EphemeralValue;
 use LangGraph\Channels\LastValue;
 use LangGraph\Channels\Missing;
 use LangGraph\Errors\EmptyChannelError;

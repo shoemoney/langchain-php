@@ -4,17 +4,10 @@ declare(strict_types=1);
 
 namespace LangGraph\State;
 
-use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableInterface;
 use LangChain\Runnables\RunnableLambda;
-use LangChain\Runnables\RunnableSequence;
-use LangGraph\Channels\AnyValue;
-use LangGraph\Channels\BaseChannel;
-use LangGraph\Channels\BinaryOperatorAggregate;
 use LangGraph\Channels\EphemeralValue;
-use LangGraph\Channels\LastValue;
 use LangGraph\Channels\Missing;
-use LangGraph\Channels\UntrackedValue;
 use LangGraph\Errors\InvalidUpdateError;
 use LangGraph\Pregel\ChannelWrite;
 use LangGraph\Pregel\Command;

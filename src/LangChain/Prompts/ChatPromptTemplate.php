@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace LangChain\Prompts;
 
-use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\ChatMessage;
-use LangChain\Messages\HumanMessage;
 use LangChain\Messages\MessageUtils;
-use LangChain\Messages\SystemMessage;
 use LangChain\OutputParsers\BaseOutputParser;
 
 /**

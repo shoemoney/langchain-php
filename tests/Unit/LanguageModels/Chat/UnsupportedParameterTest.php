@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\LanguageModels\Chat;
 
 use LangChain\LanguageModels\Chat\Anthropic\ChatAnthropic;
-use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageOutputs;
 use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
