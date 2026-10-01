@@ -2536,23 +2536,15 @@
   "Thread CLOSED: cross-references added (HANDOFF.md:7 'Counts live HERE', PORT_STATUS.md:5 'ledger lives HERE'), both naming the other and the sync-before-test rule. Six iterations 273-278: observed -> could not reproduce -> 5/5 -> candidate cause -> wrong-file proof -> DELIBERATE RED -> documented"
  ],
  "maverick-279": [
-  "#maverick #4 IS CONFIRMED \u2014 THE FIRST ACCEPTED BEHAVIOURAL DIVERGENCE IN MANY ITERATIONS, AND IT IS IN A CORE PRIMITIVE. The port, `Runnable.php:66-73`:",
-  "#  public function transform(iterable $input, ?RunnableConfig $config = null): \\Generator {",
-  "#      foreach ($input as $item) {",
-  "#          foreach ($this->stream($item, $config) as $pair) { yield $pair; }",
-  "#      }",
-  "#  }",
-  "#That is a PURE PASS-THROUGH: every chunk the inner stream produces is yielded as it arrives, and nothing is accumulated. Upstream, `base.ts:659-671`:",
-  "#  let finalChunk;",
-  "#  for await (const chunk of generator) {",
-  "#    if (finalChunk === undefined) { finalChunk = chunk; }",
-  "#    else { finalChunk = this._concatOutputChunks(finalChunk, chunk as any); }",
-  "#  }",
-  "#  yield* this._streamIterator(finalChunk, ensureConfig(options));",
-  "#Upstream GATHERS every chunk through `_concatOutputChunks` and then streams the SINGLE accumulated result. So the finding's claim \u2014 'streams input differently than upstream' \u2014 is literally true, and the difference is structural rather than cosmetic: the port yields N values where upstream yields 1.",
-  "#WHAT THIS DOES AND DOES NOT ESTABLISH. It establishes a DIVERGENCE, which is a fact about the two codebases. It does NOT yet establish a DEFECT, because divergence and defect are different claims and this loop has refuted twenty-five findings that were divergences or proposed ones. What would settle it is whether a caller can OBSERVE the difference: a pass-through yields progressively, a gather yields once at the end, so a consumer that concatenates sees the same text either way while a consumer that counts chunks, applies backpressure, or reads the first value early sees something different. The port's behaviour is arguably the more useful one \u2014 streaming progressively is what most callers want \u2014 and that is precisely why it is a divergence worth RECORDING rather than one to fix blind. The loop's rules make fidelity the criterion, and fidelity says gather; the loop's judgement says the pass-through is defensible. That tension is the finding, and it is the first in this run where the honest answer is 'this is a real difference and I am not certain which side is right.'",
-  "#THE NEXT STEP IS SPECIFIED AND IT IS EXECUTABLE IN ONE COMMAND: A TEST THAT COUNTS THE YIELDS. Drive `transform()` with a runnable whose `stream()` emits three chunks and assert how many values come out \u2014 three for the port, one for upstream. That test is worth having REGARDLESS of which behaviour is chosen, because it converts an unstated contract into a stated one, and an unstated contract is what let the divergence survive two portings unnoticed. It is not being written here because 282's budget went to establishing the divergence with both sources quoted, and a test written without deciding which behaviour it asserts would encode a guess as a guard \u2014 the 262 failure in a new context.",
-  "#AND THE BATCH IS NOW COMPLETE WITH A DIFFERENT SHAPE THAN 279 RECORDED. It is TWO REFUTED (#2 by the port's own comment, #1 by JavaScript's unreachable state), ONE REPEAT spanning five iterations (#3), ONE REQUEST FOR A TEST (#5), and ONE CONFIRMED DIVERGENCE (#4). That last category has not appeared in any batch this loop has triaged, and it arrived from the same batch whose other four findings were refuted or repetitive \u2014 which is the fifth consecutive confirmation that a reviewer's HIT RATE TRACKS WHAT IT LOOKED AT, now with the sharpest possible demonstration: the one finding that asked what the two implementations DO rather than what they SHOULD contain is the only one that found something real."
+  "#282's DIVERGENCE IS CONFIRMED AND IT GAINS NEW CONTEXT: THE PORT'S OWN DOCUMENTATION IS ALREADY REASONING ABOUT TRANSFORM'S SHAPE, AND IT CITES THE TYPESCRIPT CONTRACT. `BaseTransformOutputParser.php:22-26`:",
+  "#  Note on the shape of {@see self::transform()}: unlike",
+  "#  {@see \\LangChain\\Runnables\\Runnable::transform()}, this override yields the",
+  "#  parsed values themselves rather than `[channel, value]` pairs, because that is",
+  "#  the contract the TypeScript original exposes and every parser test asserts.",
+  "#So the port's author was aware that two `transform()` shapes exist, named both, and justified one of them by appeal to the TypeScript original. That is the same two-level signature 213, 214, 219, 226, 232 and 244 each recorded: a decision written where it is made, with its reason attached.",
+  "#WHAT THAT DOES TO 282's FINDING IS SHARPEN IT RATHER THAN SETTLE IT, AND THE SHARPENING IS SPECIFIC. The docblock says the PARSER's transform yields values rather than `[channel, value]` pairs BECAUSE that is the TypeScript contract. `Runnable::transform()` yields exactly the pairs the docblock contrasts against \u2014 `foreach ($this->stream($item, $config) as $pair) { yield $pair; }` \u2014 and upstream's `transform()` at `base.ts:659-671` does not yield pairs at all, it GATHERS and yields one result. So there are two separate questions where 282 saw one: whether the port's `Runnable::transform()` should yield pairs or values, and separately whether it should stream N chunks or gather to 1. The docblock answers the first in favour of values for the PARSER path, which is a different class, and says nothing about the second. The divergence is therefore REAL, DOCUMENTED-ADJACENT, and NARROWER THAN 282 STATED.",
+  "#AND THE DECISION 282 DEFERRED IS NOW BETTER GROUNDED, THOUGH STILL NOT MADE. The rule is that fidelity wins, and fidelity says gather. But the port's own documentation argues from the TypeScript contract in the OPPOSITE DIRECTION for the neighbouring class \u2014 choosing the shape upstream exposes over the shape the base class happens to have \u2014 which is an argument that the author's standard is 'match the original's observable contract', not 'copy the original's control flow'. Under THAT standard the question becomes whether a caller can observe N-versus-1, which is the chunk-count test 282 already specified. The test is still the right next step and the decision is still not made, but the decision now has a stated principle to appeal to rather than two competing intuitions, which is the most this finding can be given without a behavioural experiment.",
+  "#THE BATCH IS CLOSED. Two refuted, one repeat, one test request, one confirmed-and-narrowed divergence. Across five batches and roughly twenty-five findings this is the FIRST that produced a confirmed difference between the two codebases, and it did so by asking what the implementations DO. That remains the run's central lesson in its most economical form, and it cost twenty-five findings to learn: POINT A REVIEWER AT WHAT THE CODE IS AND IT WILL PROPOSE; POINT IT AT WHAT THE CODE DOES AND IT WILL FIND."
  ],
  "probe-280": [
   "#1 REFUTED: upstream's default lengthFunction is (text)=>text.length, UTF-16 code units, which CANNOT fail - a JS string has no 'invalid UTF-8' state, so the defect is UNREACHABLE there. PHP strings ARE byte sequences, so the port's mb_chr fallback is the correct adaptation of a language difference"
@@ -2562,5 +2554,8 @@
  ],
  "probe-282": [
   "#4 CONFIRMED - FIRST ACCEPTED DIVERGENCE: port Runnable::transform (:66-73) yields EVERY chunk (pass-through); upstream base.ts:659-671 GATHERS via _concatOutputChunks then yields ONE. Divergence != defect: need a chunk-COUNT test to see if callers can observe it"
+ ],
+ "probe-283": [
+  "282's divergence SHARPENED, not settled: BaseTransformOutputParser:22-26 already reasons about transform's shape and cites 'the contract the TypeScript original exposes'. So there are TWO questions - pairs-vs-values (docblock answers, for the parser) and stream-N-vs-gather-1 (unanswered). Fidelity says gather; the port's own stated standard is 'match the original's observable contract'"
  ]
 }
