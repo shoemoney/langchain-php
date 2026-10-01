@@ -369,3 +369,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:41375d7 -->
 | `Runnable::pick()` missing | one of five upstream `Runnable` methods absent and undeclared | delegates to a new `RunnablePick` via `pipe()`, per `base.ts:628`; the port-local private `pick()` helpers in `ChatOpenAI`/`ChatAnthropic` renamed to `pickOption()` to clear the collision | 41375d7 |
+
+<!-- fix:229c1c5 -->
+| `Runnable::withRetry()` missing | second of five absent upstream `Runnable` methods | `RunnableRetry extends RunnableBinding` with a 3-attempt default, `onFailedAttempt`, and `retry:attempt:<n>` tagging; `stream()` deliberately not retried | 229c1c5 |
