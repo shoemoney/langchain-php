@@ -332,6 +332,9 @@ non-zero count from one should be treated as a claim about the detector until it
 | 439 | `ai.ts` merges `response_metadata` with `mergeResponseMetadata`, not `_mergeDicts` | looked like a behavioural difference | **REJECTED.** `messages/metadata.ts:11-17` reads `const output = _mergeDicts(a, b) ?? {}; return output;` — a typed wrapper with identical behaviour, so the port's `mergeDicts(...) ?? []` is equivalent (in PHP both empties are `[]`) | no change needed |
 | 439 | the port nests `usage_metadata` inside `response_metadata`; upstream has it top-level and merges it with `mergeUsageMetadata`, which SUMS counts | looked like counts would be overwritten instead of summed | **REJECTED by execution.** Two chunks carrying `input_tokens` 10 and 5 concat to **15** (`output_tokens` 2 and 3 -> **5**), matching `mergeUsageMetadata` exactly. `MessageMerge::mergeDicts` recurses into nested arrays and ADDS numeric values, so the nesting is behaviourally invisible | no change needed |
 
+<!-- fix:e2a4b90 -->
+| 440 | `Runnable::transform()` read its argument as INPUTS and yielded one pair per item | upstream `base.ts:655-671` folds the incoming CHUNKS with `_concatOutputChunks` and then `yield* this._streamIterator(finalChunk, ...)`, whose default (`base.ts:297-302`) is `yield this.invoke(input, options)` — so the argument is a chunk stream to gather and the result is ONE raw value | added `Runnable::concatOutputs()` transcribing `utils/stream.ts`, rewrote `transform()` (and `RunnablePick::transform()`) to fold then invoke once and yield raw | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
