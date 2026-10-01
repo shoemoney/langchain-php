@@ -28,6 +28,7 @@ TRIAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "triage.json")
 MARKERS = ("#RESOLVED", "#OPEN", "#CLOSED", "#RETRACTED", "#PARTLY")
 # A `#PARTLY` note also satisfies a bare `#RESOLVED`-family check upstream of it.
 KNOWN_KEYS: dict[str, list[str]] = {}
+AUTO_STAMP = "#OPEN - status not stated; set it when the work closes."
 
 
 def _has_marker(note: str) -> bool:
@@ -44,11 +45,16 @@ def main(argv: list[str]) -> int:
         # protected the JSON but the SHELL had already mangled the text before
         # the script saw it, so the guarantee has to cover the whole path.
         key = argv[2]
-        status = "OPEN"
+        status = None
         if len(argv) >= 4 and argv[3].startswith("--status="):
             status = argv[3].split("=", 1)[1].strip().lstrip("#").upper()
         notes = [ln.rstrip("\n") for ln in sys.stdin.read().split("\n") if ln.strip()]
-        if status != "OPEN" and notes and not notes[0].startswith("#"):
+        # A stated status becomes the marker on the caller's own first note, so
+        # the entry's LEADING note states it. Prefixing here rather than after
+        # the auto-stamp is what keeps a RESOLVED entry from reading as OPEN.
+        # This applies to an explicit --status=OPEN too: the caller stated a
+        # status, so the auto-stamp's "status not stated" text would be false.
+        if status and notes and not notes[0].startswith("#"):
             notes = [f"#{status} - {notes[0]}"] + notes[1:]
     else:
         if len(argv) < 3:
@@ -56,6 +62,7 @@ def main(argv: list[str]) -> int:
             return 2
         key = argv[1]
         notes = list(argv[2:])
+        status = None
 
     with open(TRIAGE, encoding="utf-8") as fh:
         triage = json.load(fh)
@@ -70,8 +77,14 @@ def main(argv: list[str]) -> int:
             return 1
 
     existing = triage.setdefault(key, [])
-    if key.startswith("audit/") and not existing:
-        existing.append("#OPEN - status not stated; set it when the work closes.")
+    # The auto-stamp exists for a note that genuinely does NOT state a status.
+    # A caller who passed --status= has stated one, so stamping OPEN above it
+    # reproduced the exact defect this entry was written about: an entry whose
+    # first line reads #OPEN while its resolution sits underneath. The stamp is
+    # therefore conditional on the absence of a stated status, not on the key
+    # being new.
+    if key.startswith("audit/") and not existing and status is None:
+        existing.append(AUTO_STAMP)
     existing.extend(notes)
 
     if key.startswith("audit/") and not _has_marker(existing[0]):

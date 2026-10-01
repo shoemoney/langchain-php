@@ -1312,7 +1312,7 @@
    "video"
   ],
   "ctx": 1048576,
-  "price": "0.000000415"
+  "price": "0.0000006824"
  },
  {
   "id": "moonshotai/kimi-k3:batch",
@@ -3169,7 +3169,7 @@
    "video"
   ],
   "ctx": 1048576,
-  "price": "0.000000415"
+  "price": "0.0000006824"
  },
  {
   "id": "~openai/gpt-astra-latest",
