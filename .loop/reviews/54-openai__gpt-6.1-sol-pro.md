@@ -1,32 +1,32 @@
 # Review 54 - openai/gpt-6.1-sol-pro
-_asked 2026-09-29T13:00:43 - served by openai/gpt-6.1-sol-pro - 27s_
+_asked 2026-09-30T21:32:36 - served by openai/gpt-6.1-sol-pro - 32s_
 
-## 1. Image rendering permanently overwrites reusable messages
+## 1. Wire-spelled bindings lose to constructor values
 **Severity:** MAJOR
-**Evidence:** `ChatPromptTemplate.php`, `parseImagePrompts()` assigns `$message->content = $blocks` on the original message.
-**Why it matters:** Formatting an image URL containing `{id}` with `id=A` removes the marker; a subsequent render with `id=B` still sends A's image. Caller-owned messages are also modified.
-**Suggested fix:** Clone the message before assigning rendered blocks. Add a regression rendering the same template with A then B and asserting both URLs and the unchanged original message.
+**Evidence:** Both clients’ `bindTools()` store `$next->kwargs[$key] = $value`; `canonicalise()` copies aliases only when `!array_key_exists($camel, $bag)`.
+**Why it matters:** Constructing with `maxTokens: 99`, then binding `max_tokens: 50`, still sends 99: the existing canonical key masks the newer binding.
+**Suggested fix:** Canonicalise incoming binding kwargs before merging them into stored kwargs. Assert the request sends 50 for both clients when the constructor used the other spelling.
 
-## 2. Required history rejects a valid empty conversation
+## 2. Empty per-call tools cannot clear bound tools
 **Severity:** MAJOR
-**Evidence:** `MessagesPlaceholder.php`, `formatMessages()` checks `if (!$input)` before its list-coercion branch.
-**Why it matters:** `new MessagesPlaceholder('history')` rejects `['history' => []]` as “undefined,” preventing a first conversation turn even though the caller supplied a valid message list.
-**Suggested fix:** Distinguish missing/null input from an empty list; let `[]` reach list coercion and return `[]`. Pin missing, null, empty-list, and populated-list cases separately.
+**Evidence:** Both clients use `convertTools($this->pick($options, 'tools')) ?? ...convertTools($bound['tools'] ?? null)`; `convertTools([])` returns `null`.
+**Why it matters:** Passing `tools: []` after binding tools re-offers the bound tools instead of removing them; the model can call tools the caller explicitly excluded.
+**Suggested fix:** Select the configuration layer before conversion, preserving an explicitly supplied empty array; then omit the wire `tools` key. Test clearing a nonempty bound list.
 
-## 3. Factory-inferred variables still include bound partials
+## 3. Bound and per-call streamUsage are ignored
 **Severity:** MAJOR
-**Evidence:** `PromptTemplate.php`, `fromTemplate()` passes every `Template::templateVariables()` result as `inputVariables`, without excluding `partialVariables` keys.
-**Why it matters:** A human-message template with `{name}` already bound as a partial still advertises `name` as required; an enclosing chat prompt checks for it and throws before the inner template can apply its partial.
-**Suggested fix:** Remove partial-variable keys from inferred input variables, matching upstream `langchain-core/src/prompts/prompt.ts`. Test the partially bound prompt both directly and inside `ChatPromptTemplate::fromMessages()`.
+**Evidence:** OpenAI checks `if ($this->streamUsage)`; Anthropic uses `$this->streamUsage ? MessageOutputs::usageFromEvent($event) : []`, despite accepting options and storing binding kwargs.
+**Why it matters:** `bindTools($tools, ['streamUsage' => false])` records the setting but still requests/emits usage; per-call overrides likewise do nothing.
+**Suggested fix:** Resolve `streamUsage` from options, bound kwargs, then the property; pass that resolved value into Anthropic’s consumer. Assert both override directions on actual streams.
 
-## 4. Chat string factory loses its Mustache configuration
+## 4. Anthropic empty tool arguments have the wrong shape
 **Severity:** MAJOR
-**Evidence:** `ChatPromptTemplate.php`, `fromTemplate()` passes `$options` to the inner `PromptTemplate` but calls `fromMessages()` without them.
-**Why it matters:** The outer chat defaults to f-string handling. A Mustache variable intentionally omitted by the caller therefore triggers the outer “Missing value” check instead of rendering empty.
-**Suggested fix:** Forward the applicable chat options, especially `templateFormat` and `validateTemplate`, to `fromMessages()`. Test `fromTemplate('{{name}}', ['templateFormat' => Template::MUSTACHE])->formatMessages([])`.
+**Evidence:** `MessageInputs::convertMessage()` builds tool-use blocks with `'input' => $call['args'] ?? []`; the resulting request goes through `Js::encode($params)`.
+**Why it matters:** A no-argument assistant tool call is sent back as `"input":[]`, not `"input":{}`, making an ordinary tool-history round trip malformed.
+**Suggested fix:** Preserve an object for empty argument maps when building Anthropic tool-use blocks. Assert the raw second-request body contains `"input":{}` after a no-argument tool response.
 
-## 5. Scalar prompt invocation discards the supplied value
+## 5. Named tool arrays bypass schema conversion
 **Severity:** MAJOR
-**Evidence:** `BasePromptTemplate.php`, `invoke()` replaces every non-array input with `[]`.
-**Why it matters:** A single-variable prompt invoked with `'hello'`, including through an LCEL sequence, throws for a missing variable rather than binding `'hello'`; upstream supports this shorthand.
-**Suggested fix:** Mirror upstream `langchain-core/src/prompts/base.ts`: wrap non-record input under the sole input-variable name, and reject it explicitly for multi-variable prompts. Test scalar invocation directly and through a sequence.
+**Evidence:** `MessageInputs::convertTool()` immediately returns when `isset($tool['input_schema']) || isset($tool['name'])`, bypassing its later `parameters`/`schema` mapping.
+**Why it matters:** An accepted array such as `['name' => 'lookup', 'parameters' => $schema]` reaches Anthropic without `input_schema`; the request lacks the required argument schema.
+**Suggested fix:** Treat only arrays already carrying `input_schema` as provider-shaped; normalise other named arrays through the schema-mapping branch. Assert the outgoing body contains `input_schema` and no `parameters`.
