@@ -354,3 +354,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:c1620c8 -->
 | `Completions::convertMessage()` forwarded content verbatim | an Anthropic `thinking`/`reasoning` block reached an OpenAI-compatible wire and a strict endpoint answered 400 | non-`text` blocks are filtered on the way out; tool calls still travel in `tool_calls` | c1620c8 |
+
+<!-- fix:71ebf26 -->
+| `versionsSeen` inner maps serialised as arrays | the 362 fix cast the OUTER level only, so `{"fan_out":[]}` reached the bytes for any task triggered solely by a `Send` push | `toArray()` recurses one level; `channelVersions` scalars deliberately not cast | 71ebf26 |
