@@ -147,6 +147,8 @@ class Pregel extends Runnable
 
         $validInput = $this->validateInput($input);
 
+        $modes = $this->resolveStreamModes();
+
         $loop = PregelLoop::initialize([
             'input' => $validInput,
             'config' => $config,
@@ -161,9 +163,57 @@ class Pregel extends Runnable
             'triggerToNodes' => $this->triggerToNodes,
         ]);
 
-        $loop->streamModes = (array) $this->streamMode;
+        $loop->streamModes = $modes;
 
         return $loop->run($this->inputChannels);
+    }
+
+    /**
+     * The stream modes this port can actually produce.
+     *
+     * Upstream's `StreamMode` union (`pregel/types.ts`) declares eight — `values`,
+     * `updates`, `debug`, `messages`, `checkpoints`, `tasks`, `custom`, `tools`. Only
+     * the first two are emitted here, because the other six require mode payloads
+     * this port does not build. That is ported-subsystem scope, not a patch, and it
+     * is named here so the gap is a declared constant rather than something a caller
+     * discovers by receiving an empty stream.
+     *
+     * @var list<string>
+     */
+    public const SUPPORTED_STREAM_MODES = ['updates', 'values'];
+
+    /**
+     * Validate the configured modes and normalise to a list.
+     *
+     * Without this, asking for a mode the port cannot emit is a SILENT NO-OP:
+     * `PregelLoop::emit()` drops any chunk whose mode is not subscribed, so
+     * `streamMode: ['debug']` yields an empty stream, no exception and no clue. A
+     * caller cannot tell that from a graph which legitimately produced nothing, and
+     * the two demand opposite responses. Refusing at the boundary is the same rule
+     * the port already applies to an unserialisable channel value: refuse rather
+     * than lose the caller's work silently.
+     *
+     * @return list<string>
+     */
+    private function resolveStreamModes(): array
+    {
+        $modes = array_values(array_map(strval(...), (array) $this->streamMode));
+
+        $unsupported = array_values(array_diff($modes, self::SUPPORTED_STREAM_MODES));
+        if ($unsupported !== []) {
+            throw new \InvalidArgumentException(sprintf(
+                'Unsupported stream mode(s): %s. This port emits %s; the remaining upstream modes '
+                . '(%s) are not implemented. Requesting one would otherwise produce an empty stream '
+                . 'with no error.',
+                implode(', ', $unsupported),
+                implode(', ', self::SUPPORTED_STREAM_MODES),
+                implode(', ', array_diff([
+                    'values', 'updates', 'debug', 'messages', 'checkpoints', 'tasks', 'custom', 'tools',
+                ], self::SUPPORTED_STREAM_MODES)),
+            ));
+        }
+
+        return $modes;
     }
 
     /**

@@ -1063,13 +1063,19 @@ class PregelLoop
      * Values are emitted without a namespace, because a caller reading the
      * graph's state should not have to know it is nested.
      *
+     * GATED, like every other mode. This used to push straight into
+     * `$streamBuffer`, so a graph configured `streamMode: ['updates']` received
+     * `values` chunks and nothing else — the subscription was silently inverted,
+     * and the caller could not tell it from a graph that produced no updates.
+     * Upstream gates uniformly at the consumer (`streamMode.includes(mode)`,
+     * `pregel/index.ts:2511`) with no unconditional channel, so the two are now
+     * equivalent.
+     *
      * @param list<mixed> $payload
      */
     public function emitValues(array $payload): void
     {
-        foreach ($payload as $item) {
-            $this->streamBuffer[] = ['values', $item];
-        }
+        $this->emit($payload, 'values');
     }
 
     /** Which stream modes this loop is producing. */
@@ -1079,14 +1085,30 @@ class PregelLoop
     /**
      * Hand every buffered chunk to the caller.
      *
+     * The keys are EXPLICIT and MONOTONIC, and that is load-bearing. `run()` calls
+     * this from five places via `yield from`, and a sub-generator's auto-keys restart
+     * at 0 on every call — so each drain re-yielded key `0` and the outer generator
+     * emitted `0, 0, 0`. `foreach` ignores keys and saw every chunk, but
+     * `iterator_to_array($stream)` — the DEFAULT, `preserve_keys: true` — collapses
+     * them, keeping only the last. Measured on a graph streamed with
+     * `['updates','values']`: `foreach` yielded 3 chunks, `iterator_to_array()`
+     * returned 1.
+     *
+     * So a caller doing the obvious thing silently lost every chunk but the last,
+     * with no error. This counter is instance state precisely so it survives across
+     * drains, which is what makes the outer sequence a proper list again.
+     *
      * @return \Generator<int, array{0: string, 1: mixed}>
      */
     private function drain(): \Generator
     {
         while ($this->streamBuffer !== []) {
-            yield array_shift($this->streamBuffer);
+            yield $this->yieldedChunks++ => array_shift($this->streamBuffer);
         }
     }
+
+    /** Monotonic across every {@see self::drain()} call for this run. */
+    private int $yieldedChunks = 0;
 
     /**
      * Schedule a task mid-superstep, from a node calling another node.
