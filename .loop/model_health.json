@@ -31,5 +31,8 @@
  "stepfun/step-3.7-flash": false,
  "xiaomi/mimo-v2.6-pro-ultraspeed": true,
  "z-ai/glm-4.5v": false,
- "qwen/qwen3.8-flash": false
+ "qwen/qwen3.8-flash": false,
+ "thinkingmachines/inkling": false,
+ "thinkingmachines/inkling-small": false,
+ "unbiased/pareto-26.10-preview": true
 }

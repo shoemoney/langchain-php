@@ -281,5 +281,12 @@
   "file": ".loop/advisory/ernie-4-5-vl-424b-a47b.md",
   "chars": 5917,
   "cost": 0.0067
+ },
+ "anthropic/claude-fable-5.1": {
+  "status": "ok",
+  "at": "2026-10-01T22:07:16.594668+00:00",
+  "file": ".loop/advisory/claude-fable-5-1.md",
+  "chars": 15456,
+  "cost": 0.8221
  }
 }
