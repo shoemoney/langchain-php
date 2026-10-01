@@ -129,7 +129,22 @@ These are MEASURED ZEROS, not assumptions. Each was re-run on this commit.
 | Non-`_once` `include`/`require` statements under `src/` | 0 | The generalized form of the 426 hazard. A regex sweep returns 9 hits, all prose ("must include it", "does not require a real tool") — see the detector note below. |
 | Declared class name vs PSR-4 implied name, case-insensitive | 231 exact, 0 case-only, 0 different | The dev box is case-INSENSITIVE APFS and CI is case-SENSITIVE Linux. A file whose class name differs from its path only by case autoloads locally and fatals on CI. `SourceConventionTest` already enforces the exact match; this sweep confirms it holds at 231/231. |
 | Case-insensitive FQCN collisions across `src/` + `tests/` | 0 |
+| `@return` type atoms that name a non-existent class | **NOT DETERMINED — validator abandoned** | An `@return` resolver reported 98 unresolved atoms, then 67 after three parser fixes. Every residue was a parser gap, not a defect: PHP builtin CLASSES (`\Generator`) absent from a scalar-only builtin table; `array{values: X}` shape KEYS harvested as class names; `@template` scope read from the method docblock when the template sits on the class; and `use`-resolution whose candidate list was wrong (the `use` parser itself captures `LangChain\Runnables\RunnableInterface` correctly in isolation). **Zero of the 67 were shown to contradict the code, so no validator was landed** — see the note below. |
 | `catch` blocks under `src/` that are empty in full | 0 of 122 scanned | Swallowed errors are invisible to every other signal. Enforced by `NoSilentlySwallowedErrorsTest` using `token_get_all()` — a commented catch is permitted (that IS the declaration of intent), an unexplained one is not. The single src/ catch is `JsonUtils::strictParsePartialJson()`, verified faithful to upstream `utils/json.ts:35-38`. | Two files differing only by case would collide on macOS and not on Linux. |
+
+### The `PromptValue` candidate, rejected with evidence
+
+`BasePromptTemplate::invoke()` is annotated `@return PromptValue`, and no `LangChain\Prompts\PromptValue`
+exists — the real class is `LangChain\Schema\PromptValue`. That reads like a broken reference and is not
+one: `src/LangChain/Prompts/BasePromptTemplate.php:10` declares `use LangChain\Schema\PromptValue;`, so the
+bare name resolves correctly. Rejected.
+
+The instructive part is how nearly it was accepted. A resolver that checks only the current namespace
+would flag it — and would equally flag the bare class name in **all 231 source files**, since almost every
+one relies on an import. That is the fourth detector this run produced whose first output was entirely
+false positives, and it is why the existing `DocblockReturnTest` remains a `@template` POSITIVE CONTROL
+only. A negative rule needs a trustworthy type resolver behind it, and this port does not have one worth
+shipping; asserting 67 correct docblocks are broken would be worse than having no rule at all.
 
 ### Detector note — three ad-hoc detectors, three 100% false-positive rates
 
