@@ -43,6 +43,8 @@ final class ModelTracingAttributionTest extends TestCase
 
         $model->generateMessages(
             [['a' => 'first'], ['b' => 'second']],
+            [],
+            null,
             new RunnableConfig(callbacks: [$collector]),
         );
 
@@ -85,6 +87,8 @@ final class ModelTracingAttributionTest extends TestCase
         try {
             $model->generateMessages(
                 [['a' => 'first'], ['b' => 'second']],
+                [],
+                null,
                 new RunnableConfig(callbacks: [$collector]),
             );
             self::fail('expected the second prompt to fail');

@@ -260,6 +260,33 @@ abstract class BaseChatModel extends BaseLanguageModel
     }
 
     /**
+     * Merge the two callback carriers into the config that actually runs.
+     *
+     * `$callbacks` and `$config->callbacks` are the same concept arriving by two
+     * routes, so the question "which wins" has to have an answer that is written
+     * down rather than inferred. Upstream takes `(input, options, callbacks)` on
+     * both `generate` and `generatePrompt` and has no config object at all;
+     * `RunnableConfig` is this port's carrier for callbacks, metadata, tags and
+     * run naming. `$config` is the LATER, richer route, so it wins — a bare
+     * `$callbacks` argument fills a gap rather than overriding an explicit
+     * config.
+     *
+     * Merge, don't rebuild. `new RunnableConfig(callbacks: ...)` discarded every
+     * other field the caller set — the per-call `runName` and `tags` never
+     * reached the traced run and `Run::name()` fell back to the component id
+     * silently. Later config wins.
+     */
+    private static function configWithCallbacks(
+        ?array $callbacks,
+        ?RunnableConfig $config,
+    ): RunnableConfig {
+        return RunnableConfig::mergeConfigs(
+            new RunnableConfig(callbacks: $callbacks ?? []),
+            $config ?? new RunnableConfig(),
+        );
+    }
+
+    /**
      * Run the model over prompt values, converting each to messages.
      *
      * The parameter is `$promptValues`, NOT upstream's `$messages`: the body calls
@@ -269,7 +296,7 @@ abstract class BaseChatModel extends BaseLanguageModel
      *
      * @param list<PromptValue|mixed>   $promptValues
      * @param array<string, mixed>      $options
-     * @param list<object>|null         $callbacks
+     * @param list<object>|null         $callbacks  ignored when `$config` carries callbacks
      */
     public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null, ?RunnableConfig $config = null): LLMResult
     {
@@ -280,23 +307,35 @@ abstract class BaseChatModel extends BaseLanguageModel
                 : self::convertInputToPromptValue($promptValue)->toMessages();
         }
 
-        // Merge, don't rebuild. `new RunnableConfig(callbacks: ...)` discarded every other field the
-        // caller set — the per-call `runName` and `tags` never reached the traced run and `Run::name()`
-        // fell back to the component id silently. Later config wins.
-        $config = RunnableConfig::mergeConfigs(
-            new RunnableConfig(callbacks: $callbacks ?? []),
-            $config ?? new RunnableConfig(),
+        return $this->generateMessages(
+            $promptMessages,
+            $options,
+            $callbacks,
+            self::configWithCallbacks($callbacks, $config),
         );
-
-        return $this->generateMessages($promptMessages, $config, $options);
     }
 
     /**
+     * Run the model over message lists, one traced run per list.
+     *
+     * NOT an upstream name — upstream has `generate(messages, options, callbacks)`,
+     * which this port keeps as the protected per-prompt `generate()`. The name was
+     * introduced here because the protected `generate()` cannot be called from
+     * outside the class, and the public surface needed the batch-of-prompts entry
+     * point that upstream's public `generate()` provides.
+     *
      * @param list<list<BaseMessage>> $messageLists
      * @param array<string, mixed>     $options
+     * @param list<object>|null        $callbacks  ignored when `$config` carries callbacks
      */
-    public function generateMessages(array $messageLists, ?RunnableConfig $config = null, array $options = []): LLMResult
-    {
+    public function generateMessages(
+        array $messageLists,
+        array $options = [],
+        ?array $callbacks = null,
+        ?RunnableConfig $config = null,
+    ): LLMResult {
+        $config = self::configWithCallbacks($callbacks, $config);
+
         $invocationParams = $this->invocationParams($options);
         $callbackManager = $this->configureCallbacks(
             $config,

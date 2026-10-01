@@ -181,6 +181,8 @@ final class SilentSuccessTest extends TestCase
         try {
             $model->generateMessages(
                 [['a' => 'p1'], ['b' => 'p2'], ['c' => 'p3']],
+                [],
+                null,
                 new RunnableConfig(callbacks: [$collector]),
             );
             self::fail('the second prompt must fail');
