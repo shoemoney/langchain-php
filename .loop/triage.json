@@ -207,7 +207,8 @@
   "#2 uncaught exception in postStream \u2014 REJECTED as a contract matter. The SHIPPED Guzzle transport raises on non-2xx before yielding (verified repeatedly). A third-party HttpClient that RETURNS on the stream path violates the interface contract \u2014 and the client structurally cannot check it, since postStream yields raw bytes and never sees a status. The contract is now documented explicitly on the interface.",
   "#3 null-pointer in eventToChunk \u2014 REJECTED. Probe: a missing, null, or wrongly-typed content_block all return null and are ignored; a non-numeric index coerces to 0 harmlessly. No null can be dereferenced.",
   "#4 inconsistent empty-tool handling \u2014 REJECTED, deliberate and documented: providers REJECT tools:[], so the key is omitted.",
-  "#5 mergeConfig undocumented \u2014 REJECTED, and it is the second reviewer this session to claim a doc is missing when it is extensive. mergeConfig carries a 21-line docblock directly above it stating the precedence rule and why `$a + $b` keeps the left operand."
+  "#5 mergeConfig undocumented \u2014 REJECTED, and it is the second reviewer this session to claim a doc is missing when it is extensive. mergeConfig carries a 21-line docblock directly above it stating the precedence rule and why `$a + $b` keeps the left operand.",
+  "#2 REFUTED by the port's own comment (RecursiveCharacterTextSplitter:96-106 documents the measured failure AND why a constructor guard was rejected as port-diverging). #3 is a REPEAT spanning 180/181/219/232/244. #1 (invalid UTF-8 length fn) is the one open item, landing on 182's deliberate code-point fallback"
  ],
  "google/gemma-4-31b-it": [
   "#1 'Bare Fences with Preambles Fail' \u2014 REJECTED on upstream evidence. langchain-core/src/output_parsers/structured.ts:111-115:",
@@ -2533,5 +2534,19 @@
  ],
  "probe-278": [
   "Thread CLOSED: cross-references added (HANDOFF.md:7 'Counts live HERE', PORT_STATUS.md:5 'ledger lives HERE'), both naming the other and the sync-before-test rule. Six iterations 273-278: observed -> could not reproduce -> 5/5 -> candidate cause -> wrong-file proof -> DELIBERATE RED -> documented"
+ ],
+ "maverick-279": [
+  "#maverick #2, 'RecursiveCharacterTextSplitter Should Accept Empty Separator List' \u2014 REFUTED BY THE PORT'S OWN CODE, AND THE REFUTATION IS A COMMENT THAT IS THE BEST DOCUMENTATION IN THE FILE. `RecursiveCharacterTextSplitter.php:96-106` reads:",
+  "#  // gives \"Undefined array key -1\" and then",
+  "#  // `splitOnSeparator(): Argument #2 ($separator) must be of type string, null given`.",
+  "#  // Measured, both, on a splitter constructed with `separators: []`.",
+  "#  // \u2026 So this resolves to '' \u2014 the floor separator \u2014 which reproduces upstream's `[text]` result.",
+  "#  // A constructor guard would also stop the fatal, but it would REJECT an input upstream accepts,",
+  "#  // and this is a port: the language difference is the port's problem to absorb, not the caller's.",
+  "#  $separator = $separators === [] ? '' : $separators[count($separators) - 1];",
+  "#So the empty list IS accepted, the two failures it used to cause were MEASURED rather than assumed, and the decision NOT to add a constructor guard is explicitly justified on port-discipline grounds. This is a refutation by the code's own documentation, which is the strongest form available: the port did not merely handle the case, it recorded what the case cost and why the obvious remedy was rejected.",
+  "#AND THE BATCH'S OTHER ITEMS ARE ALREADY-TERRITORY, WHICH IS THE PATTERN 191 PREDICTED AND 232 QUANTIFIED. #3 'TextSplitter Warns on Oversized Chunks Using trigger_error' is a REPEAT of a question this loop settled three times: 180 established the warn site is `recordOversized`-style RECORDING rather than a PHP warning, 181 confirmed the recording is unconditional, 219 read the same site in `GuzzleHttpClient` and found it deliberate, 232 extended it to THREE levels of protection (a source comment at `Schema.php:237`, the `PhpVersionCompatibilityTest` denylist, and the 8.2 CI job where a warning is a fatal), and 244 re-read the guard's own docblock and had to be CORRECTED for claiming it was silent. Five iterations for one finding is the most expensive refutation in this run, and the fifth was this loop misreading its own documentation.",
+  "##1 'TextSplitter Length Function Should Handle Invalid UTF-8' is the one genuinely open item, and it lands in territory 182 already mapped: the `mb_chr` fallback to a code-point count on damaged input is a DELIBERATE choice, recorded in the comment 232 quoted \u2014 'a damaged string measures as its code-point count'. The finding says it SHOULD handle invalid UTF-8, which is a claim about upstream's behaviour, and upstream is the only thing that settles it. #4 and #5 are DEFERRED-UNVERIFIED, with #5 being a request for a test rather than a defect.",
+  "#THE BATCH IS ALSO A STRUCTURAL SIGNATURE WORTH READING: FOUR OF ITS FIVE FINDINGS ASK FOR SOMETHING TO BE ADDED OR CHANGED \u2014 accept an empty list, handle invalid UTF-8, use a different warning mechanism, add a test. Only #4 claims a divergence from upstream. A batch that mostly proposes ADDITIONS to a faithful port is a batch measuring the port's surface rather than its fidelity, and 191's conclusion holds for this batch as it did for the last four: a reviewer's hit rate tracks what it looked at, and this one looked at the text splitter's edges rather than at its logic."
  ]
 }

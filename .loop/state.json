@@ -1795,6 +1795,41 @@
    "chars": 3020,
    "findings": 5,
    "severity_hits": 5
+  },
+  "meta-llama/llama-4-maverick": {
+   "model": "meta-llama/llama-4-maverick",
+   "at": "2026-09-30T22:43:13",
+   "actual_model": "meta-llama/llama-4-maverick",
+   "usage": {
+    "prompt_tokens": 43984,
+    "completion_tokens": 384,
+    "total_tokens": 44368,
+    "cost": 0.0157784,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0157784,
+     "upstream_inference_prompt_cost": 0.0153944,
+     "upstream_inference_completions_cost": 0.000384
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/55-meta-llama__llama-4-maverick.md",
+   "chars": 1746,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1851,7 +1886,8 @@
   "~google/gemini-pro-latest",
   "perplexity/sonar-pro",
   "~deepseek/deepseek-flash-latest",
-  "openai/gpt-6.1-sol-pro"
+  "openai/gpt-6.1-sol-pro",
+  "meta-llama/llama-4-maverick"
  ],
  "next_index": 0
 }
