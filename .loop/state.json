@@ -1727,6 +1727,39 @@
    "chars": 3372,
    "findings": 5,
    "severity_hits": 5
+  },
+  "~deepseek/deepseek-flash-latest": {
+   "model": "~deepseek/deepseek-flash-latest",
+   "at": "2026-09-30T21:23:10",
+   "actual_model": "deepseek/deepseek-v4.1-flash",
+   "usage": {
+    "prompt_tokens": 49802,
+    "completion_tokens": 24000,
+    "total_tokens": 73802,
+    "cost": 0.0437406,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0437406,
+     "upstream_inference_prompt_cost": 0.0149406,
+     "upstream_inference_completions_cost": 0.0288
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 24000,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "length",
+   "reasoning_tokens": 24000,
+   "status": "truncated",
+   "chars": 83071,
+   "file": ".loop/reviews/53-~deepseek__deepseek-flash-latest.md"
   }
  },
  "order": [
@@ -1781,7 +1814,8 @@
   "stealth/space-bunny-alpha",
   "~openai/gpt-astra-latest",
   "~google/gemini-pro-latest",
-  "perplexity/sonar-pro"
+  "perplexity/sonar-pro",
+  "~deepseek/deepseek-flash-latest"
  ],
  "next_index": 0
 }
