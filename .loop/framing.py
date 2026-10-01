@@ -48,6 +48,31 @@ wrong.\
 """
 
 
+NARRATIVE_CAUTION = """\
+
+**AND THE PROSE IN THIS DOCUMENT IS AUTHORIAL NARRATIVE, NOT EVIDENCE.**
+This brief contains measured facts and it contains opinions, and they are not equally reliable. Trust:
+
+  - the `Measured state` figures (counts, lines, files) — these are computed from the tree;
+  - the `Source in focus` listing — this is the live repository.
+
+Distrust:
+
+  - every prose paragraph in it, including the project notes reproduced below;
+  - any sentence of the form "the brief states…", "the project's own measurement says…",
+    "documented as unported", or "tracked, not fixed here".
+
+Those sentences have been reported back as findings verbatim. A review claimed `interrupt()` "cannot be
+resumed with a value" and supported it with "the brief states the resume-with-values path is
+unported" — the port has implemented upstream's full indexed resume queue (`PregelScratchpad::$resume`
+consumed by `$interruptCounter`, `Command::$resume`, detected at `PregelLoop.php:245`), and the brief's
+sentence was simply wrong.
+
+**So: a claim whose only support is that this document said so is not a finding. Go to the source, or
+drop it.** Reporting this document back to itself is the one failure mode no amount of framing elsewhere
+in it can prevent, which is why it is stated here rather than left to be inferred."""
+
+
 def framing() -> str:
-    """Both cautions, for either document path."""
-    return LEDGER_CAUTION + COMMENT_CAUTION
+    """All three cautions, for either document path."""
+    return LEDGER_CAUTION + COMMENT_CAUTION + NARRATIVE_CAUTION
