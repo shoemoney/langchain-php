@@ -121,13 +121,90 @@ abstract class Runnable implements RunnableInterface
         return $this->batchEach($inputs, $config, $options);
     }
 
+    /**
+     * Upstream's `concat` dispatch, transcribed from `libs/langchain-core/src/utils/stream.ts`.
+     *
+     * Order matters and is upstream's: lists append, strings concatenate, numbers add, an object with a
+     * `concat` method delegates, and two plain objects merge RECURSIVELY for keys that already exist and
+     * are not lists. Anything else throws. `_concatOutputChunks` (`base.ts:460`) is a one-line delegate to
+     * this function, and `RunnableBinding` (`base.ts:1425`) and `RunnableSequence` (`base.ts:2084`)
+     * re-delegate to their wrapped runnable, so one implementation serves the whole hierarchy.
+     */
+    public static function concatOutputs(mixed $first, mixed $second): mixed
+    {
+        $firstIsList = \is_array($first) && array_is_list($first);
+        $secondIsList = \is_array($second) && array_is_list($second);
+
+        if ($firstIsList && $secondIsList) {
+            return array_merge($first, $second);
+        }
+
+        if (\is_string($first) && \is_string($second)) {
+            return $first . $second;
+        }
+
+        if ((\is_int($first) || \is_float($first)) && (\is_int($second) || \is_float($second))) {
+            return $first + $second;
+        }
+
+        if (\is_object($first) && method_exists($first, 'concat')) {
+            return $first->concat($second);
+        }
+
+        if (\is_array($first) && \is_array($second)) {
+            $chunk = $first;
+            foreach ($second as $key => $value) {
+                if (\array_key_exists($key, $chunk) && !\is_array($chunk[$key])) {
+                    $chunk[$key] = self::concatOutputs($chunk[$key], $value);
+                } else {
+                    $chunk[$key] = $value;
+                }
+            }
+
+            return $chunk;
+        }
+
+        throw new \InvalidArgumentException(\sprintf(
+            'Cannot concat %s and %s',
+            get_debug_type($first),
+            get_debug_type($second),
+        ));
+    }
+
+    /**
+     * Gathers the incoming CHUNKS into one, then invokes the runnable on the result and yields it RAW.
+     *
+     * Upstream `base.ts:655-671`:
+     *
+     *     let finalChunk;
+     *     for await (const chunk of generator) {
+     *       if (finalChunk === undefined) finalChunk = chunk;
+     *       else finalChunk = this._concatOutputChunks(finalChunk, chunk);
+     *     }
+     *     yield* this._streamIterator(finalChunk, ensureConfig(options));
+     *
+     * and the default `_streamIterator` (`base.ts:297-302`) is `yield this.invoke(input, options)`.
+     *
+     * **The argument is therefore a stream of chunks to GATHER, not a list of inputs to stream over** —
+     * the port previously read it the other way round and yielded one `[channel, value]` pair per input,
+     * which is the opposite contract on both counts. It also did not call `stream()` at all here, so
+     * nothing in `src/` depended on the old shape; measured before changing anything.
+     *
+     * `$seen` is a separate flag rather than a `null` check because upstream's sentinel is `undefined`:
+     * a legitimately null first chunk must still be concatenated WITH the next one, which a null check
+     * would silently discard.
+     */
     public function transform(iterable $input, ?RunnableConfig $config = null): \Generator
     {
-        foreach ($input as $item) {
-            foreach ($this->stream($item, $config) as $pair) {
-                yield $pair;
-            }
+        $final = null;
+        $seen = false;
+
+        foreach ($input as $chunk) {
+            $final = $seen ? self::concatOutputs($final, $chunk) : $chunk;
+            $seen = true;
         }
+
+        yield $this->invoke($final, $config);
     }
 
     // ---- composition ----------------------------------------------------

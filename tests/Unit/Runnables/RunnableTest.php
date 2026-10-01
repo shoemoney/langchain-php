@@ -300,16 +300,49 @@ final class RunnableTest extends TestCase
      * explicit instead of leaving it unstated. An unstated contract is what let
      * the divergence survive two portings unnoticed.
      */
-    public function testTransformYieldsOnePairPerInnerChunk(): void
+    public function testTransformGathersChunksAndYieldsOneRawResult(): void
     {
         $lambda = RunnableLambda::from(static fn (string $s): string => strtoupper($s));
 
-        $pairs = iterator_to_array($lambda->transform(['a', 'b', 'c']), false);
+        $out = iterator_to_array($lambda->transform(['a', 'b', 'c']), false);
 
-        self::assertCount(3, $pairs, 'one pair per input item — the port streams rather than gathers');
-        self::assertSame(['A', 'B', 'C'], array_map(static fn (array $p): mixed => $p[1], $pairs));
+        // Upstream `base.ts:655-671` folds the incoming CHUNKS with `_concatOutputChunks` and then does
+        // `yield* this._streamIterator(finalChunk, ...)`, whose default (`base.ts:297-302`) is
+        // `yield this.invoke(input, options)`. So the argument is a stream of chunks to GATHER, not a
+        // list of inputs to stream over, and the result is ONE raw value — not a [channel, value] pair.
+        self::assertCount(1, $out, 'upstream gathers every chunk and yields a single result');
+        self::assertSame('ABC', $out[0], 'chunks concat to "abc", which is then invoked once');
     }
 
+    public function testTransformConcatenatesArrayChunks(): void
+    {
+        $lambda = RunnableLambda::from(static fn (array $parts): array => $parts);
+
+        $out = iterator_to_array($lambda->transform([['a'], ['b'], ['c']]), false);
+
+        self::assertSame([['a', 'b', 'c']], $out, 'upstream `concat` appends arrays rather than overwriting');
+    }
+
+    /**
+     * An EMPTY chunk stream still yields ONE result, not none.
+     *
+     * Upstream's `finalChunk` stays `undefined` and is passed to `_streamIterator` regardless
+     * (`base.ts:659-670`), whose default is `yield this.invoke(input, options)` — so a no-chunk stream
+     * invokes the runnable once with nothing. An earlier version of this test asserted an empty array,
+     * which is what the port's old per-input loop happened to do and is NOT what upstream does; had the
+     * fix been written to the convenient expectation, the suite would have gone green on a divergence.
+     */
+    public function testTransformOfAnEmptyStreamStillYieldsOneResult(): void
+    {
+        $lambda = RunnableLambda::from(static fn (mixed $x): string => $x === null ? 'NULL-INPUT' : (string) $x);
+
+        self::assertSame(
+            ['NULL-INPUT'],
+            iterator_to_array($lambda->transform([]), false),
+            'upstream invokes once even when the chunk stream is empty, because `_streamIterator` is called '
+                . 'with `finalChunk` unconditionally',
+        );
+    }
 
     public function testConfigFromArrayAcceptsBothKeyStyles(): void
     {
