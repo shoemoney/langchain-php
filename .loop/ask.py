@@ -8,7 +8,7 @@ Ask ONE reviewer model for five improvements, save the answer, advance the roste
 
 State lives in .loop/state.json so a crashed run resumes rather than re-asking.
 """
-import base64, json, os, random, re, sys, time, datetime, urllib.request, urllib.error
+import base64, json, os, random, re, subprocess, sys, time, datetime, urllib.request, urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
@@ -212,6 +212,24 @@ NOT_A_REVIEWER = (
 )
 
 
+def pending_models(roster, state):
+    """The models this iteration may actually ask.
+
+    ONE definition, used by both `--list` and the selection path. They drifted:
+    `--list` computed "pending" as "not asked and not retired" while selection
+    also excluded NOT_A_REVIEWER, so `--list` advertised
+    `x-ai/grok-4.20-multi-agent` as PENDING on a run where the selector would
+    refuse it — a diagnostic pointing at a reviewer that can never be asked.
+    Two answers to "who is left" is one too many.
+    """
+    return [
+        m for m in roster
+        if m["id"] not in state["asked"]
+        and not any(k in m["id"] for k in NOT_A_REVIEWER)
+        and not is_retired(state, m["id"])
+    ]
+
+
 def load_state():
     if os.path.exists(STATE):
         return json.load(open(STATE))
@@ -371,8 +389,15 @@ def main():
         # read as "3 still to go" when the roster is in fact spent (measured at iteration 383:
         # 75 total, 72 asked, 3 retired, 0 pending). One command should tell the whole story.
         retired = [m for m in roster if m["id"] not in asked and is_retired(state, m["id"])]
-        pending = [m for m in roster if m["id"] not in asked and not is_retired(state, m["id"])]
-        print(f"asked {len(asked)}/{len(roster)}  |  pending {len(pending)}  |  retired {len(retired)}")
+        pending = pending_models(roster, state)
+        print(f"asked {len(asked)} total | roster {len(roster)} | pending {len(pending)} | retired {len(retired)}")
+        # `asked` counts every model ever asked, which can exceed the roster's
+        # size when the roster shrinks (488's filter took 88 -> 58 after 73 had
+        # already been asked). "asked 73/58" reads as nonsense, so the two are
+        # reported as what they are rather than as a fraction of each other.
+        off_roster = len(asked) - len([m for m in roster if m["id"] in asked])
+        if off_roster > 0:
+            print(f"  ({off_roster} previously-asked model(s) are no longer in the roster)")
         for m in roster:
             mid = m["id"]
             if mid in asked:
@@ -394,14 +419,41 @@ def main():
             print(f"{model} is a router or classifier, not a reviewer — refusing to spend an iteration on it.")
             return
     else:
-        pending = [
-            m for m in roster
-            if m["id"] not in state["asked"]
-            and not any(k in m["id"] for k in NOT_A_REVIEWER)
-            and not is_retired(state, m["id"])
-        ]
+        pending = pending_models(roster, state)
         if not pending:
-            print("every reviewer in the roster has been asked.")
+            # A fixed snapshot always runs dry, and this loop hit that twice in
+            # one session (487 and 488), each time stopping STEP 2 until someone
+            # noticed and re-ran models.py by hand. Refresh from the live
+            # catalogue instead, so an infinite loop can actually keep going.
+            print("roster snapshot exhausted — refreshing from the live OpenRouter catalogue...")
+            before = {m["id"] for m in roster}
+            for script in (".loop/models.py", ".loop/roster.py"):
+                subprocess.run([sys.executable, script], check=True,
+                               stdout=subprocess.DEVNULL)
+            roster = json.load(open(".loop/roster.json"))
+            state = load_state()
+            pending = pending_models(roster, state)
+            added = len({m["id"] for m in roster} - before)
+            print(f"  refreshed: {len(roster)} in roster ({added} new), {len(pending)} never asked")
+
+        if not pending:
+            # Say WHICH state this is. The old message claimed "every reviewer has
+            # been asked" while three of them had never been asked at all — they
+            # were EXCLUDED by NOT_A_REVIEWER — so a true-looking zero described a
+            # state that had not happened, and pointed at the wrong remedy.
+            asked = set(state["asked"])
+            excluded = [m["id"] for m in roster
+                        if m["id"] not in asked
+                        and any(k in m["id"] for k in NOT_A_REVIEWER)]
+            retired = [m["id"] for m in roster if is_retired(state, m["id"])]
+            print(
+                f"no eligible reviewer: {len(roster)} in roster, {len(asked)} asked, "
+                f"{len(excluded)} excluded as non-reviewers, {len(retired)} retired."
+            )
+            if excluded:
+                print("  excluded: " + ", ".join(excluded))
+            print("  STEP 2 has nothing to ask. Run `.loop/advisory.py` (STEP 2b) or widen")
+            print("  the roster's NOT_A_REVIEWER list — but do NOT read this as 'asked'.")
             return
         # rotate: seeded by time so successive rounds differ, but never re-ask
         random.seed()
