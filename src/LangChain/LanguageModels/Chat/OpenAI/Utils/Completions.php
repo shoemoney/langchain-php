@@ -31,21 +31,78 @@ use LangChain\Utils\Js;
  *
  * ## Divergence from upstream
  *
- * Upstream additionally *filters* `content` on the way out, dropping
- * `tool_use`, `tool_call`, `functionCall`, `reasoning`, `reasoning_content` and
- * `thinking` blocks — strict OpenAI-compatible providers reject them echoed back
- * in history. This port passes `content` through unchanged.
+ * Upstream drops six `content` block types on the way out — `tool_use`,
+ * `tool_call`, `functionCall`, `reasoning`, `reasoning_content` and `thinking` —
+ * because strict OpenAI-compatible providers reject them echoed back in history.
+ * This port drops the same six and nothing else; see
+ * `DROPPED_CONTENT_BLOCK_TYPES`. Multimodal blocks (`image`, `audio`, `file`,
+ * `video`) are legal Chat Completions input and are forwarded untouched, as
+ * upstream does.
  *
- * That is a real difference, not an oversight, and it is a consequence of the
- * message layer: upstream's standard content-block conversion is what produces
- * those block types in `content` in the first place, and the port has no
- * `output_version: v1` conversion path. So in practice an assistant message
- * here carries tool calls in `toolCalls` and prose in `content`, with no
- * reasoning block to echo. If a caller hand-builds such a content list, they
- * must filter it themselves."
+ * Two narrower differences remain, both consequences of the message layer:
+ * upstream's standard content-block conversion is what produces `thinking` and
+ * `tool_use` blocks in `content` in the first place, and this port has no
+ * `output_version: v1` conversion path — so those two spellings only ever turn
+ * up in a hand-built content list. And upstream additionally applies
+ * prompt-cache breakpoints to data blocks on the way through
+ * (`applyPromptCacheBreakpoint`); this port has no cache-control concept at this
+ * layer, so those blocks pass through verbatim.
+ *
+ * An earlier version of this docblock claimed "This port passes `content`
+ * through unchanged… a caller hand-building such a content list must filter it
+ * themselves". That was false on both counts — the filter existed (added by
+ * `c1620c8`), and it was an allow-list that discarded every non-`text` block,
+ * not a deny-list of six. A docblock that describes the opposite of the code is
+ * worse than no docblock, because it is the thing a future editor trusts.
  */
 final class Completions
 {
+    /**
+     * Content-block types dropped on the way out to the Chat Completions wire.
+     *
+     * Verbatim from upstream `converters/completions.ts:846-857`, which reaches
+     * this list by asking "is this one of the six the API rejects as input?" and
+     * answers `return []` for those and `return m` for EVERYTHING ELSE. It is a
+     * deny-list, deliberately: `image`, `audio`, `file` and `video` blocks are
+     * legal Chat Completions input and upstream forwards them untouched.
+     *
+     *   - Tool-call blocks travel in the message's `tool_calls` field, so
+     *     resending them as content is a duplicate/invalid part.
+     *   - Reasoning traces are output-only. Echoing one back in request history
+     *     is rejected by strict OpenAI-compatible providers, e.g. DeepSeek's
+     *     "unknown variant `reasoning`, expected `text`".
+     *
+     * `tool_use`, `functionCall` and `reasoning_content` are Anthropic/Gemini
+     * spellings that arrive only in a hand-built content list — this port has no
+     * `output_version: v1` conversion path — so they are named here as literals
+     * for the same reason upstream names them.
+     */
+    private const DROPPED_CONTENT_BLOCK_TYPES = [
+        'tool_use',
+        'tool_call',
+        'functionCall',
+        'reasoning',
+        'reasoning_content',
+        'thinking',
+    ];
+
+    /**
+     * Dropped here but NOT by upstream — a deliberate, recorded divergence.
+     *
+     * Upstream's list is a closed enumeration, so `redacted_thinking` is
+     * forwarded by upstream and a strict endpoint answers 400 on it exactly as
+     * it would on `thinking`. That is an upstream gap rather than intended
+     * behaviour, and the alternative — being faithful to a list that provokes
+     * the failure this filter exists to prevent — is not worth the fidelity.
+     *
+     * Kept separate from the six above so the two are never confused: one is
+     * upstream's rule and must track upstream, the other is this port's, and
+     * `NonOpenAIBlocksDroppedTest` guards it independently.
+     */
+    private const PORT_DROPPED_CONTENT_BLOCK_TYPES = [
+        'redacted_thinking',
+    ];
+
     /**
      * Render a message list as Chat Completions `messages` params.
      *
@@ -92,19 +149,37 @@ final class Completions
             return $param;
         }
 
-        // Content can be an Anthropic-shaped BLOCK ARRAY, not just a string: a reply carrying a
+// Content can be an Anthropic-shaped BLOCK ARRAY, not just a string: a reply carrying a
         // `thinking` block keeps its blocks (that is correct — the blocks belong to the message), and
         // forwarding them verbatim put `{"type":"thinking"}` on an OpenAI-compatible wire, which has no
-        // such block type and answers 400. Upstream drops `thinking`/`reasoning` on the way out and
-        // keeps the text; `tool_use` is not dropped here because an assistant's tool calls travel in
-        // the `tool_calls` field below, not in `content`.
+        // such block type and answers 400. Upstream drops exactly six types on the way out and
+        // forwards every other block untouched, which is what DROPPED_CONTENT_BLOCK_TYPES encodes.
+        //
+        // This was once `=== 'text'`, i.e. an ALLOW-list that kept text and discarded everything else.
+        // That is upstream's rule INVERTED, and iteration 487 proved the cost by execution: a
+        // four-block message (text + image + audio + file) went out as ONE block, so the request asked
+        // "What is in this image?" with no image on the wire and nothing reported the loss. Upstream
+        // forwards `image`/`audio`/`file`/`video`, so this port was dropping legal multimodal input.
         //
         // This consumer was simply never exercised before iteration 345 corrected `contentOf()` to
         // stop collapsing a multi-block reply to a string. Both sides were correct in isolation.
         $param['content'] = is_array($message->content)
             ? array_values(array_filter(
                 $message->content,
-                static fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'text',
+                static fn (mixed $block): bool => !is_array($block)
+                    || !in_array(
+                        $block['type'] ?? null,
+                        // array_merge, NOT `+`: both operands are lists keyed from 0, and `+` is a
+// union that keeps the FIRST value per key, so the second list's only entry
+// collided with key 0 and was silently discarded — `redacted_thinking` stopped
+// being dropped while the multi-modal probe still passed, because that probe
+// carries no redacted_thinking block. NonOpenAIBlocksDroppedTest caught it.
+                        array_merge(
+                            self::DROPPED_CONTENT_BLOCK_TYPES,
+                            self::PORT_DROPPED_CONTENT_BLOCK_TYPES,
+                        ),
+                        true,
+                    ),
             ))
             : $message->content;
 

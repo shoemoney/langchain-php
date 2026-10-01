@@ -16,8 +16,18 @@ use PHPUnit\Framework\TestCase;
  *
  *     {"role":"assistant","content":[{"type":"thinking",…},{"type":"text",…}]}
  *
- * OpenAI has no `thinking` block type and a strict endpoint answers 400. Upstream drops
- * `thinking`/`reasoning`/`tool_use` on the way out and keeps the text.
+ * OpenAI has no `thinking` block type and a strict endpoint answers 400.
+ *
+ * UPSTREAM'S RULE IS A DENY-LIST OF SIX, NOT "KEEP THE TEXT". `completions.ts:846-857`
+ * enumerates `tool_use`, `tool_call`, `functionCall`, `reasoning`,
+ * `reasoning_content` and `thinking`, returns `[]` for those, and returns the block
+ * untouched for everything else — `image`, `audio` and `file` are legal Chat Completions
+ * input and go through. This test used to say "upstream drops thinking/reasoning/tool_use
+ * and keeps the text", which described an allow-list; that reading is what let the
+ * filter be written as `=== 'text'` and silently delete legal multi-modal blocks. See
+ * `MultimodalBlocksReachTheWireTest` for the other half, and this file's
+ * `redacted_thinking` case below for the one place the port deliberately drops MORE
+ * than upstream does.
  *
  * WHY THIS PATH WAS ONLY NOW REACHABLE: `MessageOutputs::contentOf()` used to collapse a multi-block
  * Anthropic reply to a plain string, so this consumer never saw blocks. Correcting that (iteration 345)
