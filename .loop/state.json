@@ -1619,7 +1619,8 @@
    "finish_reason": "stop",
    "reasoning_tokens": 0,
    "status": "error",
-   "error": "NameError: name 'SYSTEM' is not defined"
+   "error": "NameError: name 'SYSTEM' is not defined",
+   "resolved": "FIXED 190-190: `ask.py`'s top-up path had five defects (undefined SYSTEM, undefined prompt(), undefined b, png passed as max_tokens, response dict concatenated to a string). Narrowed the call to a content array, extracted via text_of(), and mutation-verified: the pre-fix block raises NameError, the fixed block runs. The status below is the HISTORICAL outcome of that run, not a live defect."
   },
   "~openai/gpt-astra-latest": {
    "model": "~openai/gpt-astra-latest",
