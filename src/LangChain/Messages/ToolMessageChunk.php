@@ -22,6 +22,15 @@ class ToolMessageChunk extends BaseMessageChunk
 
     public ?string $toolName = null;
 
+    /**
+     * The structured payload a tool returns alongside its textual content.
+     *
+     * Upstream `tool.ts` stores `artifact` on the chunk and merges it in `concat` with
+     * `_mergeObj(this.artifact, chunk.artifact)`. The port stored it on `ToolMessage` only, so a
+     * STREAMED tool result lost it entirely.
+     */
+    public mixed $artifact = null;
+
     public function __construct(string|array $fields = [])
     {
         parent::__construct($fields);
@@ -30,6 +39,7 @@ class ToolMessageChunk extends BaseMessageChunk
             $this->toolCallId = is_string($id) ? $id : '';
             $name = $fields['tool_name'] ?? $fields['toolName'] ?? null;
             $this->toolName = is_string($name) ? $name : null;
+            $this->artifact = $fields['artifact'] ?? null;
         }
 
         $this->kwargs['tool_call_id'] = $this->toolCallId;
@@ -52,6 +62,10 @@ class ToolMessageChunk extends BaseMessageChunk
             // fallback to the incoming chunk. The port let the incoming id win unless it was empty,
             // which re-points a concatenated tool RESULT at a different CALL.
             'tool_call_id' => $this->toolCallId,
+            // Upstream `tool.ts`: `artifact: _mergeObj(this.artifact, chunk.artifact)` —
+            // an OBJECT merge, so both sides contribute. `mergeObj` is the port's counterpart of
+            // `_mergeObj` and was previously unused by any message class.
+            'artifact' => MessageMerge::mergeObj($this->artifact, $other->artifact),
             'name' => $other->name ?? $this->name,
             'id' => $this->id ?? $other->id,
         ]);

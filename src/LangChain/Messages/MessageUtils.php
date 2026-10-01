@@ -334,6 +334,13 @@ final class MessageUtils
         if ($message instanceof ToolMessage) {
             $base['tool_call_id'] = $message->toolCallId;
 
+            // The artifact is the tool's structured payload, distinct from `content`. The chunk
+            // class stores and merges it, but without this nothing ever put it IN the chunk — the half of
+            // the fix that lives in a different file from the field it feeds.
+            if ($message->artifact !== null) {
+                $base['artifact'] = $message->artifact;
+            }
+
             return new ToolMessageChunk($base);
         }
 
