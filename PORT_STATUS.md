@@ -348,6 +348,9 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:2f8153a -->
 | 458 | a tool declaring a `ToolRuntime` parameter received a run manager instead | upstream `tools/types.ts:472-486` injects one automatically; the class shipped but nothing constructed it, and both invocation sites forwarded the run manager, so a correctly-written tool raised `TypeError` naming two unrelated classes | conditional injection by type hint at `DynamicTool.php:60` and `DynamicStructuredTool.php:55`, with a fallback runtime for the no-toolCall case; `ToolRuntimeInjectionTest` holds the older `(input, runManager, config)` contract | identical |
 
+<!-- fix:bf4ca3d -->
+| 466 | `wireCheckpoint()` stored empty maps as JSON arrays | duplicated across `MemorySaver` and `SqliteSaver`; the hand-written branch for `Pregel\Checkpoint\Checkpoint` omitted the object casts 362/368 put in `toArray()`, so `channel_versions` and every empty inner `versions_seen` map serialised as `[]` | casts applied in place, keeping the snake_case key set the reader (`Checkpoint::fromArray((array) $this->serde->loadsTyped(...))`) requires; guarded by `WireCheckpointEmptyMapShapeTest` on both savers, asserting the raw stored bytes | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
