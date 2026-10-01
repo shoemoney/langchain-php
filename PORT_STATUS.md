@@ -635,7 +635,8 @@ re-checked the three remaining OPEN rows instead of trusting 401's method. The d
 conclusion unsafe was a search scoped to ONE FILE; the three checks were re-run across all of `src/`, under
 camelCase AND snake_case spellings, and with code separated from prose:
 
-| upstream method | exact | variants | verdict |
+| 476 | `AIMessageChunk` has NO `toolCalls` field at all, so a chunk-assembled message has none | **476 PROVED IT LIVE, with a named consumer.** Measured: `AIMessage` HAS `toolCalls` (`[{name:f,args:{a:1},id:c1}]`), `AIMessageChunk` does NOT have the property or an accessor at all, and `$chunk->concat($chunk)->toolCalls` is **ABSENT**. Upstream `ai.ts` gives the chunk a `tool_calls` field and merges it in `concat`, so this is 475's finding confirmed rather than a modelling choice. **The consumer is `MessageUtils.php:191`**, which reads `$m->toolCalls` when building the buffer string — so a streamed AI message carrying tool calls renders WITHOUT them. That makes it observable, not merely a missing field | **not fixed in 476.** Adding the field is a modelling change with wire-shape consequences: the open question is whether `tool_calls` should be STORED on the chunk or DERIVED from `tool_call_chunks` (upstream frequently derives it), and that decision needs its own test before code moves | **live: chunk-assembled messages lose tool_calls** |
+
 | --- | --- | --- | --- |
 | `withListeners` | 0 | `with_listener`, `listeners`, `configFactor`, `config_factor` all **0** | **CONFIRMED absent** — 401's `grep -rn configFactor src/ -> 0` reproduces |
 | `streamEvents` | 0 | `streamEvents` 2, `streamEvent` 7 — all a docblock stating it is *not* a `streamEvents` entry point, plus `handleChatModelStreamEvent` (a LangSmith callback) and `preferChatModelStreamEvents` (a handler flag) | **CONFIRMED absent** |
