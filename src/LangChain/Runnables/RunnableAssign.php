@@ -59,10 +59,7 @@ class RunnableAssign extends Runnable
     /** @param list<mixed> $inputs */
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
     {
-        return array_map(
-            fn (mixed $input): mixed => $this->invoke($input, $config),
-            array_values($inputs),
-        );
+        return $this->batchEach($inputs, $config, $options);
     }
 
     public function pipe(RunnableInterface $next): RunnableSequence

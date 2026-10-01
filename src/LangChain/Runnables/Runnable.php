@@ -54,36 +54,50 @@ abstract class Runnable implements RunnableInterface
      * @param list<mixed>              $inputs
      * @param array<string, mixed>|null $options Unused.
      */
-    public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
+    /**
+     * The one batch loop, shared by every implementation.
+     *
+     * Upstream's `Runnable.batch` is `inputs.map(...)` followed by `Promise.all(...)`, which ALWAYS
+     * yields a LIST — string keys on `$inputs` are discarded. Every implementation here delegates here
+     * rather than hand-rolling its own loop, because two things had already drifted apart by hand:
+     *
+     *  - `returnExceptions` (`batchOptions`, `base.ts:281`) was honoured by `Runnable::batch()` and
+     *    ignored by `RunnableSequence`, `RunnableWithFallbacks`, `RunnableParallel` and
+     *    `RunnableAssign`, so the option was real, documented, tested — and inert on every composition
+     *    type, which is where a caller would actually reach for it;
+     *  - the loop form KEPT string keys where upstream drops them, so a string-keyed batch returned a
+     *    string-keyed array instead of a list. Nothing errored; the shape was simply different.
+     *
+     * @param list<mixed> $inputs
+     * @param array<string, mixed>|null $options
+     *
+     * @return list<mixed>
+     */
+    protected function batchEach(array $inputs, ?RunnableConfig $config, ?array $options): array
     {
-        // `batchOptions.returnExceptions` (`runnables/base.ts:240-241`, honoured at `:281`).
-        //
-        // It was accepted and IGNORED here, and three reviewers reported that across cycles 3, 4 and 5.
-        // This loop refused all three on the grounds that the port's own docblock said the option was
-        // ignored — which is this same mistake a second time: A DOCBLOCK SAYING AN OPTION IS IGNORED IS
-        // A DESCRIPTION OF A GAP, NOT A JUSTIFICATION FOR IT. Upstream implements the option, so the
-        // port was simply missing it.
-        $returnExceptions = (bool) ($options['returnExceptions'] ?? false);
+        $inputs = array_values($inputs);
 
-        if (!$returnExceptions) {
-            return array_map(
-                fn (mixed $input): mixed => $this->invoke($input, $config),
-                array_values($inputs)
-            );
+        if (!(bool) ($options['returnExceptions'] ?? false)) {
+            return array_map(fn (mixed $input): mixed => $this->invoke($input, $config), $inputs);
         }
 
         $out = [];
-        foreach (array_values($inputs) as $position => $input) {
+        foreach ($inputs as $position => $input) {
             try {
                 $out[$position] = $this->invoke($input, $config);
             } catch (\Throwable $e) {
-                // Upstream returns "mixed RunOutputs and errors" — the Throwable takes the failed
-                // item's SLOT, and the remaining items still run.
+                // Upstream returns "mixed RunOutputs and errors": the Throwable takes the failed item's
+                // SLOT and the remaining items still run.
                 $out[$position] = $e;
             }
         }
 
         return $out;
+    }
+
+    public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
+    {
+        return $this->batchEach($inputs, $config, $options);
     }
 
     public function transform(iterable $input, ?RunnableConfig $config = null): \Generator

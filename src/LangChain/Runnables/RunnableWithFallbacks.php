@@ -48,11 +48,6 @@ class RunnableWithFallbacks extends Runnable
 
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
     {
-        $out = [];
-        foreach ($inputs as $i => $input) {
-            $out[$i] = $this->invoke($input, $config);
-        }
-
-        return $out;
+        return $this->batchEach($inputs, $config, $options);
     }
 }
