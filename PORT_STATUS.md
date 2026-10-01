@@ -360,3 +360,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:998c87e -->
 | `BaseLanguageModel::invoke()` discarded 14 of 16 config fields | only `options` and `callbacks` crossed the boundary; `runName` and `tags` never reached the traced run and `Run::name()` fell back to the component id | `generatePrompt()` takes the config as a fourth argument and merges it | 998c87e |
+
+<!-- fix:49be3c3 -->
+| `Runnable::withConfig()` missing | no way to bind a config onto a runnable, so `runName`/`tags` had no affordance and three reviews misread the absence as a dropped value | delegates to `bind([], $config)`, matching upstream `base.ts:175-183` | 49be3c3 |
