@@ -71,11 +71,45 @@ class RunnableLambda extends Runnable
             // unambiguous, so the arity is checked first.
             $reflection = $this->reflectCallable($func);
 
-            if ($reflection === null
-                || $reflection->isVariadic()
-                || $reflection->getNumberOfParameters() >= 2
-            ) {
-                return $func($input, $config);
+            // Upstream's `(input, config?)` typing makes "the second parameter is the config
+            // channel" unambiguous at the type level, and the TYPE is the discriminator here too —
+            // not optionality. `fn(mixed $x, ?RunnableConfig $c = null)` is a config slot that happens
+            // to be defaulted; `fn(array $xs, string $sep = ' ')` is the caller's own data. Counting
+            // parameters, or asking whether the second one is optional, conflates the two: the old
+            // `getNumberOfParameters() >= 2` gate sent the config into `$sep` and a legal closure died
+            // with a TypeError.
+            //
+            // An UNTYPED second parameter is treated as the config slot, matching the long-standing
+            // behaviour where anything untyped was assumed to want the config.
+            $reflection = $this->reflectCallable($func);
+            $takesConfig = true;
+
+            if ($reflection !== null && !$reflection->isVariadic()) {
+                $params = $reflection->getParameters();
+                if (count($params) < 2) {
+                    $takesConfig = false;
+                } elseif ($params[1]->hasType()) {
+                    $type = $params[1]->getType();
+                    $names = $type instanceof \ReflectionNamedType && $type->isBuiltin()
+                        ? []
+                        : array_map(
+                            static fn (\ReflectionNamedType $t): string => $t->getName(),
+                            $type instanceof \ReflectionUnionType || $type instanceof \ReflectionIntersectionType
+                                ? $type->getTypes()
+                                : [$type],
+                        );
+                    $names[] = $type instanceof \ReflectionNamedType ? $type->getName() : '';
+                    $takesConfig = $names === [] || in_array(RunnableConfig::class, $names, true)
+                        || in_array('mixed', $names, true);
+                }
+            }
+
+            if ($takesConfig) {
+                // A lambda that DOES take the config gets a real one even when the caller passed
+                // none. Upstream's `ensureConfig` always yields a config, so handing a lambda `null`
+                // in the slot it declared as its config channel was a second, separate defect: the
+                // measured failure was 'must be of type string, null given'.
+                return $func($input, $config ?? new RunnableConfig());
             }
 
             return $func($input);
