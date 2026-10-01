@@ -37,7 +37,9 @@ class FunctionMessageChunk extends BaseMessageChunk
             'additional_kwargs' => MessageMerge::mergeDicts($this->additional_kwargs, $other->additional_kwargs) ?? [],
             'response_metadata' => MessageMerge::mergeDicts($this->response_metadata, $other->response_metadata) ?? [],
             'id' => $this->id ?? $other->id,
-            'name' => $other->name ?? $this->name,
+            // Upstream `function.ts:73`: `name: this.name ?? ""` — the accumulated chunk wins, and
+            // the fallback is the EMPTY STRING, not null.
+            'name' => $this->name ?? '',
         ]);
     }
 }

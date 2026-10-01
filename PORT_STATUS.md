@@ -319,6 +319,8 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:07486a5 -->
 | 436 | message-chunk `concat()` inverted the `id` precedence in all six chunk types | the port read `$other->id ?? $this->id`, so a streamed message took its id from the LAST chunk; upstream reads `id: this.id ?? chunk.id` at all seven sites (`ai.ts:445`, `chat.ts:122`, `function.ts:74`, `human.ts:77`, `system.ts:62`/`:112`, `tool.ts:206`), so the accumulated chunk keeps it | swapped in all six types; guarded by `MessageChunkConcatIdPrecedenceTest` | identical |
 
+| 437 | the port MERGES `name` in four chunk types where upstream drops it | `ai.ts`, `chat.ts`, `human.ts` and `tool.ts` carry no `name` in `concat` (read directly: `tool.ts:192-208` builds content/additional_kwargs/response_metadata/artifact/`tool_call_id`/`id`/`status` and no `name`), so upstream's concatenated chunk has no name at all; the port preserves it via `$this->name ?? $other->name` | **deliberately unchanged.** The precedence is now correct in the two types upstream actually merges (`system.ts:63`, `function.ts:73`), but removing preservation in the other four is a behaviour removal whose effect on port consumers was not measured, and upstream's `null` means discarding a populated field. Fidelity says match; the risk of removing it blind says measure first | not guarded |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
@@ -527,7 +529,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4221** |
+| **Total so far** | | **4230** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
