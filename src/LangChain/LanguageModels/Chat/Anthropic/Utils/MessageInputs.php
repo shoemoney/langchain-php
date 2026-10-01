@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels\Chat\Anthropic\Utils;
 
+use LangChain\Utils\Js;
+
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\HumanMessage;
@@ -151,12 +153,29 @@ final class MessageInputs
                 'content' => array_merge(
                     self::textBlocks($message->content),
                     array_map(
-                        static fn (array $call): array => [
-                            'type' => 'tool_use',
-                            'id' => $call['id'] ?? '',
-                            'name' => $call['name'] ?? '',
-                            'input' => $call['args'] ?? [],
-                        ],
+                        static function (array $call): array {
+                            // Anthropic types `input` as an OBJECT. `$call['args'] ?? []` left an empty
+                            // PHP array, and PHP encodes an empty array as `[]` — a JSON array where an
+                            // object is required. Measured before this cast:
+                            //   {"type":"tool_use","id":"call_1","name":"lookup","input":[]}
+                            //
+                            // This is the same "empty object encodes as [] instead of {}" defect the
+                            // project's hard rules name as having broken a real release, where it is
+                            // recorded as guarded — the guard covers the OpenAI path, where
+                            // `Completions::toolCallToWire()` already applies exactly this expression.
+                            // The sibling provider was left unfixed, so the same cast is applied here
+                            // rather than a different one.
+                            $args = $call['args'] ?? [];
+
+                            return [
+                                'type' => 'tool_use',
+                                'id' => $call['id'] ?? '',
+                                'name' => $call['name'] ?? '',
+                                'input' => is_array($args) && $args !== [] && Js::isList($args)
+                                    ? $args
+                                    : (object) $args,
+                            ];
+                        },
                         $message->toolCalls,
                     ),
                 ),
