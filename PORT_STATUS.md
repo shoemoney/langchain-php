@@ -278,6 +278,9 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:68bcc47 -->
 | 433 | `ChannelWrite::batch()` / `RunnableBranchWriter::batch()` discarded `returnExceptions` and preserved string keys | Both `implement RunnableInterface` directly, so 412's `batchEach()` refactor could not reach them; both hand-rolled `array_map` over `invoke()` reading neither `$options` nor `array_values($inputs)` where upstream `Runnable.batch` (`base.ts:281`, `:3081`) honours both | logic moved to one place, `Runnable::batchEachFor()`, called by all six implementations; guarded by `PregelRunnableBatchTest` (ChannelWrite only) | identical |
 
+<!-- fix:3e74392 -->
+| 434 | `RunnableBranchWriter::stream()` fataled on a scalar input | `yield from $this->invoke(...)` with `invoke()` returning the scalar `$input` raised `Error: Can use "yield from" only with arrays and Traversables`, killing the process on any streamed conditional edge | changed to `yield $this->invoke(...)`, mirroring `ChannelWrite::stream()`; **the pair-vs-raw yield SHAPE is deliberately unpinned and remains an open question** — `Runnable::stream()` yields a pair, upstream `base.ts:297-302` yields raw | guarded by `RunnableBranchWriterStreamTest` | fatal removed; shape unresolved |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
