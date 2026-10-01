@@ -345,3 +345,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:816ce85 -->
 | Anthropic multi-block answer text | `generate()` returned `''` for any non-single-block payload (including the ordinary `thinking`+`text` shape) | `MessageOutputs::stringifyText()` concatenates every `text` block | 816ce85 |
+
+<!-- fix:01d99fc -->
+| Pregel `Checkpoint` skipped the empty-map cast | the `(object)` cast lived on the sibling `LangGraph\Checkpoint` class; the engine writes `LangGraph\Pregel\Checkpoint`, so `"channelVersions":[]` | added `toArray()` to the Pregel class; encoder `instanceof` matches both | 01d99fc |
