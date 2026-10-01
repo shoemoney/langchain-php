@@ -8,6 +8,7 @@ use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableLambda;
 use LangGraph\Pregel\ChannelWrite;
 use LangGraph\Pregel\Constants;
+use LangGraph\Pregel\RunnableBranchWriter;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
@@ -96,5 +97,58 @@ final class PregelRunnableBatchTest extends TestCase
             'upstream Runnable.batch does inputs.map(...) + Promise.all(...), which ALWAYS yields a list; '
                 . 'got keys ' . json_encode(array_keys($results)),
         );
+    }
+
+    /**
+     * Iteration 433 applied the same `batchEachFor()` delegation to `RunnableBranchWriter` but left it
+     * untested, because its `invoke()` only throws when there ARE writes to send. So the fixture makes
+     * the SEND callable itself throw on its first call, and the branch writer returns a destination for
+     * the first input only: three items in, exactly one Throwable out, the rest untouched.
+     */
+    public function testRunnableBranchWriterBatchCollectsExceptionsInsteadOfThrowingOnTheFirst(): void
+    {
+        $calls = 0;
+        [$config] = self::configCapturingWritesFailingOnce();
+        $writer = new RunnableBranchWriter(static fn (mixed $in): ?string => $in === 'a' ? 'dest' : null);
+
+        $results = $writer->batch(['a', 'b', 'c'], $config, ['returnExceptions' => true]);
+
+        self::assertCount(3, $results, 'all three items must produce a slot');
+        $errors = array_filter($results, static fn (mixed $r): bool => $r instanceof \Throwable);
+        self::assertCount(
+            1,
+            $errors,
+            'returnExceptions=true must collect the failure into its slot instead of aborting the batch',
+        );
+        self::assertTrue(array_is_list($results), 'a batch always comes back as a list');
+    }
+
+    public function testRunnableBranchWriterBatchReturnsAListForStringKeyedInput(): void
+    {
+        $writer = new RunnableBranchWriter(static fn (): ?string => null);
+        [$config] = self::configCapturingWrites();
+
+        $results = $writer->batch(['x' => 'a', 'y' => 'b'], $config);
+
+        self::assertTrue(
+            array_is_list($results),
+            'got keys ' . json_encode(array_keys($results)) . ' — upstream always yields a list',
+        );
+    }
+
+    /** @return array{0: RunnableConfig} a config whose SEND callable throws on its first call only */
+    private static function configCapturingWritesFailingOnce(): array
+    {
+        $calls = 0;
+
+        return [RunnableConfig::fromArray([
+            'configurable' => [
+                Constants::CONFIG_KEY_SEND => static function (array $entries) use (&$calls): void {
+                    if (++$calls === 1) {
+                        throw new \RuntimeException('send fails');
+                    }
+                },
+            ],
+        ])];
     }
 }

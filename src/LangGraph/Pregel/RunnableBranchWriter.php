@@ -95,9 +95,28 @@ class RunnableBranchWriter implements RunnableInterface
         return $input;
     }
 
+    /**
+     * Yields the invoke result, mirroring `ChannelWrite::stream()` — the peer Pregel write step, which
+     * also does `yield $this->invoke(...)`.
+     *
+     * This previously read `yield from $this->invoke($input, $config)`, and `invoke()` returns `$input`,
+     * which for a scalar node value is a STRING. `yield from 'a'` raises
+     * `Error: Can use "yield from" only with arrays and Traversables`, so streaming a conditional edge
+     * with an ordinary scalar value killed the process. Reproduced in 434:
+     *
+     *     php -r '... foreach ($w->stream("a", $config) as $c) {}'
+     *     Error: Can use "yield from" only with arrays and Traversables
+     *
+     * NOTE the unresolved convention, deliberately not decided here: `Runnable::stream()` yields a
+     * `[CHANNEL_DEFAULT, value]` PAIR while `ChannelWrite::stream()` yields the RAW value. Upstream's
+     * `Runnable._streamIterator` (`base.ts:297-302`) does `yield this.invoke(input, options)` — raw. This
+     * fix chose the peer-class shape because the fatal is unambiguous under EITHER convention, whereas
+     * which shape is correct is a separate question that should be settled against upstream rather than
+     * inferred from a crash. Recorded in PORT_STATUS.
+     */
     public function stream(mixed $input, ?RunnableConfig $config = null): \Generator
     {
-        yield from $this->invoke($input, $config);
+        yield $this->invoke($input, $config);
     }
 
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array

@@ -132,6 +132,39 @@ These are MEASURED ZEROS, not assumptions. Each was re-run on this commit.
 | `@return` type atoms that name a non-existent class | **NOT DETERMINED — validator abandoned** | An `@return` resolver reported 98 unresolved atoms, then 67 after three parser fixes. Every residue was a parser gap, not a defect: PHP builtin CLASSES (`\Generator`) absent from a scalar-only builtin table; `array{values: X}` shape KEYS harvested as class names; `@template` scope read from the method docblock when the template sits on the class; and `use`-resolution whose candidate list was wrong (the `use` parser itself captures `LangChain\Runnables\RunnableInterface` correctly in isolation). **Zero of the 67 were shown to contradict the code, so no validator was landed** — see the note below. |
 | `catch` blocks under `src/` that are empty in full | 0 of 122 scanned | Swallowed errors are invisible to every other signal. Enforced by `NoSilentlySwallowedErrorsTest` using `token_get_all()` — a commented catch is permitted (that IS the declaration of intent), an unexplained one is not. The single src/ catch is `JsonUtils::strictParsePartialJson()`, verified faithful to upstream `utils/json.ts:35-38`. | Two files differing only by case would collide on macOS and not on Linux. |
 
+### 434: the `stream()` yield-shape convention is genuinely unresolved
+
+`RunnableBranchWriter::stream()` read `yield from $this->invoke($input, $config)`. `invoke()` returns
+`$input`, a string for an ordinary node value, so `yield from 'a'` raised
+`Error: Can use "yield from" only with arrays and Traversables` and streaming a conditional edge killed
+the process. Fixed to `yield $this->invoke($input, $config)`, mirroring `ChannelWrite::stream()`.
+
+**Which shape is correct is a separate, still-open question, deliberately not decided here:**
+
+| implementation | yields |
+| --- | --- |
+| `Runnable::stream()` | `[CHANNEL_DEFAULT, value]` — a PAIR |
+| `ChannelWrite::stream()` | the RAW value |
+| upstream `Runnable._streamIterator` (`base.ts:297-302`) | `yield this.invoke(input, options)` — RAW |
+
+The port is internally inconsistent, and the fix chose the peer-class shape. That is defensible on one
+ground only: **`yield from` on a scalar is wrong under EVERY convention**, so the fatal is unambiguous
+even though the correct yield shape is not. `RunnableBranchWriterStreamTest` therefore asserts the
+absence of the fatal and the yielded VALUE, and deliberately does not pin the pair-vs-raw shape —
+freezing that would encode a guess as a guard, which is the 431 failure mode.
+
+`RunnableBranchWriter`'s `batch()` is now covered too, closing the gap 433 left open. Its `invoke()` only
+throws when there ARE writes to send, so the fixture makes the `CONFIG_KEY_SEND` callable itself throw on
+its first call and has the branch writer return a destination for the first input only: three items in,
+exactly one Throwable out.
+
+**A tooling note worth recording:** the heading this note was to be inserted before was present in the
+file and its text matched what the script was matching on, yet `assert a in s` still failed. Rather than
+keep guessing at the invisible difference, the note was inserted at the heading's MEASURED line number.
+The suite count also moved 4198 -> 4205 without any source change, purely from adding test files — which
+is why `sync_docs.py` runs before the suite rather than after.
+
+
 ### 432: two MORE hand-rolled `batch()` implementations — live bug, fix recipe included
 
 Enumerating every class that declares its **own** `batch()` (via reflection, not text search) gives 9:
@@ -453,7 +486,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4198** |
+| **Total so far** | | **4205** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
