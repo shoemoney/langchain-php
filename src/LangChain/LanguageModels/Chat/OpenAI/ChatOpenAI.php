@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels\Chat\OpenAI;
 
+use LangChain\LanguageModels\Chat\NormalisesProviderOptions;
 use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Chat\OpenAI\Utils\Completions;
 use LangChain\LanguageModels\Chat\OpenAI\Utils\Tools;
@@ -68,6 +69,8 @@ use LangChain\Utils\Http\SseParser;
  */
 class ChatOpenAI extends BaseChatModel
 {
+    use NormalisesProviderOptions;
+
     /**
      * Every wire spelling of every call option, mapped to its canonical name.
      *
@@ -371,22 +374,6 @@ class ChatOpenAI extends BaseChatModel
     }
 
     /**
-     * Fold every wire spelling onto its canonical name.
-     *
-     * @param array<string, mixed> $bag
-     *
-     * @return array<string, mixed>
-     */
-    public static function canonicalise(array $bag): array
-    {
-        foreach (self::KEY_ALIASES as $wire => $camel) {
-            if (array_key_exists($wire, $bag) && !array_key_exists($camel, $bag)) {
-                $bag[$camel] = $bag[$wire];
-            }
-        }
-
-        return $bag;
-    }
 
     /**
      * Parameters accepted by other clients that this one cannot send.
@@ -417,24 +404,6 @@ class ChatOpenAI extends BaseChatModel
     }
 
     /**
-     * The first non-null of `$options` under any of the given keys.
-     *
-     * Both spellings are accepted because the TypeScript SDK uses `top_p` and
-     * `max_tokens` while the PHP-facing constructors use `topP` and `maxTokens`,
-     * and a caller may reasonably use either.
-     *
-     * @param array<string, mixed> $options
-     */
-    private function pickOption(array $options, string ...$keys): mixed
-    {
-        foreach ($keys as $key) {
-            if (array_key_exists($key, $options) && $options[$key] !== null) {
-                return $options[$key];
-            }
-        }
-
-        return null;
-    }
 
     /**
      * Convert caller-supplied tools, whatever shape they arrive in.

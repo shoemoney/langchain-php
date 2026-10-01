@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels\Chat\Anthropic;
 
+use LangChain\LanguageModels\Chat\NormalisesProviderOptions;
 use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageInputs;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageOutputs;
@@ -56,6 +57,8 @@ use LangChain\Utils\Http\SseParser;
  */
 class ChatAnthropic extends BaseChatModel
 {
+    use NormalisesProviderOptions;
+
     public const DEFAULT_API_URL = 'https://api.anthropic.com/v1/messages';
 
     /**
@@ -278,41 +281,8 @@ class ChatAnthropic extends BaseChatModel
     }
 
     /**
-     * Fold every wire spelling onto its canonical name.
-     *
-     * One table shared by the constructor, bound kwargs and per-call options.
-     * As three separate hand-written lists they drifted, and the constructor
-     * reading only camelCase meant `new ChatAnthropic(['max_tokens' => 99])`
-     * was accepted and then ignored.
-     *
-     * @param array<string, mixed> $bag
-     *
-     * @return array<string, mixed>
-     */
-    public static function canonicalise(array $bag): array
-    {
-        foreach (self::KEY_ALIASES as $wire => $camel) {
-            if (array_key_exists($wire, $bag) && !array_key_exists($camel, $bag)) {
-                $bag[$camel] = $bag[$wire];
-            }
-        }
-
-        return $bag;
-    }
 
     /**
-     * @param array<string, mixed> $options
-     */
-    private function pickOption(array $options, string ...$keys): mixed
-    {
-        foreach ($keys as $key) {
-            if (array_key_exists($key, $options) && $options[$key] !== null) {
-                return $options[$key];
-            }
-        }
-
-        return null;
-    }
 
     /**
      * Convert caller-supplied tools, whatever shape they arrive in.
