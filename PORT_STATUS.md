@@ -132,6 +132,49 @@ These are MEASURED ZEROS, not assumptions. Each was re-run on this commit.
 | `@return` type atoms that name a non-existent class | **NOT DETERMINED — validator abandoned** | An `@return` resolver reported 98 unresolved atoms, then 67 after three parser fixes. Every residue was a parser gap, not a defect: PHP builtin CLASSES (`\Generator`) absent from a scalar-only builtin table; `array{values: X}` shape KEYS harvested as class names; `@template` scope read from the method docblock when the template sits on the class; and `use`-resolution whose candidate list was wrong (the `use` parser itself captures `LangChain\Runnables\RunnableInterface` correctly in isolation). **Zero of the 67 were shown to contradict the code, so no validator was landed** — see the note below. |
 | `catch` blocks under `src/` that are empty in full | 0 of 122 scanned | Swallowed errors are invisible to every other signal. Enforced by `NoSilentlySwallowedErrorsTest` using `token_get_all()` — a commented catch is permitted (that IS the declaration of intent), an unexplained one is not. The single src/ catch is `JsonUtils::strictParsePartialJson()`, verified faithful to upstream `utils/json.ts:35-38`. | Two files differing only by case would collide on macOS and not on Linux. |
 
+### 432: two MORE hand-rolled `batch()` implementations — live bug, fix recipe included
+
+Enumerating every class that declares its **own** `batch()` (via reflection, not text search) gives 9:
+
+| class | delegates to `batchEach()`? |
+| --- | --- |
+| `RunnableSequence:208`, `RunnableWithFallbacks:49`, `RunnableParallel:94`, `RunnableAssign:60`, `RunnableBranch:148` | yes |
+| `RunnableBinding:43` | no — **correct as written**: delegates to `$this->bound->batch($inputs, $merged, $options)`, passing `$options` through |
+| `RunnablePick:80` | no — latent, see 431 below |
+| **`ChannelWrite:68`**, **`RunnableBranchWriter:103`** | **no — live defect** |
+
+Both Pregel classes are `array_map(fn ($i) => $this->invoke($i, $config), $inputs)`, which means they
+(a) **never read `$options`**, so `returnExceptions` is silently ignored, and (b) **omit
+`array_values($inputs)`**, so a string-keyed batch returns a string-keyed array where upstream's
+`inputs.map(...)` + `Promise.all(...)` always yields a list. Neither was ever in the test provider.
+
+**Proven by execution, not inferred:**
+
+    php -r 'require "vendor/autoload.php"; (new ChannelWrite([]))->batch([1,2,3]);'
+    Fatal error: Uncaught LogicException: ChannelWrite requires a write function in config.
+      at src/LangGraph/Pregel/ChannelWrite.php:180
+      #3 ChannelWrite->{closure}()  at src/LangGraph/Pregel/ChannelWrite.php:70  <- array_map
+
+**This is the same defect 429 fixed in `RunnableBranch`, and it is NOT the 431 `RunnablePick` case.**
+`RunnablePick::invoke()` is total, so its missing `returnExceptions` is unobservable; `ChannelWrite::invoke()`
+**does** throw, so the flag is observable and the fix is verifiable. `RunnableBranchWriter` is the same
+shape and needs the same treatment.
+
+Neither can simply call `Runnable::batchEach()`: both `implement RunnableInterface` **directly** rather
+than extending `Runnable`, so the `protected` helper is unreachable. The fix needs either a shared
+static helper or the loop inlined in each, with a comment citing `base.ts:281` and `:3081`.
+
+**Fix recipe, so this is executable rather than a note:** a correct fixture needs
+`$config->configurable[Constants::CONFIG_KEY_SEND]` set to a callable (otherwise `doWrite()` throws at
+`ChannelWrite.php:177-181` before anything else is observable), and a write entry of
+`['channel' => 'c', 'value' => null, 'mapper' => $flaky]` — `resolveWrites()` invokes a `mapper` that is a
+`RunnableInterface` per write, so a mapper that throws for one input and succeeds for another yields
+exactly one Throwable with three inputs, which is what the provider counts.
+
+**Deliberately NOT fixed in 432.** The recipe was confirmed by reading `doWrite()` only after the
+iteration's measurement budget was spent, and a fix whose test has not been watched RED is the exact
+failure mode 431 documented. Recorded with citations instead.
+
 ### 431: a provider case that reported coverage of a class it never touched
 
 `BatchReturnExceptionsEverywhereTest` carried a case labelled `'RunnablePick'`, and it was not one.
