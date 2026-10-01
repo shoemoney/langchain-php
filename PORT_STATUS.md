@@ -334,3 +334,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:c537236 -->
 | `BaseChatModel::isMetadataOnly()` dropped terminal stream chunks | read `$chunk->message` only, so a chunk carrying just `finish_reason`/`stop_reason` in `generationInfo` was discarded | consults `generationInfo` for a non-empty stop reason | `c537236` |
+
+<!-- fix:c698427 -->
+| `MessageInputs::convertTool()` short-circuited on `input_schema` OR `name` | flattened OpenAI tools (`name` + `parameters`) reached Anthropic with no `input_schema` | requires a non-empty `name` AND `input_schema` before passing through | `c698427` |
