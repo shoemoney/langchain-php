@@ -2075,5 +2075,12 @@
   "deepseek/deepseek-v4.1-flash",
   "anthropic/claude-sonnet-5.5"
  ],
- "next_index": 0
+ "next_index": 0,
+ "attempts": {
+  "google/gemma-4-31b-it:free": {
+   "count": 1,
+   "last": "429 rate limited; {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-31b-it:free is temporarily ra",
+   "at": "2026-10-01T01:25:03"
+  }
+ }
 }

@@ -34,7 +34,7 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **2352 passing, 6473 assertions** |
+| Tests | **2352 passing, 6474 assertions** |
 | Size | 232 src files / 34,750 lines · 114 test files / 26,420 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
@@ -163,7 +163,27 @@ because each represents a **class** of mistake that is easy to repeat.
 
 ## House conventions
 
-Follow these or CI fails you.
+**Read this line before trusting it: only the FIRST convention below is CI-enforced.** It used to
+read "Follow these or CI fails you", which was wrong — measured against `phpunit.xml`
+(`failOnWarning="true"`, `failOnRisky="true"`) and `ci.yml` (jobs: `lint`, `test`, `coverage`):
+
+- **PHPUnit 11 attributes** — ENFORCED. Deprecated `@covers` / `@dataProvider` emit a warning and
+  `failOnWarning` fails the run.
+- **`declare(strict_types=1)` on every file** — convention only, NOT enforced by any test.
+  Measured 0 violations across `src/` and `tests/`.
+- **One class per file, PSR-4 path-matched** — convention only, NOT enforced by any test. It has
+  been checked by hand, as a shell one-liner, on most iterations of the review loop — a real check
+  that only runs when someone remembers to run it. **Writing `SourceConventionTest` to close this is
+  known, scoped work, and two real facts were measured while attempting it:**
+  (a) `src/` legitimately contains function-only files — `createTool.php`, `coerceToRunnable.php`,
+  `Pregel/interrupt.php` — so a "declared type matches filename" rule must exempt them; and
+  (b) **19 files under `tests/` declare a SOURCE namespace** (`tests/Unit/Checkpoint/*` declares
+  `LangChain\Checkpoint\*`, not `LangChain\Tests\Unit\Checkpoint\*`). Whether that is a
+  deliberate pattern for protected-member access or namespace sloppiness is **unresolved**, so the
+  guard must not be landed until it is decided — a guard that needs an unexplained 19-file carve-out
+  is a weakened assertion.
+- **Generics → `@template` / `@param` / `@return`** — convention only, NOT enforced.
+- **No AI/Claude attribution** — convention only, NOT enforced by any job.
 
 - **PHPUnit 11 — attributes, NEVER doc-comments.** `#[CoversClass(X::class)]`.
   `@covers` / `@dataProvider` doc-comments are deprecated and the suite runs

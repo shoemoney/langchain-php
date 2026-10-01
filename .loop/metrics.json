@@ -1,8 +1,8 @@
 {
  "src_files": 232,
- "src_lines": 34791,
+ "src_lines": 34750,
  "test_files": 114,
- "test_lines": 26451,
+ "test_lines": 26420,
  "tests": 2352,
  "assertions": 6474,
  "suite_ok": true
