@@ -2355,5 +2355,16 @@
  ],
  "probe-239": [
   "238's transport guard RUNS and is UNCONDITIONAL (OK in 0.037s, no skip/requires/getenv) but asserted on the RESPONSE not the request. The real request-body assertion is at :98-100 in testAnInvokeCrossesTheRealTransport, plus 4 Unit files. 238 corrected: right in substance, wrong citation"
+ ],
+ "structured-output-request-guard-240": [
+  "#RESOLVED - 239's open question is answered: the STRUCTURED-OUTPUT REQUEST SIDE IS COVERED, in three places, and the 118 hole is closed. The decisive line is `ProviderClientRegressionTest.php:112`:",
+  "#  self::assertSame(self::SCHEMA, $http->lastRequestBody()['tools'][0]['function']['parameters']);",
+  "#which compares the DECODED WIRE STRUCTURE against the expected schema directly rather than checking for presence or shape. That is precisely the guard against the defect the hard rules name - a Schema instance nested as a property that failed validation OPEN - and it is asserted on the bytes that left, not on a mocked intermediate. Two further tests cover the PROVIDER DIVERGENCE: `ToolWireShapeTest.php:105` and `OptionPathMatrixTest.php:286` both read `($isAnthropic ? $tool['input_schema'] : $tool['function']['parameters'])`.",
+  "#RUN RATHER THAN READ, per 237/238: `phpunit --filter ProviderClientRegressionTest` -> OK (12 tests, 21 assertions) in 3.06s; `--filter ToolWireShapeTest` -> OK (5 tests, 31 assertions). Both unconditional, both fast, both with no network or credential dependency - the same property 239 identified as the reason the port's wire behaviour is verifiable on a machine with no keys.",
+  "#SO 239's CAVEAT IS WITHDRAWN AND THE WHOLE REQUEST-BODY THREAD IS NOW CLOSED ACROSS THREE ITERATIONS. 238 found the guard and praised the wrong test; 239 ran it, corrected the citation, and left the structured-output request side open on the theory that a canned response means a mirrored fixture; 240 found that the theory was wrong because the schema is asserted on the REQUEST side independently of the response. The three-step sequence is the method working end to end - find, run, follow the open question - and the thing that made it work is that each step checked the previous step's CLAIM rather than repeating it.",
+  "#WHAT REMAINS IS SMALLER AND IS NOT A GAP: whether the Anthropic `input_schema` path and the OpenAI `function.parameters` path are asserted with the SAME schema object, or with separately-constructed equivalents. `OptionPathMatrixTest` reads both branches through one ternary, which suggests a shared fixture, but this loop has not read far enough to confirm it, and the difference matters because a test that builds two different expected structures can pass while both diverge from what the caller supplied. That is a narrower question than the one 239 left open and it is not urgent: the class is exercised on both branches and both pass."
+ ],
+ "probe-240": [
+  "239's open question CLOSED: the structured-output REQUEST is asserted directly - ProviderClientRegressionTest:112 assertSame(self::SCHEMA, lastRequestBody()['tools'][0]['function']['parameters']). Ran: OK 12/21 and ToolWireShapeTest OK 5/31. 118 hole closed"
  ]
 }
