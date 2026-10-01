@@ -321,6 +321,9 @@ non-zero count from one should be treated as a claim about the detector until it
 
 | 437 | the port MERGES `name` in four chunk types where upstream drops it | `ai.ts`, `chat.ts`, `human.ts` and `tool.ts` carry no `name` in `concat` (read directly: `tool.ts:192-208` builds content/additional_kwargs/response_metadata/artifact/`tool_call_id`/`id`/`status` and no `name`), so upstream's concatenated chunk has no name at all; the port preserves it via `$this->name ?? $other->name` | **deliberately unchanged.** The precedence is now correct in the two types upstream actually merges (`system.ts:63`, `function.ts:73`), but removing preservation in the other four is a behaviour removal whose effect on port consumers was not measured, and upstream's `null` means discarding a populated field. Fidelity says match; the risk of removing it blind says measure first | not guarded |
 
+<!-- fix:ce87ac0 -->
+| 437 | message-chunk `concat()` inverted the `name` precedence | the port read `$other->name ?? $this->name`; upstream reads `name: this.name ?? chunk.name` (`system.ts:63`) and `name: this.name ?? ""` (`function.ts:73`), so the accumulated chunk wins and function messages default to an empty string rather than null | swapped per type, each with the upstream line in a comment; guarded by `MessageChunkConcatNamePrecedenceTest` | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
