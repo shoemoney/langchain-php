@@ -98,6 +98,33 @@ abstract class Runnable implements RunnableInterface
     // ---- composition ----------------------------------------------------
 
     /**
+     * Retry this runnable on failure.
+     *
+     * Port of `Runnable.withRetry`, which upstream defines as
+     * `new RunnableRetry({ bound: this, kwargs: {}, config: {}, maxAttemptNumber: fields?.stopAfterAttempt, ...fields })`
+     * — and upstream's `RunnableRetry` extends `RunnableBinding`, which this port already has, so this
+     * is a subclass of existing machinery rather than a new mechanism.
+     *
+     * Upstream's default is three attempts. Only `stopAfterAttempt` and `onFailedAttempt` are
+     * accepted; `stopAfterAttempt` is upstream's name for the attempt ceiling and maps to this port's
+     * `maxAttemptNumber`.
+     *
+     * @param array{stopAfterAttempt?: int, onFailedAttempt?: callable} $fields
+     */
+    public function withRetry(array $fields = []): RunnableRetry
+    {
+        return new RunnableRetry(
+            $this,
+            [],
+            null,
+            (int) ($fields['stopAfterAttempt'] ?? RunnableRetry::DEFAULT_MAX_ATTEMPTS),
+            isset($fields['onFailedAttempt']) && \is_callable($fields['onFailedAttempt'])
+                ? $fields['onFailedAttempt']
+                : null,
+        );
+    }
+
+    /**
      * Select one or more named fields from this runnable's output.
      *
      * Port of `Runnable.pick` (`base.ts:628`), which upstream defines as
