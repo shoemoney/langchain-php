@@ -52,6 +52,18 @@ final class SseParser
             // stray was always swallowed), but depending on that is how this
             // quietly breaks the moment an `event:` or `id:` field is read.
             $separatorLength = $this->separatorLengthAt($at);
+            if ($separatorLength === null) {
+                // `nextBoundary()` returned an offset that starts no known separator, so the buffer
+                // is in a state this parser does not model. Guessing a length here would strand bytes
+                // and, because the payload reader discards non-`data:` lines, the corruption would
+                // surface as a silently missing event rather than an error.
+                throw new \LogicException(sprintf(
+                    'SseParser: nextBoundary() returned offset %d, which starts no known separator '
+                    . '(buffer begins %s). Refusing to guess a separator length.',
+                    $at,
+                    var_export(substr($this->buffer, 0, 8), true)
+                ));
+            }
 
             $block = substr($this->buffer, 0, $at);
             $this->buffer = substr($this->buffer, $at + $separatorLength);
@@ -120,9 +132,18 @@ final class SseParser
     }
 
     /**
-     * How many bytes the separator occupying `$offset` occupies.
+     * How many bytes the separator occupying `$offset` occupies, or null if none does.
+     *
+     * It used to `return 2` when nothing matched. That path is unreachable today because
+     * `nextBoundary()` only returns an offset that really does start a separator — which is exactly
+     * why it survived: no reachable input could tell it apart from a correct value, and the real
+     * separators are 4, 2 and 2 bytes, so `2` was right by coincidence for two of the three.
+     *
+     * Returning null makes the no-match case ANNOUNCED. The caller throws on it rather than consuming
+     * a guessed length, so a future separator — or a future caller that computes its own offset —
+     * inherits an exception instead of a silent stranding of bytes.
      */
-    private function separatorLengthAt(int $offset): int
+    private function separatorLengthAt(int $offset): ?int
     {
         foreach (self::SEPARATORS as $separator) {
             if (substr($this->buffer, $offset, strlen($separator)) === $separator) {
@@ -130,7 +151,7 @@ final class SseParser
             }
         }
 
-        return 2;
+        return null;
     }
 
     /**
