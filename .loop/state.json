@@ -2294,9 +2294,9 @@
    "at": "2026-10-01T01:25:03"
   },
   "google/gemma-4-26b-a4b-it:free": {
-   "count": 1,
+   "count": 3,
    "last": "429 rate limited; {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporaril",
-   "at": "2026-10-01T03:48:48"
+   "at": "2026-10-01T04:16:35"
   },
   "qwen/qwen3.8-27b:free": {
    "count": 1,
