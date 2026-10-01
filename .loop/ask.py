@@ -540,9 +540,17 @@ def main():
             # the model as asked.
             rec["status"] = "rate_limited"
             rec["error"] = f"429 rate limited; {body[:120]}"
+            # Retryable: let the caller re-pick WITHOUT recording, so the
+            # roster is not consumed by a provider that was briefly unwilling.
+            return
         else:
             rec["status"] = f"http_{e.code}"
-        return
+            # PERMANENT (403 account gate, 404 guardrail): fall THROUGH to the
+            # shared save below, so the model is recorded as asked and is not
+            # re-selected forever. Iterations 290-291: the single `return` above
+            # was written for 429 and silently applied to every HTTP error, so
+            # `meta/muse-spark-1.3-contributor` 403'd at 185 and again at 290
+            # with no trace in `asked` either time.
     except Exception as e:
         rec.update(status="error", error=f"{type(e).__name__}: {e}")
         print(f"    ERROR {type(e).__name__}: {e}")

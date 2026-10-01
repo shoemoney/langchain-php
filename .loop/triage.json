@@ -2602,22 +2602,25 @@
   "Build attempted AGAIN with 288's full spec, FAILED AGAIN, instrument DELETED. Parser+spellings genuinely fixed (all 4 positive controls fired), but 4 NEW false positives: '$tools === null || $tools === []' - the language's own DEFENSIVE idiom, which looks like a fail-open and is the opposite. Pattern refinement made it worse (1 -> 4 failures). Three iterations on one instrument; 288's diagnosis is the durable artifact"
  ],
  "failed-selection-leaves-no-trace-290": [
-  "#THE DEFECT IS LOCATED PRECISELY, AND IT IS A CORRECT DECISION GENERALIZED TOO FAR. `ask.py:530-552`:",
-  "#    except urllib.error.HTTPError as e:",
-  "#        ... rec['status'] = f'http_{e.code}'",
-  "#        return                      <-- RETURNS BEFORE THE SAVE",
-  "#    state['asked'][model] = rec     <-- only reached on the NON-HTTPError path",
-  "#    state['order'].append(model)",
-  "#    save_state(state)",
-  "#The `return` is DELIBERATE and its own comment says why, for ONE status: on 429 it sets `status='rate_limited'` and the comment reads 'A rate limit is the provider being briefly unwilling, not a verdict on the model... Let the caller re-pick instead of recording the model as asked.' That is RIGHT for a 429. The defect is that the same `return` is taken for EVERY HTTP error, so an unrepairable one \u2014 a 403 account gate, a 404 guardrail \u2014 also leaves no trace, and the model is re-selected forever. `meta/muse-spark-1.3-contributor` is absent from `asked` for exactly this reason and has now cost two slots (185, 290).",
-  "#THE FIX IS TO NARROW THE EARLY RETURN TO THE STATUSES IT WAS WRITTEN FOR, and it is a two-line change: return early only for `429` (and arguably `503`), and let every other HTTP status fall through to the shared `state['asked'][model] = rec; save_state(state)` at :550-552, where the body already sets `rec['status'] = f'http_{e.code}'` and `rec['error']`. The distinction the code needs is RETRYABLE versus PERMANENT, and 429 is the only one in this roster that is reliably retryable \u2014 403 is an account gate that no retry reaches and 404 is a guardrail that will answer identically forever.",
-  "#AND THE GENERAL FORM IS THE ONE 290 NAMED \u2014 A STATUS NEEDS A LIFECYCLE \u2014 NOW WITH ITS MECHANISM. The `return` is a decision that a failure is not worth recording, and it was made once, for a transient failure, in a handler shared by transient and permanent ones. That is the same over-generalisation this run has been documenting in the PORT all along: 216's `parsePartialJson` catches broadly because upstream's bare `catch {}` is broad, 280's `lengthFunction` cannot fail because JavaScript has no invalid-string state, and here a re-pick decision written for 429 became a re-pick decision for everything. In each case a NARROW truth was implemented as a BROAD one, and in each case the broad version is only discoverable by looking at a case the narrow truth did not anticipate.",
-  "#WHAT IS DELIBERATELY NOT CHANGED IS THE 429 BEHAVIOUR ITSELF, because it is correct and the loop has evidence for it. Two of the recorded 429s recovered a slot on retry, and the comment's reasoning \u2014 a rate limit is not a verdict on a model \u2014 is exactly the distinction 290 says is missing elsewhere. So the change is strictly subtractive: the early return stops applying to statuses it was never about. Recording a 403 as asked will make one model permanently unavailable, which is the correct outcome, and it will also make the ledger honest about a fact the ledger has been silently omitting for two iterations."
+  "#RESOLVED IN 292: the early return is narrowed to 429, and a permanent HTTP failure now falls through to the shared save. Verified by reading the patched handler:",
+  "#    if e.code == 429 and retry_on_429():",
+  "#        ... rec['status'] = 'rate_limited'",
+  "#        return                       <-- now INSIDE the 429 branch only",
+  "#    else:",
+  "#        rec['status'] = f'http_{e.code}'",
+  "#        # PERMANENT (403 account gate, 404 guardrail): fall THROUGH to the shared save",
+  "#    (falls through to)  state['asked'][model] = rec; state['order'].append(model); save_state(state)",
+  "#So a 403 will henceforth be recorded as asked, `asked` will grow by one per permanent failure, and the roster will stop re-selecting a model that cannot answer. The 429 path is byte-for-byte unchanged apart from a comment, which is the point \u2014 the fix is strictly subtractive and touches only the statuses the original decision was never about.",
+  "#THE FIX WAS VERIFIED BY EXERCISING THE HARNESS RATHER THAN BY A UNIT TEST, and that is a deliberate choice worth recording. `python3 .loop/ask.py` was run after the patch and produced review 56 (`cohere/command-a-plus`, truncated) with `asked` growing from 55 to 56 \u2014 so the file parses, the selection path runs, and the save fires. What that does NOT demonstrate is the 403 branch specifically, because provoking a real 403 would require selecting the gated model, which is the behaviour being fixed. The verification that matters is structural and was done by reading the patched handler: the `return` is now lexically inside the 429 branch and the `else` falls through. A unit test for this would mean simulating `urllib.error.HTTPError`, which is worth having eventually and is not being written inside a review iteration \u2014 287 and 289 both showed what happens when a harness test is built in one.",
+  "#AND THE LEDGER IS NOW HONEST ABOUT BOTH FACTS 290 SURFACED. `asked` will accumulate permanent failures as `http_403` entries rather than silently omitting them, which means the count of 'asked' models will now include some that produced no review \u2014 and that is correct, because the question the roster asks is 'have we tried this', not 'did it work'. The second fact \u2014 `stealth/space-bunny-alpha` still carrying 189's repaired NameError as a current `status=error` \u2014 is NOT fixed here, because marking it resolved means editing history rather than adding to it, and that is a decision for whoever owns the ledger. It is recorded here as still open rather than quietly dropped, which is the third time in this run that a known-stale record has been left visible rather than tidied away."
  ],
  "probe-290": [
   "Reviewer slot LOST AGAIN: meta/muse-spark-1.3-contributor 403 age-gate for the 2nd time (185, 290). IT IS STILL IN THE ROSTER and was NEVER ASKED - the 403 leaves no trace in asked, so it looks un-asked forever. ALSO: stealth/space-bunny-alpha still shows the 189 NameError as a CURRENT error though 190 fixed it"
  ],
  "probe-291": [
   "DEFECT LOCATED: ask.py:530-552 - the catch block's  on HTTPError SKIPS state['asked'][model]=rec and save_state(). The return is DELIBERATE for 429 ('let the caller re-pick'), but applies to EVERY HTTP error, so 403/404 also leave no trace. Fix: narrow the early return to 429/503"
+ ],
+ "probe-292": [
+  "FIX APPLIED + VERIFIED: ask.py's early return is now INSIDE the 429 branch; a 403/404 falls through to state['asked'][model]=rec + save_state. Harness exercised (review 56 produced, asked 55->56). 429 path byte-identical apart from a comment"
  ]
 }
