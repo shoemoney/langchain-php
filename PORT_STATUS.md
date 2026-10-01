@@ -118,6 +118,36 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 <!-- fix:74102a8 -->
 | 426 | `autoload.files` double-include fatal | `coerceToRunnable.php`, `createTool.php`, `interrupt.php` declare a function and are ALSO PSR-4-reachable as class names, so `class_exists()` re-includes them and PHP raises an uncatchable `Cannot redeclare` fatal | guarded each declaration with `function_exists()`; `FilesAutoloadRedeclarationTest` spawns a subprocess per case (both casings, derived from `composer.json`) | identical |
 
+## Verified sweeps (iteration 427) — recorded so they are not re-asked
+
+These are MEASURED ZEROS, not assumptions. Each was re-run on this commit.
+
+| Sweep | Result | Why it matters |
+| --- | --- | --- |
+| Files in composer `autoload.files` that also declare a class | 0 of 3 | `coerceToRunnable.php`, `createTool.php`, `interrupt.php` declare functions only, so the 426 double-include hazard cannot escalate to a redeclared CLASS. |
+| `class_exists()` on each entry's class-shaped name (both casings) | returns `false`, no fatal | 426's `function_exists()` guard made the probe HONEST, not merely quiet. It also removed a platform divergence: before the fix macOS raised `Cannot redeclare` where Linux returned `false`; both now agree. |
+| Non-`_once` `include`/`require` statements under `src/` | 0 | The generalized form of the 426 hazard. A regex sweep returns 9 hits, all prose ("must include it", "does not require a real tool") — see the detector note below. |
+| Declared class name vs PSR-4 implied name, case-insensitive | 231 exact, 0 case-only, 0 different | The dev box is case-INSENSITIVE APFS and CI is case-SENSITIVE Linux. A file whose class name differs from its path only by case autoloads locally and fatals on CI. `SourceConventionTest` already enforces the exact match; this sweep confirms it holds at 231/231. |
+| Case-insensitive FQCN collisions across `src/` + `tests/` | 0 | Two files differing only by case would collide on macOS and not on Linux. |
+
+### Detector note — three ad-hoc detectors, three 100% false-positive rates
+
+Every detector written for this iteration reported a total false-positive count on first contact, and
+each failed the same way: **it did not distinguish code from prose or from non-code structure.**
+
+1. The class-name sweep reported **29 missing classes**; 4 were functions (my collector only read
+   `class`/`trait`/`interface`), the rest were intermediate namespace segments and placeholder example names
+   (Foo, FooTest) quoted by reviewers as illustrations. Real missing after correction: **0**.
+2. The `include`/`require` sweep reported **9 hits**; all 9 were English prose inside comments and error
+   messages. Real statements: **0**.
+3. The PSR-4 name check reported **231 mismatches out of 231**; it compared a fully-qualified name against a
+   short class name, so nothing could ever match. Corrected: **231 exact, 0 mismatches**.
+
+The same shape appeared in the SOURCE earlier this run and was fixed there — `mergeConfigs` handling 7 of
+16 `RunnableConfig` fields, `invoke()` forwarding 2 of 16, `handleChatModelStart` 2 of 16, and every
+`batch()` implementation. **An ad-hoc detector is the least reliable artifact this loop produces, and a
+non-zero count from one should be treated as a claim about the detector until it has been re-derived.**
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
