@@ -1864,6 +1864,41 @@
    "status": "truncated",
    "chars": 88157,
    "file": ".loop/reviews/56-cohere__command-a-plus.md"
+  },
+  "mistralai/mistral-small-2603": {
+   "model": "mistralai/mistral-small-2603",
+   "at": "2026-09-30T23:47:20",
+   "actual_model": "mistralai/mistral-small-2603",
+   "usage": {
+    "prompt_tokens": 46333,
+    "completion_tokens": 8659,
+    "total_tokens": 54992,
+    "cost": 0.01214535,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.01214535,
+     "upstream_inference_prompt_cost": 0.00694995,
+     "upstream_inference_completions_cost": 0.0051954
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 8341,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 8341,
+   "status": "ok",
+   "file": ".loop/reviews/57-mistralai__mistral-small-2603.md",
+   "chars": 2479,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -1922,7 +1957,8 @@
   "~deepseek/deepseek-flash-latest",
   "openai/gpt-6.1-sol-pro",
   "meta-llama/llama-4-maverick",
-  "cohere/command-a-plus"
+  "cohere/command-a-plus",
+  "mistralai/mistral-small-2603"
  ],
  "next_index": 0
 }
