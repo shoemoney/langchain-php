@@ -253,5 +253,12 @@
   "file": ".loop/advisory/ministral-3b-2512.md",
   "chars": 7644,
   "cost": 0.0013
+ },
+ "inclusionai/ling-3.0-flash-vl": {
+  "status": "ok",
+  "at": "2026-10-01T09:31:25.239042+00:00",
+  "file": ".loop/advisory/ling-3-0-flash-vl.md",
+  "chars": 15242,
+  "cost": 0.001
  }
 }
