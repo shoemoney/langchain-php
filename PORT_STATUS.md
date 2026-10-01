@@ -372,3 +372,23 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:229c1c5 -->
 | `Runnable::withRetry()` missing | second of five absent upstream `Runnable` methods | `RunnableRetry extends RunnableBinding` with a 3-attempt default, `onFailedAttempt`, and `retry:attempt:<n>` tagging; `stream()` deliberately not retried | 229c1c5 |
+
+## Known-absent upstream API (declared gaps, not decisions)
+
+Measured at iteration 401 by diffing the public surface of `Runnable` on both sides, and classified at
+402-404 by reading each implementation's BODY rather than its signature. **These are recorded as gap
+reports on purpose — each says what is missing and what it would need, not why it is acceptable.**
+
+| upstream method | what its body requires | size | status |
+|---|---|---|---|
+| `withConfig(config)` | `bind([], $config)` | delegation | **ADDED** — `Runnable::withConfig` |
+| `pick(keys)` | `pipe(new RunnablePick(keys))`; `pipe()` already exists | one small class | **ADDED** — `RunnablePick` |
+| `withRetry({stopAfterAttempt, onFailedAttempt})` | `class RunnableRetry extends RunnableBinding` + attempt counting | one subclass | **ADDED** — `RunnableRetry` |
+| `withListeners({onStart,onEnd,onError})` | `configFactories` — a per-call config callback. The port's `RunnableBinding` holds a STATIC config array and there is no factory concept (`grep -rn configFactor src/` → 0) | needs a new concept on a class four paths depend on | **OPEN** |
+| `streamEvents` | taps a registered `streamEventsHandler` off the run manager and drives `tapOutputIterable` (`base.ts:534-539`) — needs both a handler class and a tap mechanism on the callback manager | largest runnable-level item | **OPEN** |
+| `getGraph()` | `new Graph()` (`:587`) — a graph-diagram (DOT) subsystem | out of scope for a runtime port | **OPEN — proposed for the documented-unported list** |
+| `assign(mapping)` | `pipe(new RunnableMap(...))` | small; not yet read | **OPEN** |
+
+Each OPEN row is a task, not an excuse. The two `OPEN` rows that would need new *capability* rather than
+a new class (`withListeners`, `streamEvents`) should be attempted as their own change with their own
+mutation check — bundling a structural addition with a diagnosis is what cost iteration 374.
