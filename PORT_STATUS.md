@@ -354,6 +354,9 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:8437881 -->
 | 474 | `ChatMessageChunk::concat()` reset a custom role to `chat` | the role was never carried, so the constructor default won; upstream `chat.ts` carries `role: this.role` in `concat` (left-wins, as 436 settled for `id`), so a streamed `ChatMessage` with a non-default role silently became `chat` | `'role' => $this->type` added to the concat field map; guarded by `ChatMessageChunkConcatRoleTest` via `MessageUtils::convertToChunk()` | identical |
 
+<!-- fix:c0a53af -->
+| 485 | a STREAMED tool result silently lost its `artifact` | `ToolMessage` stored it, `ToolMessageChunk` did not, so `convertToChunk()` had nothing to carry and `concat()` could not recover it | four sites: the chunk field, its constructor, its `concat()` merge via `MessageMerge::mergeObj()` (upstream's `_mergeObj`), and `convertToChunk()` carrying the value; guarded by `ToolMessageArtifactPreservedTest`, mutation-verified on the fourth site | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
