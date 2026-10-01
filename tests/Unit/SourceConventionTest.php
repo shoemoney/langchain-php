@@ -159,4 +159,97 @@ final class SourceConventionTest extends TestCase
      *     rather than `str_contains`. A guard that cannot be stated correctly is worse than no guard,
      *     because it teaches the next reader that the convention is machine-checked when it is not.
      */
+
+    /**
+     * Two files declaring the same fully-qualified name.
+     *
+     * This was the FOURTH thing this file did not cover, and the only PSR-4 property with no automated
+     * check at all: the duplicate half of the rule was verified by an ad-hoc `php -r` one-liner this loop
+     * happened to run on most iterations for several hundred of them. A check that only runs when
+     * someone remembers is a gate that protects nothing — and it was the same ritual 329 replaced.
+     *
+     * PSR-4 forbids it outright ("if a class name is declared in both, it is a PSR-4 autoloading
+     * error"). Here it matters specifically: two classes under one FQCN leaves the second silently
+     * unreachable, and which one wins depends on autoloader ordering.
+     *
+     * The whole map is built once rather than accumulated as the suite runs, so the assertion does not
+     * depend on test order — an order-dependent duplicate check would itself be a flaky check, which is
+     * the 412 lesson in a new place.
+     */
+    #[DataProvider('phpFiles')]
+    public function testNoFullyQualifiedNameIsDeclaredTwice(string $rel, string $path): void
+    {
+        $map = self::declarationMap();
+        $src = (string) file_get_contents($path);
+
+        // The three function-only files declare no type at all, so there is nothing to check — the same
+        // exemption 329 records for the one-class-per-file rule.
+        if (\in_array($rel, self::FUNCTION_ONLY_FILES, true)) {
+            self::assertStringNotContainsString(
+                '/^(?:final\s+|abstract\s+|readonly\s+)*(?:class|interface|trait|enum)\s+/m',
+                $src,
+                $rel . ' is registered as function-only but declares a type',
+            );
+
+            return;
+        }
+
+        preg_match_all(
+            '/^(?:final\s+|abstract\s+|readonly\s+)*(?:class|interface|trait|enum)\s+(\w+)/m',
+            $src,
+            $types,
+        );
+        self::assertNotEmpty($types[1], $rel . ' declares no type, so there is nothing to check');
+
+        $base = self::namespaceOf($src, $rel);
+        foreach ($types[1] as $type) {
+            $key = $base . '\\' . $type;
+            // The map holds EVERY declaration, including this file's own, so the check is on the
+            // COUNT of files per name — not on membership. An earlier version asserted `assertArrayNotHasKey`
+            // against a map that contained the key by construction and therefore failed 367 times, which
+            // is the 409 invalid-data-provider shape: a check that cannot pass.
+            self::assertLessThan(
+                2,
+                \count($map[$key] ?? []),
+                $key . ' is declared in ' . implode(' and ', $map[$key] ?? []) . '; PSR-4 forbids it and '
+                    . 'the second file is silently unreachable',
+            );
+        }
+    }
+
+    private static function namespaceOf(string $src, string $rel): string
+    {
+        if (!preg_match('/^namespace\s+([^;{]+)[;{]/m', $src, $ns)) {
+            self::fail($rel . ' declares no namespace');
+        }
+
+        return trim($ns[1]);
+    }
+
+    /** @return array<string, list<string>> FQCN => every file that declares it. */
+    private static function declarationMap(): array
+    {
+        static $map = null;
+        if ($map !== null) {
+            return $map;
+        }
+
+        $map = [];
+        foreach (self::phpFiles() as [$rel, $path]) {
+            $src = (string) file_get_contents($path);
+            if (!preg_match('/^namespace\s+([^;{]+)[;{]/m', $src, $ns)) {
+                continue;
+            }
+            preg_match_all(
+                '/^(?:final\s+|abstract\s+|readonly\s+)*(?:class|interface|trait|enum)\s+(\w+)/m',
+                $src,
+                $types,
+            );
+            foreach ($types[1] as $type) {
+                $map[trim($ns[1]) . '\\' . $type][] = $rel;
+            }
+        }
+
+        return $map;
+    }
 }
