@@ -602,6 +602,26 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 ## Known-absent upstream API (declared gaps, not decisions)
 
+**Re-verified at 447 with a search wide enough to support the conclusion.** 446 produced one FALSE absence
+claim in this table (`assign(mapping)`, which the port ships as `RunnablePassthrough::assign()`), so 447
+re-checked the three remaining OPEN rows instead of trusting 401's method. The difference that made 401's
+conclusion unsafe was a search scoped to ONE FILE; the three checks were re-run across all of `src/`, under
+camelCase AND snake_case spellings, and with code separated from prose:
+
+| upstream method | exact | variants | verdict |
+| --- | --- | --- | --- |
+| `withListeners` | 0 | `with_listener`, `listeners`, `configFactor`, `config_factor` all **0** | **CONFIRMED absent** — 401's `grep -rn configFactor src/ -> 0` reproduces |
+| `streamEvents` | 0 | `streamEvents` 2, `streamEvent` 7 — all a docblock stating it is *not* a `streamEvents` entry point, plus `handleChatModelStreamEvent` (a LangSmith callback) and `preferChatModelStreamEvents` (a handler flag) | **CONFIRMED absent** |
+| `getGraph` | 0 | `toDot` 1 — a docblock citing langsmith's `convertToDottedOrderFormat`, not graph DOT | **CONFIRMED absent** |
+
+**The three method names are genuinely missing. What was missing was the METHOD, and that is the part worth
+keeping.** Every absence check now runs a **control** — a pattern that MUST match (`function batchEach`
+returns 2) — before its zeros are believed. 447's first attempt returned 14 zeros because zsh globbed
+`--include=*.php` and errored on every line, so grep never ran; without the control that output is
+indistinguishable from three real confirmations. **A zero from a command that failed is not a zero**, and
+that is now the third distinct detector failure this run (427's three regexes, 435's dropped autoloader,
+446's too-narrow file scope) plus the first one caused by the SHELL rather than the pattern.
+
 Measured at iteration 401 by diffing the public surface of `Runnable` on both sides, and classified at
 402-404 by reading each implementation's BODY rather than its signature. **These are recorded as gap
 reports on purpose — each says what is missing and what it would need, not why it is acceptable.**
