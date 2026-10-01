@@ -43,6 +43,13 @@ class ChatMessageChunk extends BaseMessageChunk
             'content' => MessageMerge::mergeContent($this->content, $other->content),
             'additional_kwargs' => MessageMerge::mergeDicts($this->additional_kwargs, $other->additional_kwargs) ?? [],
             'response_metadata' => MessageMerge::mergeDicts($this->response_metadata, $other->response_metadata) ?? [],
+            // Upstream `chat.ts` carries `role: this.role` in `concat` — the already-accumulated
+            // role wins, the same left-wins precedence 436 reconciled for `id`. Without it the
+            // constructor's default path reset the role to `chat`, so a streamed `ChatMessage` with a
+            // non-default role silently became `chat`. `human.ts` has no such line, which is why
+            // `HumanMessageChunk::concat()` correctly carries no role — and why these two bodies are
+            // meant to DIFFER, reversing the convergence 471 observed.
+            'role' => $this->type,
             'id' => $this->id ?? $other->id,
             'name' => $other->name ?? $this->name,
         ]);
