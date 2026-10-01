@@ -337,3 +337,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:c698427 -->
 | `MessageInputs::convertTool()` short-circuited on `input_schema` OR `name` | flattened OpenAI tools (`name` + `parameters`) reached Anthropic with no `input_schema` | requires a non-empty `name` AND `input_schema` before passing through | `c698427` |
+
+<!-- fix:0f3e774 -->
+| Anthropic `tool_use` `input` shape | a no-arg call serialised as a JSON array (`"input":[]`) | casts to an object (`"input":{}`), mirroring `Completions::toolCallToWire()` | 0f3e774 |
