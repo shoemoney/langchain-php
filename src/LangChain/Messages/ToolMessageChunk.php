@@ -50,7 +50,7 @@ class ToolMessageChunk extends BaseMessageChunk
             'response_metadata' => MessageMerge::mergeDicts($this->response_metadata, $other->response_metadata) ?? [],
             'tool_call_id' => $other->toolCallId !== '' ? $other->toolCallId : $this->toolCallId,
             'name' => $other->name ?? $this->name,
-            'id' => $other->id ?? $this->id,
+            'id' => $this->id ?? $other->id,
         ]);
     }
 }
