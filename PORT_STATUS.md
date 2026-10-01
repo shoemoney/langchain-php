@@ -331,3 +331,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:54c37e3 -->
 | `SseParser::separatorLengthAt()` no-match fallback | returned a hardcoded `2` | returns `null`; `feed()` throws rather than consuming a guessed length | `54c37e3` |
+
+<!-- fix:c537236 -->
+| `BaseChatModel::isMetadataOnly()` dropped terminal stream chunks | read `$chunk->message` only, so a chunk carrying just `finish_reason`/`stop_reason` in `generationInfo` was discarded | consults `generationInfo` for a non-empty stop reason | `c537236` |
