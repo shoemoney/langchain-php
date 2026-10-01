@@ -132,11 +132,40 @@ def inventory():
     return {k: v for k, v in sorted(inv.items()) if k not in (".", "")}
 
 
+def strip_php_comments(src: str) -> str:
+    """Remove comments, docblocks and attributes so a reference scan sees CODE.
+
+    A `use` statement is the only thing that creates a dependency. Scanning raw
+    text counts a PROSE mention as one, and this instrument did: it reported
+    `LangChain -> LangGraph: 1 files` for 30+ iterations when the single hit was
+    a docblock in `Runnable.php` EXPLAINING why two LangGraph classes implement
+    `batch()` themselves. An advisory then built a ranked finding on that edge —
+    "one `LangChain\\*` file reaching into `LangGraph\\*` is an inverted
+    dependency" — about a comment.
+
+    Order matters: docblocks first, then `//`, then attributes. A naive `//`
+    pass would eat the `//` inside a URL or a regex literal that appears inside a
+    string, and attributes are stripped because `#[CoversClass(...)]` legitimately
+    names classes from the other package in tests, not in src.
+    """
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    src = re.sub(r"//[^\n]*", "", src)
+    src = re.sub(r"#\[[^\]]*\]", "", src, flags=re.S)
+    return src
+
+
 def dep_edges():
-    """Which top-level package references which. Cheap namespace scan."""
+    """Which top-level package references which. Scans CODE, not prose.
+
+    Comments are stripped first: a docblock naming the other package is a
+    sentence ABOUT the architecture, not a dependency created by it. Measured,
+    that one distinction takes `LangChain -> LangGraph` from 1 to 0 — the port
+    has no upward dependency at all, which is what upstream's
+    `@langchain/core` having no dependency on `@langchain/langgraph` requires.
+    """
     edges = collections.Counter()
     for p in (ROOT / "src").rglob("*.php"):
-        body = p.read_text(encoding="utf-8", errors="replace")
+        body = strip_php_comments(p.read_text(encoding="utf-8", errors="replace"))
         own = p.relative_to(ROOT / "src").parts[0]
         for target in ("LangChain", "LangGraph"):
             if target == own:
