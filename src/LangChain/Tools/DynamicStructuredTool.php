@@ -18,7 +18,7 @@ use LangChain\Tracers\CallbackManagerForToolRun;
  */
 final class DynamicStructuredTool extends StructuredTool
 {
-    use InjectsToolRuntime;
+    use InvokesToolCallable;
 
     /** @var callable(mixed, CallbackManagerForToolRun|null, RunnableConfig|null): mixed */
     private $func;
@@ -41,28 +41,5 @@ final class DynamicStructuredTool extends StructuredTool
     /**
      * Name the trace run after the tool. See {@see DynamicTool::call()}.
      */
-    public function call(mixed $arg, ?RunnableConfig $config = null, ?array $tags = null): mixed
-    {
-        $config ??= new RunnableConfig();
-        if ($config->runName === null) {
-            $config = clone $config;
-            $config->runName = $this->name;
-        }
-
-        return parent::call($arg, $config, $tags);
-    }
-
-    protected function callTool(mixed $arg, ?CallbackManagerForToolRun $runManager = null, ?RunnableConfig $parentConfig = null): mixed
-    {
-        // Upstream `tools/types.ts:472-486`: a tool function with a parameter typed `ToolRuntime` has one
-        // AUTOMATICALLY INJECTED, carrying state / toolCallId / config / context / store / writer, with
-        // "no `Annotated` wrapper needed". The class shipped but nothing ever constructed one, so a tool
-        // written correctly against that documentation died with a TypeError naming two unrelated classes.
-        //
-        // Conditional on the type hint, deliberately: `(input, runManager, config)` is the OLDER upstream
-        // tool signature and this port implements it correctly, so swapping the second argument
-        // unconditionally would break every tool already written against that shape.
-        return ($this->func)($arg, self::secondToolArgument($this->func, $runManager, $parentConfig), $parentConfig);
-    }
 
 }
