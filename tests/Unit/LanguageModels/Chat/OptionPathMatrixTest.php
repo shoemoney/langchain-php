@@ -70,6 +70,58 @@ final class OptionPathMatrixTest extends TestCase
         ];
     }
 
+    /**
+     * A wire-spelled constructor key must reach the same request as its
+     * canonical form.
+     *
+     * `ChatOpenAI::$KEY_ALIASES` maps `tool_choice` to `toolChoice` (with
+     * `stop_sequences`, `response_format` and four others), and the matrix
+     * above varies the ATTACHMENT route, not the SPELLING of an option — so a
+     * test that only ever passed `toolChoice` would pass unchanged if the alias
+     * map lost its entry, because `normaliseKeys()` would pass the wire
+     * spelling through untouched.
+     *
+     * The two spellings go through the CONSTRUCTOR, not `RunnableConfig`:
+     * that class has twelve fields and none of them is a tool list, so a
+     * per-call tool choice is not expressible there at all. This asserts the
+     * two constructor spellings produce an identical request, which is the
+     * property that makes the alias map load-bearing — if the entry were
+     * removed the two would diverge and this fails.
+     */
+    public function testAWireSpelledConstructorKeyProducesTheSameRequestAsItsCanonicalForm(): void
+    {
+        $choice = ['type' => 'function', 'function' => ['name' => 'search']];
+        $bodies = [];
+
+        foreach (['wire-spelled' => ['tool_choice' => $choice],
+                  'canonical'     => ['toolChoice' => $choice]] as $label => $field) {
+            $http = new class implements HttpClient {
+                public ?array $body = null;
+                public function post(string $u, array $h, string $b, array $q = [], ?float $t = null): HttpResponse
+                {
+                    $this->body = json_decode($b, true);
+                    return new HttpResponse(200, [], (string) json_encode([
+                        'id' => 'x', 'model' => 'gpt-4o',
+                        'choices' => [['index' => 0,
+                            'message' => ['role' => 'assistant', 'content' => 'ok'],
+                            'finish_reason' => 'stop']],
+                    ]));
+                }
+                public function postStream(string $u, array $h, string $b, array $q = [], ?float $t = null): \Generator
+                {
+                    yield from [];
+                }
+            };
+            $model = new ChatOpenAI($field + ['apiKey' => 'k', 'httpClient' => $http, 'tools' => [$this->tool()]]);
+            $model->invoke([new HumanMessage('hi')]);
+            $bodies[$label] = $http->body['tool_choice'] ?? null;
+        }
+
+        self::assertNotNull($bodies['wire-spelled'], 'tool_choice must reach the wire');
+        self::assertSame($bodies['canonical'], $bodies['wire-spelled'],
+            'both constructor spellings must produce the same request');
+    }
+
     /** The two ways a call can be made. */
     public static function modes(): array
     {
