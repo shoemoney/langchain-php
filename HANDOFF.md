@@ -34,8 +34,8 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **2359 passing, 6481 assertions** |
-| Size | 232 src files / 34,750 lines · 115 test files / 26,487 lines |
+| Tests | **3403 passing, 7873 assertions** |
+| Size | 232 src files / 34,750 lines · 116 test files / 26,649 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
@@ -169,12 +169,12 @@ read "Follow these or CI fails you", which was wrong — measured against `phpun
 
 - **PHPUnit 11 attributes** — ENFORCED. Deprecated `@covers` / `@dataProvider` emit a warning and
   `failOnWarning` fails the run.
-- **`declare(strict_types=1)` on every file** — convention only, NOT enforced by any test.
-  Measured 0 violations across `src/` and `tests/`.
-- **One class per file, PSR-4 path-matched** — convention only, NOT enforced by any test. It has
-  been checked by hand, as a shell one-liner, on most iterations of the review loop — a real check
-  that only runs when someone remembers to run it. **Writing `SourceConventionTest` to close this is
-  known, scoped work, and two real facts were measured while attempting it:**
+- **`declare(strict_types=1)` on every file** — **ENFORCED** by `SourceConventionTest`, over every
+  file in `src/` and `tests/`. Mutation-verified: removing the declaration fails the guard.
+- **Namespace matches the directory (PSR-4)** — **ENFORCED** by the same file.
+  Mutation-verified: renaming a `src/` namespace to a non-existent one fails the guard.
+- **One top-level type per file** — enforced for `src/` only. See the note below for why `tests/` is
+  scoped out; that scoping is deliberate and documented in the test.
   (a) `src/` legitimately contains function-only files — `createTool.php`, `coerceToRunnable.php`,
   `Pregel/interrupt.php` — so a "declared type matches filename" rule must exempt them; and
   (b) **19 files under `tests/` declare a SOURCE namespace** (`tests/Unit/Checkpoint/*` declares
