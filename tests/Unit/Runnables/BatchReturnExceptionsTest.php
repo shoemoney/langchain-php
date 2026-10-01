@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\Runnables;
 
+use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableInterface;
 use LangChain\Runnables\RunnableLambda;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -21,7 +22,7 @@ use PHPUnit\Framework\TestCase;
  * With the option unset, upstream's default is to THROW on the first failure — which is what the port
  * already does, and is pinned here so a fix cannot quietly change the default.
  */
-#[CoversClass(RunnableInterface::class)]
+#[CoversClass(Runnable::class)]
 final class BatchReturnExceptionsTest extends TestCase
 {
     private function runnable(): RunnableInterface
