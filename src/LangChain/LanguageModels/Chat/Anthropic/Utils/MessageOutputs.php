@@ -219,6 +219,44 @@ final class MessageOutputs
      *
      * @return string|list<array<string, mixed>>
      */
+    /**
+     * The plain-text answer for a payload, flattened from however many blocks it arrived in.
+     *
+     * `contentOf()` returns a STRING only when there is exactly one `type: text` block, and the raw
+     * block array otherwise. Reading that with `is_string($content) ? $content : ''` therefore produced
+     * an EMPTY STRING for every multi-block answer, while `$message->content` kept every block.
+     *
+     * The case that matters is `thinking` + `text`: a thinking block ahead of the answer is what
+     * Anthropic's extended thinking emits on essentially every request, so the ordinary shape for a
+     * thinking-enabled model was an empty answer. `StrOutputParser` and trace text both read this string.
+     *
+     * Only `text` blocks contribute. `thinking`, `redacted_thinking` and `tool_use` are not answer text,
+     * and a `tool_use` block's payload is arguments, not prose.
+     *
+     * Named to parallel `Completions::stringifyContent()` on the OpenAI side, which flattens its own
+     * content shape — the two providers now both give string consumers the answer rather than one of
+     * them silently yielding ''.
+     *
+     * @param string|list<array<string, mixed>> $content
+     */
+    public static function stringifyText(string|array $content): string
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+
+        $text = '';
+        foreach ($content as $block) {
+            if (!is_array($block) || ($block['type'] ?? null) !== 'text') {
+                continue;
+            }
+
+            $text .= (string) ($block['text'] ?? '');
+        }
+
+        return $text;
+    }
+
     private static function contentOf(array $payload, array $textBlocks): string|array
     {
         $blocks = self::blocks($payload);

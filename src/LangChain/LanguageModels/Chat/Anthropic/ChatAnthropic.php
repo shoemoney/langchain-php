@@ -402,7 +402,10 @@ class ChatAnthropic extends BaseChatModel
             static fn (mixed $v): bool => $v !== null,
         );
 
-        $text = is_string($message->content) ? $message->content : '';
+        // Flatten rather than type-check: `contentOf()` yields a string only for a single text block,
+        // so the old `is_string(...) ? ... : ''` returned '' for every multi-block answer — including
+        // the ordinary `thinking` + `text` shape that Anthropic's extended thinking always emits.
+        $text = MessageOutputs::stringifyText($message->content);
 
         return new ChatResult(
             [new ChatGeneration($message, $text, $generationInfo)],
