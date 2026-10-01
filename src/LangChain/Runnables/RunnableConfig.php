@@ -163,4 +163,73 @@ final class RunnableConfig
             'run_id_parent' => $this->runId[0] ?? null,
         ]);
     }
+
+    /**
+     * Fields whose upstream merge rule is plain "a later config overwrites an earlier one".
+     *
+     * Upstream `mergeConfigs` in `libs/langchain-core/src/runnables/config.ts` iterates
+     * `Object.keys(options)`, so only keys ACTUALLY PRESENT are copied. When a config arrives as an
+     * array (which is how `StructuredTool::$defaultConfig` is supplied) this method keeps that
+     * presence semantics with `array_key_exists()`; a `RunnableConfig` object cannot distinguish an
+     * absent key from one set to its default, so all of its fields are treated as present.
+     */
+    private const LATER_WINS_FIELDS = [
+        'runId', 'callbacks', 'maxConcurrency', 'recursionLimit', 'verbose',
+        'runName', 'runIdParent', 'checkpointId', 'checkpointMap',
+        'options', 'toolCall', 'context',
+    ];
+
+    /**
+     * Mirrors upstream `mergeConfigs` from `libs/langchain-core/src/runnables/config.ts`.
+     *
+     * Upstream has no equivalent of a hand-written per-field list, so it inherits every config key by
+     * construction. The per-key rules are:
+     *
+     *  - `metadata` / `configurable`: spread — a key set on either side survives;
+     *  - `tags`: union of both, deduplicated, first-seen order preserved;
+     *  - `signal`: combined;
+     *  - every other key: overwritten by the later config.
+     *
+     * Upstream's `timeout` rule (`Math.min`) has no target here — `RunnableConfig` has no `timeout`
+     * field — and upstream's `signal` combination uses `AbortSignal.any()`, which has no PHP
+     * equivalent, so a later `signal` wins. See PORT_STATUS.md "Known non-exact behaviours".
+     */
+    public static function mergeConfigs(mixed ...$configs): self
+    {
+        $copy = new self();
+
+        foreach ($configs as $config) {
+            if ($config === null) {
+                continue;
+            }
+
+            $isArray = is_array($config);
+            $in = $isArray ? self::fromArray($config) : $config;
+            if (! $in instanceof self) {
+                continue;
+            }
+
+            $copy->metadata = array_merge($copy->metadata, $in->metadata);
+            $copy->configurable = array_merge($copy->configurable, $in->configurable);
+            $copy->tags = array_values(array_unique(array_merge($copy->tags, $in->tags)));
+
+            if ($in->signal !== null) {
+                $copy->signal = $in->signal;
+            }
+
+            foreach (self::LATER_WINS_FIELDS as $field) {
+                if ($isArray) {
+                    if (array_key_exists($field, $config)) {
+                        $copy->$field = $in->$field;
+                    }
+
+                    continue;
+                }
+
+                $copy->$field = $in->$field;
+            }
+        }
+
+        return $copy;
+    }
 }

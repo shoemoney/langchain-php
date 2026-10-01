@@ -31,6 +31,8 @@ composer test
 ## langchain-core
 
 | Subsystem | Status | Notes |
+| RunnableConfig merge | `signal` combined | later `signal` wins | upstream `mergeConfigs` calls `AbortSignal.any([a,b])`, which has no PHP equivalent — there is no signal type to compose | 2026-10-01 |
+| RunnableConfig merge | `timeout` rule absent | not ported | upstream applies `Math.min` across configs; `RunnableConfig` in this port has no `timeout` field, so there is nothing to minimise | 2026-10-01 |
 |---|---|---|
 | `utils/promise` + event loop | ✅ | `Promise`, `Await` (fiber scheduler) |
 | `utils/stream` (Observable) | ✅ | `Observable` |
@@ -319,4 +321,4 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **2342** |
+| **Total so far** | | **2347** |

@@ -338,43 +338,14 @@ abstract class StructuredTool extends BaseLangChain
             return $merged;
         }
 
-        $defaults = RunnableConfig::fromArray($this->defaultConfig);
-        if ($defaults === null) {
-            return $merged;
-        }
-
-        $combined = clone $merged;
-        if ($merged->tags === []) {
-            $combined->tags = $defaults->tags;
-        }
-        if ($merged->metadata === []) {
-            $combined->metadata = $defaults->metadata;
-        }
-        if ($merged->callbacks === []) {
-            $combined->callbacks = $defaults->callbacks;
-        }
-        if ($merged->options === []) {
-            $combined->options = $defaults->options;
-        }
-        if ($merged->runName === null) {
-            $combined->runName = $defaults->runName;
-        }
-        // `ToolRuntime::fromConfig()` reads `$config->context`, and `context`
-        // was absent from this list — so a `defaultConfig` that set a runtime
-        // context (an agent id, a tenant, an injected client) silently lost it
-        // whenever the caller did not pass context on the per-call config, and
-        // the tool body saw null where its author had configured a value.
-        // Same class as the `kwargs`-recorded-but-never-read defects.
-        if ($merged->context === null) {
-            $combined->context = $defaults->context;
-        }
-
-        if ($merged->configurable === []) {
-            $combined->configurable = $defaults->configurable;
-        }
-
-        return $combined;
+        // Upstream `libs/langchain-core/src/tools/index.ts:187-188` calls the generic
+        // `mergeConfigs(this.defaultConfig, config)`. The hand-rolled field list that used to live
+        // here handled 7 of RunnableConfig's 16 keys, dropped the other 9 entirely, and gave
+        // `metadata`/`configurable`/`tags` replace-instead-of-merge semantics. Delegating keeps the
+        // field set in one place so a field added to `RunnableConfig` is inherited automatically.
+        return RunnableConfig::mergeConfigs($this->defaultConfig, $config);
     }
+
 
     /**
      * The JSON Schema describing this tool's arguments, for a model's benefit.
