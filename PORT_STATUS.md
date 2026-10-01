@@ -105,6 +105,8 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 
 ---
 
+| `b5dda88` | `RunnableInterface::batch()`'s second docblock omitted `@param $config` on a three-parameter signature. Invisible to static analysis, which parses the first block in a stack; misleading to the human who reads the second. Found by a reviewer reading the docblock in the previously-unread `**Finding N:**` corpus — the first accepted finding in 34 iterations. The guard 234 named swept all 520 methods and found 3 further name mismatches, still open. |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
