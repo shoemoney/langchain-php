@@ -274,13 +274,18 @@ final class Schema
         }
 
         if (isset($schema['allOf']) && is_array($schema['allOf'])) {
+            // Upstream `json_schema.ts` uses `.some()` here, with the reason in its own comment:
+            // "If any subschema validates only strings, then the overall schema validates only
+            // strings." This branch previously used `.every()` — the `anyOf` rule — so an `allOf`
+            // whose string-only branch was diluted by a non-string branch was routed to the
+            // structured path even though a bare string validates.
             foreach ($schema['allOf'] as $option) {
-                if (is_array($option) && !(new self($option))->validatesOnlyStrings()) {
-                    return false;
+                if (is_array($option) && (new self($option))->validatesOnlyStrings()) {
+                    return true;
                 }
             }
 
-            return true;
+            return false;
         }
 
         // `anyOf` is handled here for the same reason `allOf` is: the schema
@@ -296,13 +301,18 @@ final class Schema
                 return false;
             }
 
+            // Upstream uses `.every()` for `anyOf`/`oneOf`: "All subschemas must validate only
+            // strings." This branch previously used `.some()` — the `allOf` rule — so a tool
+            // declaring `{"anyOf": [{"type": "string"}, {"type": "number"}]}` was reported
+            // string-only and `createTool.php:77` routed it down the string path even though the
+            // schema accepts numbers.
             foreach ($options as $option) {
-                if ((new self($option))->validatesOnlyStrings()) {
-                    return true;
+                if (!(new self($option))->validatesOnlyStrings()) {
+                    return false;
                 }
             }
 
-            return false;
+            return true;
         }
 
         return false;
