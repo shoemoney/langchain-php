@@ -326,6 +326,9 @@ non-zero count from one should be treated as a claim about the detector until it
 
 | 438 | `ToolMessageChunk` does not model `artifact` or `status` | upstream `tool.ts:192-208` builds `artifact: _mergeObj(this.artifact, chunk.artifact)` and `status: _mergeStatus(this.status, chunk.status)`; the port's `ToolMessageChunk` has no such properties, so both are dropped on construction rather than merged | **not added.** These are missing fields, not inverted ones — modelling them is a porting decision with schema and wire-shape consequences, not a fidelity patch, and nothing in the port currently reads either. Recorded rather than silently omitted | unported fields |
 
+<!-- fix:5bdf2ec -->
+| 438 | `ToolMessageChunk::concat()` let the INCOMING `tool_call_id` win | the port read `$other->toolCallId !== '' ? $other->toolCallId : $this->toolCallId`, re-pointing a concatenated tool RESULT at a different CALL; upstream `tool.ts:205` is `tool_call_id: this.tool_call_id`, unconditional and with no fallback | changed to `$this->toolCallId`; guarded by `ToolMessageChunkConcatCallIdTest` | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
