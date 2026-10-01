@@ -86,6 +86,7 @@ interface RunnableInterface
      * A subclass that can honour either should say so in its own docblock.
      *
      * @param list<mixed>              $inputs
+     * @param RunnableConfig|null       $config
      * @param array<string, mixed>|null $options Upstream `batchOptions`. Unused by default.
      */
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array;
