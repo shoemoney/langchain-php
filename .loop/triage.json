@@ -2395,5 +2395,8 @@
  ],
  "probe-245": [
   "CORRECTION of 244: the PhpVersionCompatibilityTest docblock ALREADY states 244's conclusion verbatim ('hard fatal on the older members of that matrix... invisible locally'). 3rd correction in 4 iterations, same shape: a claim about PROSE drawn from the CODE without opening the prose"
+ ],
+ "probe-246": [
+  "Own-prose audit: PORT_STATUS/HANDOFF counts are ACCURATE (2340 tests; 232 src; 112 test .php of which 111 are *Test.php + 1 fixture). My probe compared two units and was corrected in the same call. PROSE claims remain unaudited - named as a deferred sweep"
  ]
 }
