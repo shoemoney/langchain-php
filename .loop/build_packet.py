@@ -361,7 +361,11 @@ def build_diagram(m):
             x = x0 + 290 + j * 234
             d.rounded_rectangle([x, y, x + 218, y + bh], 9, fill="#161b22", outline="#30363d")
             for k, part in enumerate(re.split(r"\\\\| \(", it)):
-                d.text((x + 12, y + 14 + k * 20), part[:30], font=font(15), fill="#c9d1d9")
+                d.text((x + 12, y + 14 + k * 20), # Marked, not silent: `plan.py` ellipsises its per-field cuts so a clipped
+                # field is distinguishable from a complete one (210). Two namespaces
+                # sharing a 30-char prefix would otherwise render as one label.
+                (part[:29] + "\u2026") if len(part) > 30 else part,
+                    font=font(15), fill="#c9d1d9")
         if i < len(layers) - 1:
             d.line([x0 + 125, y + bh, x0 + 125, y + 128], fill="#30363d", width=2)
             d.polygon([(x0+120, y+bh+10), (x0+130, y+bh+10), (x0+125, y+bh+20)], fill="#30363d")
