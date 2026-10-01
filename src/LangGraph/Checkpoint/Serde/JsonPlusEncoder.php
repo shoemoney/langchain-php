@@ -6,6 +6,7 @@ namespace LangGraph\Checkpoint\Serde;
 
 use LangGraph\Channels\DeltaSnapshot;
 use LangGraph\Checkpoint\Checkpoint;
+use LangGraph\Pregel\Checkpoint\Checkpoint as PregelCheckpoint;
 use LangGraph\Pregel\Send;
 
 /**
@@ -128,9 +129,15 @@ final class JsonPlusEncoder
             return null;
         }
 
-        if ($value instanceof Checkpoint) {
+        if ($value instanceof Checkpoint || $value instanceof PregelCheckpoint) {
             // A checkpoint is a typed record, not a bag of properties: its wire
             // names are the ones the TypeScript runtime reads.
+            //
+            // BOTH Checkpoint classes are matched. There are two — `LangGraph\Checkpoint\Checkpoint`
+            // and `LangGraph\Pregel\Checkpoint\Checkpoint` — and the Pregel engine writes the
+            // second one. Matching only the first left the Pregel checkpoint walking as a plain object,
+            // which is how an empty `channel_versions` reached the bytes as `[]` while the cast that
+            // was supposed to prevent exactly that sat correct and unused one class over.
             $value = $value->toArray();
         } else {
             $replacement = $this->envelopeFor($value);

@@ -51,6 +51,33 @@ class Checkpoint
      * maps are copied one level, because `applyWrites` mutates all three in
      * place and two checkpoints must not alias.
      */
+    /**
+     * The wire shape, mirroring upstream's `toJson()`.
+     *
+     * `channel_versions` and `versions_seen` are MAPS upstream — object literals in `toJson()` — so
+     * they must reach the bytes as `{}`. PHP encodes an empty array as `[]`, and a JavaScript reader
+     * handed `[]` where it expects an object cannot read the checkpoint back. A brand-new thread writes
+     * both empty, so this is the FIRST thing a checkpoint contains rather than an edge case.
+     *
+     * This method exists because the `(object)` cast added for exactly this defect lives on the OTHER
+     * `Checkpoint` class (`src/LangGraph/Checkpoint/Checkpoint.php`), and the Pregel engine writes
+     * THIS one — so the fix was present, correct and documented, and absent from every checkpoint the
+     * engine actually writes.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'v' => $this->v,
+            'id' => $this->id,
+            'ts' => $this->ts,
+            'channelValues' => $this->channelValues,
+            'channelVersions' => (object) $this->channelVersions,
+            'versionsSeen' => (object) $this->versionsSeen,
+        ];
+    }
+
     public function copy(): self
     {
         $versionsSeen = [];
