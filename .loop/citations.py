@@ -45,6 +45,28 @@ def main() -> int:
 
     text = review.read_text(encoding="utf-8", errors="replace")
 
+    # Does the LEDGER already record a fix for the thing this citation points at?
+    #
+    # Iterated 415 recorded the pattern: a fix recorded in PORT_STATUS and pinned by a test is STILL
+    # re-reported, because a reviewer reading the code sees the cast and reads it as a DESCRIPTION
+    # rather than a fix. Asking "has this already been fixed?" should be a lookup, not a reading.
+    #
+    # BUT THE LEDGER IS CONCEPT-KEYED, NOT FILE-KEYED, and that is worth stating rather than papering
+    # over: a row reads "**An empty argument object satisfies an object schema** <!-- fix:7563354 -->"
+    # and never names a `.php` file. A first attempt at this check matched on `` `Some/File.php` `` in the
+    # row's first cell and could therefore never fire — a cross-check that cannot succeed is a check that
+    # cannot be trusted, which is the 414 lesson arriving in a new place. So the search below is over the
+    # row TEXT, keyed on the cited file's basename and the words around it, and it is deliberately
+    # advisory: it surfaces candidate rows to read, it does not decide.
+    ledger = ROOT / "PORT_STATUS.md"
+    fix_rows: list[str] = []
+    if ledger.is_file():
+        fix_rows = [
+            line.strip()
+            for line in ledger.read_text(encoding="utf-8", errors="replace").split("\n")
+            if "<!-- fix:" in line
+        ]
+
     # One entry per cited path, with every line number cited for it.
     cited: dict[str, list[str]] = {}
     for m in CITE.finditer(text):
@@ -69,10 +91,19 @@ def main() -> int:
                 note = f"  (actually {rel})"
         print(f"  [{mark}] {path}:{','.join(sorted(set(lines)))}{note}")
 
+        if fix_rows:
+            stem = Path(path).stem.lower()
+            hits = [r for r in fix_rows if stem and stem in r.lower()]
+            if hits:
+                print(f"           ^ {len(hits)} LEDGER fix row(s) mention this file — READ BEFORE CALLING IT A DEFECT:")
+                for r in hits[:2]:
+                    print(f"             {r[:100]}")
+
     total = len(cited)
     print(f"\n  {total} distinct path(s) cited, {bad} do not exist.")
     if bad:
         print("  Every MISSING path is a fabricated citation. Reject before reading the prose.")
+    print("  A LEDGER line means: read the fix row BEFORE deciding this is a defect.")
     return 1 if bad else 0
 
 
