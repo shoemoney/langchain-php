@@ -132,6 +132,41 @@ These are MEASURED ZEROS, not assumptions. Each was re-run on this commit.
 | `@return` type atoms that name a non-existent class | **NOT DETERMINED — validator abandoned** | An `@return` resolver reported 98 unresolved atoms, then 67 after three parser fixes. Every residue was a parser gap, not a defect: PHP builtin CLASSES (`\Generator`) absent from a scalar-only builtin table; `array{values: X}` shape KEYS harvested as class names; `@template` scope read from the method docblock when the template sits on the class; and `use`-resolution whose candidate list was wrong (the `use` parser itself captures `LangChain\Runnables\RunnableInterface` correctly in isolation). **Zero of the 67 were shown to contradict the code, so no validator was landed** — see the note below. |
 | `catch` blocks under `src/` that are empty in full | 0 of 122 scanned | Swallowed errors are invisible to every other signal. Enforced by `NoSilentlySwallowedErrorsTest` using `token_get_all()` — a commented catch is permitted (that IS the declaration of intent), an unexplained one is not. The single src/ catch is `JsonUtils::strictParsePartialJson()`, verified faithful to upstream `utils/json.ts:35-38`. | Two files differing only by case would collide on macOS and not on Linux. |
 
+### 435: the pair-vs-raw `stream()` split is a PORT-WIDE divergence, measured at 4 vs 6
+
+434 left this open. It is now measured, and the answer is that the port is **internally inconsistent**
+rather than the port being uniformly wrong.
+
+| yields a `[CHANNEL_DEFAULT, value]` PAIR (4) | yields the RAW value (6) |
+| --- | --- |
+| `RunnableSequence:141`, `RunnablePick:64`, `RunnableAssign:54`, `RunnableEach:40` | `RunnableRetry:84`, `RunnableBinding:38`, `RunnableParallel:87`, `Pregel:133`, `ChannelWrite:63`, `RunnableBranchWriter:117` |
+
+Enumerated by reflection over every concrete class declaring its own `stream()`.
+
+**Upstream is uniform, and RAW.** `Runnable.stream()` (`base.ts:310-318`) wraps
+`this._streamIterator(input, config)`, whose default (`base.ts:297-302`) is `yield this.invoke(input,
+options)` — a raw value. There is no `CHANNEL_DEFAULT` concept in upstream `Runnable.stream()` at all;
+channel tagging belongs to Pregel's `streamMode` handling, not to the runnable contract.
+
+**Why this is worse than a single wrong class:** the split is not partitioned along any principled line.
+A `RunnableSequence` wrapping a `RunnableParallel` yields PAIRS at the outer level and RAW from the inner
+one, so the shape a consumer sees depends on composition order rather than on the contract.
+
+**Deliberately NOT changed in 435, and the blast radius is the reason.** `Runnable::transform()` consumes
+these pairs (`$pair[1]`), as does the transform test added in 407 and the 429 assertions. Converting the
+four pair-yielding implementations to raw is therefore a coordinated change across 10 implementations,
+`transform()`, and their tests — a multi-iteration refactor, not a patch. Doing it in one pass would mean
+changing streaming behaviour that currently works, on the strength of a conclusion reached from a
+convention survey rather than from a failing test.
+
+Also recorded so the survey is not repeated blindly: the first run of this sweep reported **0
+implementations**, which was impossible — `Runnable`, `ChannelWrite` and `RunnableBranchWriter` were read
+by hand earlier the same session. The cause was a dropped `require vendor/autoload.php`, so
+`class_exists()` returned false for every class and the enumeration silently produced an empty result.
+**A static sweep that reports zero is nearly always a broken sweep** — the same shape as 427's three
+regex detectors, and the reason this one was re-run before its numbers were written down.
+
+
 ### 434: the `stream()` yield-shape convention is genuinely unresolved
 
 `RunnableBranchWriter::stream()` read `yield from $this->invoke($input, $config)`. `invoke()` returns
