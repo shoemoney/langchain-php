@@ -267,5 +267,12 @@
   "file": ".loop/advisory/nova-2-lite-v1.md",
   "chars": 4797,
   "cost": 0.0054
+ },
+ "openai/gpt-4o-mini-2024-07-18": {
+  "status": "ok",
+  "at": "2026-10-01T11:56:05.158005+00:00",
+  "file": ".loop/advisory/gpt-4o-mini-2024-07-18.md",
+  "chars": 4475,
+  "cost": 0.0076
  }
 }
