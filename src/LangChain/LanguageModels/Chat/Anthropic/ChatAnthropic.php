@@ -327,9 +327,25 @@ class ChatAnthropic extends BaseChatModel
         $strict = $kwargs['strict'] ?? $this->kwargs['strict'] ?? null;
         $next->kwargs['tools'] = self::convertTools($tools, $strict === null ? null : (bool) $strict);
 
-        // Remember the decision so a later bind on this instance inherits it,
-        // matching the OpenAI client. Upstream's `bindTools` passes `strict`
-        // straight through `withConfig`, so it persists the same way.
+        // Remember the decision so a later bind on this instance inherits it.
+        // Upstream's `bindTools` passes `strict` straight through `withConfig`, so
+        // it persists the same way, and `strict` is skipped a few lines below so
+        // the general kwargs copy does not duplicate it.
+        //
+        // NOT the same mechanism as the OpenAI client, whatever a previous
+        // version of this comment claimed. ChatOpenAI stores the decision in a
+        // FIELD and reads `$kwargs['strict'] ?? $this->supportsStrictToolCalling`
+        // (ChatOpenAI.php:458); it deliberately keeps NO `kwargs['strict']`,
+        // because `invocationParams()` never reads one and a second copy of the
+        // decision only pollutes a trace. This class instead keeps the decision in
+        // `kwargs` and reads it back from there (line 327).
+        //
+        // The two are OBSERVATIONALLY EQUIVALENT for the thing that matters —
+        // both preserve `strict` across a chained `bindTools()`, which is the bug
+        // either mechanism was written to prevent — so this is not a behavioural
+        // divergence and nothing here is pinned by a test that assumes one shape.
+        // The divergence is cosmetic: this client carries a `kwargs['strict']`
+        // into every serialized run record that OpenAI does not.
         if ($strict !== null) {
             $next->kwargs['strict'] = $strict;
         }
