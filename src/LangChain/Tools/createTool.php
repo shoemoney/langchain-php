@@ -48,44 +48,56 @@ use LangChain\Runnables\RunnableConfig;
  *     verbose?: bool
  * } $fields
  */
-function tool(callable $func, array $fields): StructuredTool
-{
-    if (!isset($fields['name']) || !is_string($fields['name']) || $fields['name'] === '') {
-        throw new \InvalidArgumentException('A tool requires a non-empty name.');
+// This file is BOTH a composer `autoload.files` entry (PHP cannot autoload functions, so the
+// bootstrap must include it) AND reachable through the PSR-4 class loader, because its basename is a
+// valid class name in this namespace. Composer's `files` guard only protects its own includes; the
+// class loader uses a plain `include`. So `class_exists(__NAMESPACE__ . '\\tool')` includes this
+// file a SECOND time, and an unguarded declaration raises an uncatchable
+// `Cannot redeclare function` fatal that kills the process.
+//
+// The guard makes the second include a no-op. Every test in this suite calls the function and none
+// probes for the class, so nothing else would ever observe this.
+if (!\function_exists(__NAMESPACE__ . '\\tool')) {
+    function tool(callable $func, array $fields): StructuredTool
+    {
+        if (!isset($fields['name']) || !is_string($fields['name']) || $fields['name'] === '') {
+            throw new \InvalidArgumentException('A tool requires a non-empty name.');
+        }
+
+        $schema = Schema::from($fields['schema'] ?? null);
+        $description = $fields['description']
+            ?? $schema->description()
+            ?? $fields['name'] . ' tool';
+
+        $base = [
+            'name' => $fields['name'],
+            'description' => $description,
+            'schema' => $schema,
+            'responseFormat' => $fields['responseFormat'] ?? 'content',
+            'returnDirect' => $fields['returnDirect'] ?? false,
+            'verboseParsingErrors' => $fields['verboseParsingErrors'] ?? false,
+            'metadata' => $fields['metadata'] ?? [],
+            'extras' => $fields['extras'] ?? [],
+            'defaultConfig' => $fields['defaultConfig'] ?? null,
+            'tags' => $fields['tags'] ?? [],
+            'callbacks' => $fields['callbacks'] ?? [],
+            'verbose' => $fields['verbose'] ?? false,
+        ];
+
+        if ($schema->validatesOnlyStrings()) {
+            // Wrap the closure so a string schema's body sees a bare string. The
+            // `{input: …}` envelope the model sends is unwrapped here, which is
+            // the entire reason the two tool classes exist.
+            return new DynamicTool($base, static function (mixed $input, mixed $runManager, ?RunnableConfig $config) use ($func): mixed {
+                if (is_array($input) && array_key_exists('input', $input)) {
+                    $input = $input['input'];
+                }
+
+                return $func($input, $runManager, $config);
+            });
+        }
+
+        return new DynamicStructuredTool($base, $func);
     }
 
-    $schema = Schema::from($fields['schema'] ?? null);
-    $description = $fields['description']
-        ?? $schema->description()
-        ?? $fields['name'] . ' tool';
-
-    $base = [
-        'name' => $fields['name'],
-        'description' => $description,
-        'schema' => $schema,
-        'responseFormat' => $fields['responseFormat'] ?? 'content',
-        'returnDirect' => $fields['returnDirect'] ?? false,
-        'verboseParsingErrors' => $fields['verboseParsingErrors'] ?? false,
-        'metadata' => $fields['metadata'] ?? [],
-        'extras' => $fields['extras'] ?? [],
-        'defaultConfig' => $fields['defaultConfig'] ?? null,
-        'tags' => $fields['tags'] ?? [],
-        'callbacks' => $fields['callbacks'] ?? [],
-        'verbose' => $fields['verbose'] ?? false,
-    ];
-
-    if ($schema->validatesOnlyStrings()) {
-        // Wrap the closure so a string schema's body sees a bare string. The
-        // `{input: …}` envelope the model sends is unwrapped here, which is
-        // the entire reason the two tool classes exist.
-        return new DynamicTool($base, static function (mixed $input, mixed $runManager, ?RunnableConfig $config) use ($func): mixed {
-            if (is_array($input) && array_key_exists('input', $input)) {
-                $input = $input['input'];
-            }
-
-            return $func($input, $runManager, $config);
-        });
-    }
-
-    return new DynamicStructuredTool($base, $func);
 }

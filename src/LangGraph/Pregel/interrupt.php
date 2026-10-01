@@ -31,37 +31,49 @@ use LangGraph\Errors\GraphValueError;
  * @throws GraphInterrupt        when no resume value is waiting
  * @throws GraphValueError       when called outside a Pregel task
  */
-function interrupt(mixed $value = null): mixed
-{
-    $config = PregelScratchpad::currentConfig();
-    if ($config === null) {
-        throw new GraphValueError(
-            'interrupt() must be called from within a graph node. '
-            . 'It has no way to reach the graph state from outside a task.'
-        );
+// This file is BOTH a composer `autoload.files` entry (PHP cannot autoload functions, so the
+// bootstrap must include it) AND reachable through the PSR-4 class loader, because its basename is a
+// valid class name in this namespace. Composer's `files` guard only protects its own includes; the
+// class loader uses a plain `include`. So `class_exists(__NAMESPACE__ . '\\interrupt')` includes this
+// file a SECOND time, and an unguarded declaration raises an uncatchable
+// `Cannot redeclare function` fatal that kills the process.
+//
+// The guard makes the second include a no-op. Every test in this suite calls the function and none
+// probes for the class, so nothing else would ever observe this.
+if (!\function_exists(__NAMESPACE__ . '\\interrupt')) {
+    function interrupt(mixed $value = null): mixed
+    {
+        $config = PregelScratchpad::currentConfig();
+        if ($config === null) {
+            throw new GraphValueError(
+                'interrupt() must be called from within a graph node. '
+                . 'It has no way to reach the graph state from outside a task.'
+            );
+        }
+
+        $scratchpad = $config->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
+        if (!$scratchpad instanceof PregelScratchpad) {
+            throw new GraphValueError('interrupt() called outside a Pregel task');
+        }
+
+        $scratchpad->interruptCounter += 1;
+
+        // Resume values queued for this specific task first, then the
+        // graph-wide one. A task-specific value wins so a parent can answer one
+        // node's question without disturbing the others.
+        if ($scratchpad->resume !== []) {
+            return array_shift($scratchpad->resume);
+        }
+
+        $nullResume = $scratchpad->consumeNullResume();
+        if ($nullResume !== null) {
+            return $nullResume;
+        }
+
+        throw new GraphInterrupt([[
+            'id' => $config->configurable[Constants::CONFIG_KEY_TASK_ID] ?? null,
+            'value' => $value,
+        ]]);
     }
 
-    $scratchpad = $config->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
-    if (!$scratchpad instanceof PregelScratchpad) {
-        throw new GraphValueError('interrupt() called outside a Pregel task');
-    }
-
-    $scratchpad->interruptCounter += 1;
-
-    // Resume values queued for this specific task first, then the
-    // graph-wide one. A task-specific value wins so a parent can answer one
-    // node's question without disturbing the others.
-    if ($scratchpad->resume !== []) {
-        return array_shift($scratchpad->resume);
-    }
-
-    $nullResume = $scratchpad->consumeNullResume();
-    if ($nullResume !== null) {
-        return $nullResume;
-    }
-
-    throw new GraphInterrupt([[
-        'id' => $config->configurable[Constants::CONFIG_KEY_TASK_ID] ?? null,
-        'value' => $value,
-    ]]);
 }
