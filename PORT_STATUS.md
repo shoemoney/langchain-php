@@ -565,7 +565,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4300** |
+| **Total so far** | | **4306** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
@@ -674,3 +674,6 @@ mutation check — bundling a structural addition with a diagnosis is what cost 
 
 <!-- fix:0793e6b -->
 | five `batch()` implementations hand-rolled their own loop | `returnExceptions` honoured by one and ignored by four; `RunnableSequence`/`RunnableWithFallbacks` also PRESERVED string keys where upstream's `inputs.map` + `Promise.all` yields a list | one `Runnable::batchEach()` helper, all five delegate | 0793e6b |
+
+<!-- fix:ecc64a8 -->
+| `Completions::convertMessage()` filtered `content` with an ALLOW-list (`=== 'text'`) | upstream's rule is a DENY-list of six types and passes everything else, so `image`/`audio`/`file`/`video` blocks — legal Chat Completions input — were silently deleted. Measured before the fix: a 4-block message (text+image+audio+file) went out as **1** block, so the request asked "What is in this image?" with no image on the wire and nothing reported it | deny-list of upstream's six (`tool_use`, `tool_call`, `functionCall`, `reasoning`, `reasoning_content`, `thinking`) per `converters/completions.ts:846-857`; everything else forwarded. **This port drops ONE more type than upstream and now says so:** `redacted_thinking` is in a separate `PORT_DROPPED_CONTENT_BLOCK_TYPES`, because upstream's list is closed, upstream forwards it, and a strict endpoint 400s on it exactly as it would on `thinking` | ecc64a8 |
