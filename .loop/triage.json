@@ -2799,5 +2799,8 @@
  ],
  "probe-322": [
   "321 candidate 1 REFUTED and 320's alarm resolved: autoload_psr4.php DOES contain 'LangChain\\Tests\\ => tests/Unit' (dev install, vendor/phpunit present), while autoload_classmap.php has ZERO LangChain\\Tests\\* entries and DocblockParamTest is NOT in it. So the 132 'Skipping' warnings mean dump-autoload -o declines to classmap test classes while PSR-4 still resolves them: 112 BENIGN + 20 REAL (the LangGraph\\Tests\\ files, confirmed to have no psr-4 rule). NOT '132 broken' and NOT '112 fine' asserted - the earlier class_exists=false probe is still unreconciled (likely PHPUnit TestCase not resolvable under bare php -r) and the settling command is named. STANDING LESSON: a warning is not a finding until you know what the tool was trying to do - 320 read Skipping as data loss, 321 as a name mismatch, 322 shows mostly benign; 3 readings, 2 confident and wrong. FIX ORDER MATTERS: fix the 20 LangGraph mappings FIRST, only then make CI fail on dump-autoload warnings, or CI goes red on 112 benign lines"
+ ],
+ "probe-323": [
+  "322's SUGGESTED FIX IS WRONG, measured: adding 'LangGraph\\Tests\\' => tests/Unit/ to autoload-dev took 'does not comply' from 132 to 264 and LangGraph warnings from 20 to 152, because TWO psr-4 prefixes on the SAME directory make Composer validate every file under tests/Unit/ against BOTH rules so each mismatches the rule that does not own it. Reverted composer.json, baseline re-verified at 132/20, no diff. CORRECT FIX for the 20 is a 20-file NAMESPACE RENAME to the single mapped root, not a second root. GENERAL RULE: a psr-4 mapping is not additive when two prefixes share a directory - if the dir is already claimed, the namespace has to move"
  ]
 }
