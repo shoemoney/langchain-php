@@ -244,10 +244,96 @@ def prior_findings(limit=45):
     return "\n".join(lines[:limit])
 
 
+def declared_class(path: Path) -> str | None:
+    """The type a src file declares, from its own `class`/`interface`/`enum` line.
+
+    Parsed rather than taken from the filename: this tree has function-only files
+    and the PSR-4 path has been wrong before (five files once landed in
+    `LanguageModels/Chat/` instead of `Chat/OpenAI/`, so filename-based counting
+    would have credited the wrong namespace).
+    """
+    src = path.read_text(encoding="utf-8", errors="replace")
+    m = re.search(
+        r"^\s*(?:final\s+|abstract\s+|readonly\s+)*"
+        r"(?:class|interface|trait|enum)\s+([A-Za-z_][A-Za-z0-9_]*)",
+        src,
+        flags=re.M,
+    )
+    return m.group(1) if m else None
+
+
+def reference_counts() -> dict[str, int]:
+    """How many files reference each src class, counting CODE only.
+
+    This exists because a prose warning did not work. The brief already told the
+    reviewer, in three paragraphs, that the "test files" column counts test paths
+    and NOT usage — and `claude-fable-5-1` still reported `LangChain\\Schema` as
+    dead code with "0 test files" and "0 reference data", then suggested
+    "delete or merge any with zero non-test referrers". Measured, those four
+    classes have 3, 9, 13 and 6 referrers, and all four are covered by tests.
+
+    The column is a DIRECTORY count, so a shared abstraction used from four
+    different namespaces reads as untested no matter how many tests touch it.
+    Nothing about that is fixable by telling the reader to be careful; the
+    advisory already did that and the warning was ignored. So the number is
+    supplied instead of the caution — and `LangChain\\Schema` is the case that
+    proves it, since no amount of care with a directory count yields the truth.
+
+    Comments and docblocks are stripped, because a sentence ABOUT a class is not
+    a reference to it: `Runnable.php` names two LangGraph classes in a docblock
+    and that is prose about the architecture, not a dependency (see
+    `strip_php_comments`).
+    """
+    src_files = sorted((ROOT / "src").rglob("*.php"))
+    # One pass over every file, remembering the stripped text for reuse.
+    bodies: dict[Path, str] = {}
+    for p in src_files + sorted((ROOT / "tests").rglob("*.php")):
+        bodies[p] = strip_php_comments(p.read_text(encoding="utf-8", errors="replace"))
+
+    counts: dict[str, int] = {}
+    for p in src_files:
+        name = declared_class(p)
+        if name is None:
+            continue
+        pat = re.compile(rf"\b{re.escape(name)}\b")
+        n = 0
+        for other, body in bodies.items():
+            if other == p:
+                continue
+            if pat.search(body):
+                n += 1
+        counts[name] = n
+    return counts
+
+
+def least_referenced(refs: dict[str, int], inv: dict[str, dict], limit: int = 12) -> str:
+    """The classes with the FEWEST referrers — the only ones a reader should doubt.
+
+    Sorted ascending so a genuine orphan sits at the top of the list rather than
+    being buried under 236 healthy names. Anything here is a QUESTION for the
+    reviewer, not a verdict: a class referenced once is not dead, and a class
+    referenced only by tests is reachable but unintegrated.
+    """
+    rows = []
+    for path in sorted((ROOT / "src").rglob("*.php")):
+        name = declared_class(path)
+        if name is None:
+            continue
+        rows.append((refs.get(name, 0), name, str(path.relative_to(ROOT))))
+    rows.sort(key=lambda r: (r[0], r[1]))
+    out = ["  referrers  class                                          path"]
+    for n, name, path in rows[:limit]:
+        flag = "   <-- ORPHAN?" if n == 0 else ""
+        out.append(f"  {n:>9}  {name:<45} {path}{flag}")
+    return "\n".join(out)
+
+
 def brief():
     inv = inventory()
     top = sorted(inv.items(), key=lambda kv: -kv[1]["src"])[:22]
     edges = dep_edges()
+    refs = reference_counts()
+    orphans = sum(1 for v in refs.values() if v == 0)
     return f"""# ADVISORY BRIEF — langchain-php
 
 {framing()}
@@ -261,21 +347,27 @@ A faithful PHP port of LangChain JS / LangGraph JS. Composer PSR-4, PHP >= 8.2 f
 ## 2. Namespace inventory
 
 **How to read the third column.** It counts test files whose path sits in
-that namespace — it does NOT count how much the namespace is *used*.
-Those are very different numbers and conflating them produces a confident
-wrong answer:
+that namespace — it does NOT count how much the namespace is *used*. Those are
+different numbers, and section 2b below now gives you the usage number directly
+so you never have to infer it.
 
-* `LangChain\\Utils\\Testing` shows 0 test files because it is
-  test-support code that the tests USE. Measured: `RunCollectorCallbackHandler`
-  is referenced by 10 files, `FakeHttpClient` by 9, `StructuredToolSpec` by 3.
-  A 0 here is expected and means nothing.
-* A value namespace showing 0 test files IS a real signal. Measured:
-  `LLMResult` is referenced by 11 files, `ChatGeneration` by 10,
-  `ChatGenerationChunk` by 8.
+## 2b. Least-referenced classes (the dead-code question, answered)
 
-Judge coverage by whether a namespace's classes are referenced and its
-branches exercised — not by this column. An advisory has already reported a
-heavily referenced namespace as unreferenced on this number alone.
+**Use THIS, not the third column above, to decide whether something is dead.**
+Each class with the fewest referrers in `src/` and `tests/`, counting real code
+references and ignoring comments and docblocks:
+
+{least_referenced(refs, inv)}
+
+{orphans} of {len(refs)} src classes have zero referrers.
+
+**How to use it.** A `0` is a QUESTION, not a verdict — check whether the class is
+reached by name string, a factory, or serialization before calling it dead. A low
+count means "look here", not "delete". The third column in section 2 is a
+directory count and systematically under-reports shared abstractions: it shows
+`LangChain\\Schema` with 0 test files while `PromptValue` alone is referenced by
+13 files and covered by 5 test files. A previous advisory used that column to
+report the namespace as dead code and suggested deleting the classes.
 
 (src files / lines / test files)
 """ + "\n".join(

@@ -34,8 +34,8 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **4344 passing, 9451 assertions** |
-| Size | 236 src files / 35,723 lines · 155 test files / 31,230 lines |
+| Tests | **4354 passing, 9493 assertions** |
+| Size | 236 src files / 35,723 lines · 156 test files / 31,503 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
@@ -263,6 +263,23 @@ there is marked done **only if its tests exist and pass**.
 ## What is NOT ported
 
 Ordered by what unblocks real usage first.
+
+### Ported but not yet wired (3 classes, zero referrers)
+
+Measured by `reference_counts()` in `.loop/advisory.py`, which counts code
+references and ignores comments — not the "test files" column, which is a
+directory count and under-reports shared abstractions.
+
+| Class | Waiting on |
+|---|---|
+| `LangChain\Tools\BaseToolkit` | `ToolNode` — item 1 above. Load-bearing the moment that lands. |
+| `LangChain\Utils\Testing\FakeTool` | The test-support surface; upstream's `@langchain/core/utils/testing` double. |
+| `LangChain\Utils\Observable` | Port of upstream's `Observable`/`EventSource` pair; nothing in the port consumes an observable yet. |
+
+All three are faithful ports of something upstream **has** — unlike `pipeTo()`,
+which was both uncalled *and* invented and was removed. Do not delete these
+because nothing calls them today; that is the reasoning that removes a port
+rather than completing it.
 
 1. **Prebuilt agents — `createReactAgent`, `ToolNode`.** ⬜ **Do this first.**
    Everything they depend on now exists, including a real provider. This is the
