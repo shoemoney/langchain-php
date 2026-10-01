@@ -132,6 +132,38 @@ These are MEASURED ZEROS, not assumptions. Each was re-run on this commit.
 | `@return` type atoms that name a non-existent class | **NOT DETERMINED — validator abandoned** | An `@return` resolver reported 98 unresolved atoms, then 67 after three parser fixes. Every residue was a parser gap, not a defect: PHP builtin CLASSES (`\Generator`) absent from a scalar-only builtin table; `array{values: X}` shape KEYS harvested as class names; `@template` scope read from the method docblock when the template sits on the class; and `use`-resolution whose candidate list was wrong (the `use` parser itself captures `LangChain\Runnables\RunnableInterface` correctly in isolation). **Zero of the 67 were shown to contradict the code, so no validator was landed** — see the note below. |
 | `catch` blocks under `src/` that are empty in full | 0 of 122 scanned | Swallowed errors are invisible to every other signal. Enforced by `NoSilentlySwallowedErrorsTest` using `token_get_all()` — a commented catch is permitted (that IS the declaration of intent), an unexplained one is not. The single src/ catch is `JsonUtils::strictParsePartialJson()`, verified faithful to upstream `utils/json.ts:35-38`. | Two files differing only by case would collide on macOS and not on Linux. |
 
+### 431: a provider case that reported coverage of a class it never touched
+
+`BatchReturnExceptionsEverywhereTest` carried a case labelled `'RunnablePick'`, and it was not one.
+`Runnable::pick()` is `return $this->pipe(new RunnablePick($keys))`, so the object handed back is a
+**`RunnableSequence`** — `get_class($flaky->pick('a'))` returns `LangChain\Runnables\RunnableSequence`. The
+case was therefore re-testing a `RunnableSequence`, already covered by the row above it, while
+`RunnablePick::batch()` was never executed by the suite at all.
+
+**A green case that covers the wrong class is worse than an absent case**, because it supplies assurance
+that is not real. 429 found the same gap as a MISSING row; here the row was present, correctly-shaped and
+reporting green, which is strictly harder to notice. The provider label now names what it actually builds.
+
+**The obvious repair would have been a trap.** Constructing `new RunnablePick(...)` directly and adding it
+to the `returnExceptions` provider would assert ZERO Throwables and pass identically whether or not the flag
+was read — because `RunnablePick::invoke()` is TOTAL: a missing key returns `null` and a non-array input
+returns `null`, mirroring upstream `_pick` (`base.ts:3374-3383`), which filters `undefined` rather than
+raising. `RunnablePickInvokeIsTotalTest` now documents that total-ness so the vacuous case is not added
+later by someone assuming it would bite.
+
+Consequence, recorded rather than fixed: **`RunnablePick::batch()` still lacks `returnExceptions`
+handling, and that is a LATENT divergence rather than a live bug** — it is unobservable through the public
+surface while `invoke()` stays total, so no mutation could verify a fix. It is recorded here instead of
+being silently left as an inconsistency. (`RunnablePick` cannot reuse `Runnable::batchEach()` because it
+`implements RunnableInterface` directly rather than extending `Runnable`.)
+
+### 431: PHPUnit's printed verdict and its exit code disagree
+
+`phpunit.xml` sets `failOnWarning="true"`, and the gate works — with a live `Undefined array key` warning
+the run exits **1**, clean it exits **0**. But PHPUnit *prints* `OK, but there were issues!` in the failing
+case. **Reading the last line of output concludes the suite passed when it did not.** Two mutation checks
+this run were misread for exactly this reason before the exit code was checked. Read the exit code.
+
 ### The `PromptValue` candidate, rejected with evidence
 
 `BasePromptTemplate::invoke()` is annotated `@return PromptValue`, and no `LangChain\Prompts\PromptValue`
@@ -375,7 +407,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4182** |
+| **Total so far** | | **4192** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |

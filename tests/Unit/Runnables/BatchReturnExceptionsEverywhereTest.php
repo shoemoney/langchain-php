@@ -53,7 +53,21 @@ final class BatchReturnExceptionsEverywhereTest extends TestCase
         // data set failed for a reason that had nothing to do with returnExceptions — the same
         // wrong-fixture failure 409 recorded, and the reason 410 had to correct 409's headline count.
         yield 'RunnableBinding' => [$flaky()->bind()];
-        yield 'RunnablePick' => [$flaky()->pick('a')];
+        // HONEST LABEL, corrected in 431. This case was called 'RunnablePick' but never was:
+        // `Runnable::pick()` is `return $this->pipe(new RunnablePick($keys))`, so the object handed
+        // back is a RunnableSequence wrapping [this, RunnablePick] — `get_class($flaky->pick('a'))`
+        // returns LangChain\Runnables\RunnableSequence. The case was therefore exercising a
+        // RunnableSequence, already covered by the row above, while `RunnablePick::batch()` was never
+        // executed at all. A green test reporting coverage of a class it does not touch is worse than
+        // an absent case, because it supplies assurance that is not real.
+        //
+        // A DIRECT `new RunnablePick(...)` case is deliberately NOT added here: `RunnablePick::invoke()`
+        // is TOTAL — a missing key returns null and a non-array input returns null, mirroring upstream
+        // `_pick` (base.ts:3374), which filters undefined rather than throwing. Nothing can fail, so a
+        // returnExceptions case would assert zero Throwables and pass whether or not the flag is read.
+        // That is a vacuous guard, and `RunnablePickInvokeIsTotalTest` documents the total-ness so the
+        // case is not added later by someone assuming it would bite.
+        yield 'RunnableSequence via ::pick() (was mislabelled RunnablePick)' => [$flaky()->pick('a')];
         yield 'RunnableParallel' => [new RunnableParallel(['k' => $flaky()])];
         // RunnableAssign wraps a RunnableParallel, so the parallel must actually contain
         // something that can fail — an empty one produces no results and no errors to count.
