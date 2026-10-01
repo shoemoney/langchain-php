@@ -60,12 +60,31 @@ final class Schema
         return new self([]);
     }
 
-    /**
-     * A single string argument.
-     */
-    public static function string(): self
+/**
+ * A single string argument.
+ *
+ * Extra JSON Schema keywords are MERGED, not discarded. This factory took no
+ * parameters, so `Schema::string(['description' => 'The city'])` looked like it
+ * declared a description and PHP silently dropped the argument — a userland
+ * function called with too many arguments does not raise, it just ignores them.
+ * The result was a tool whose property reached the wire as `{"type":"string"}`
+ * with no description at all, so the model was told the argument existed and
+ * nothing about what it meant. Found by running LangChain JS and diffing the
+ * generated request body: JS emits
+ * `{"type":"string","description":"The city to look up"}` for the same tool.
+ *
+ * A raw array property (`['type' => 'string', 'description' => ...]`) always
+ * worked, which is exactly why the loss was invisible: the two spellings
+ * produced different wire output and only the factory spelling was broken.
+ *
+ * `type` cannot be overridden — this factory's entire claim is that it is a
+ * string — but `description`, `enum`, `default`, `format` and friends can.
+ *
+ * @param array<string, mixed> $keywords Extra JSON Schema keywords to merge in.
+ */
+    public static function string(array $keywords = []): self
     {
-        return new self(['type' => 'string']);
+        return new self(['type' => 'string'] + $keywords);
     }
 
     /**
