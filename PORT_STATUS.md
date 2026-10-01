@@ -149,6 +149,9 @@ The same shape appeared in the SOURCE earlier this run and was fixed there — `
 `batch()` implementation. **An ad-hoc detector is the least reliable artifact this loop produces, and a
 non-zero count from one should be treated as a claim about the detector until it has been re-derived.**
 
+<!-- fix:b509f83 -->
+| 429 | `RunnableBranch::batch()` discarded `returnExceptions` | A port-local `array_map` over `invoke()` overrode a method upstream does not override (`branch.ts:67`), so the third `$options` argument was accepted and never read; `array_map` aborts on the first Throwable where upstream returns results and errors (`base.ts:281`) | delegates to `Runnable::batchEach()`; ninth case in `BatchReturnExceptionsEverywhereTest` | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
