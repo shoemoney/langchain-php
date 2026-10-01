@@ -367,12 +367,25 @@ def main():
 
     if "--list" in args:
         asked = set(state["asked"])
-        print(f"asked {len(asked)}/{len(roster)}")
+        # Retired models are neither asked nor pending, and showing them as bare blanks made this
+        # read as "3 still to go" when the roster is in fact spent (measured at iteration 383:
+        # 75 total, 72 asked, 3 retired, 0 pending). One command should tell the whole story.
+        retired = [m for m in roster if m["id"] not in asked and is_retired(state, m["id"])]
+        pending = [m for m in roster if m["id"] not in asked and not is_retired(state, m["id"])]
+        print(f"asked {len(asked)}/{len(roster)}  |  pending {len(pending)}  |  retired {len(retired)}")
         for m in roster:
-            mark = "x" if m["id"] in asked else " "
-            rec = state["asked"].get(m["id"], {})
-            note = rec.get("status", "")
-            print(f" [{mark}] {m['id']:<44} {note}")
+            mid = m["id"]
+            if mid in asked:
+                mark, note = "x", state["asked"].get(mid, {}).get("status", "")
+            elif is_retired(state, mid):
+                mark = "r"
+                note = f"retired after {state.get('attempts', {}).get(mid, {}).get('count', '?')} attempts"
+            else:
+                mark, note = " ", "PENDING"
+            print(f" [{mark}] {mid:<44} {note}")
+        if not pending:
+            print("\n  Roster exhausted. STEP 2 has nothing left to ask; run the advisory or the")
+            print("  triple-A lens instead, or widen roster.json and re-measure.")
         return
 
     if "--model" in args:
