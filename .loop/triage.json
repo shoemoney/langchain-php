@@ -2655,5 +2655,19 @@
  ],
  "probe-301": [
   "#3 REFUTED \u2014 and 300's probe was MY OWN MUNDANE ERROR: I tested enum [\"1\",\"2\"] with values a, 1, z (all correctly rejected) and NEVER TESTED THE STRING \"1\". Correctly: \"1\"->ACCEPT \"2\"->ACCEPT \"3\"->reject; interleaved failures also recover, so validate() is NOT stateful. 4th wrong prior about a finding. 188's plainest form: true of what it measured, read as meaning more"
+ ],
+ "mergeconfig-field-gap-302": [
+  "#A REAL, CONCRETE GAP \u2014 THE STRONGEST FINDING IN SEVERAL ITERATIONS \u2014 FOUND BY TAKING #2 SERIOUSLY RATHER THAN AS THE COMMENT COMPLAINT IT WAS FRAMED AS. A static comparison of `mergeConfig`'s handled fields against `RunnableConfig`'s declared fields:",
+  "#  RunnableConfig declares: 16 fields",
+  "#  mergeConfig handles  :  7  (callbacks, configurable, context, metadata, options, runName, tags)",
+  "#  NOT handled by merge :  9  (runId, maxConcurrency, recursionLimit, signal, verbose,",
+  "#                             runIdParent, checkpointId, checkpointMap, toolCall)",
+  "#So `mergeConfig` merges less than half the configuration surface. When the per-call config does not set a field, the `defaultConfig` value for the nine unhandled fields is DISCARDED rather than inherited.",
+  "#AND THIS IS THE EXACT DEFECT SHAPE THE PORT ALREADY DOCUMENTED AND FIXED ONCE. `StructuredTool.php:362-371` records: '`ToolRuntime::fromConfig()` reads `$config->context`, and `context` was absent from this list \u2014 so a `defaultConfig` that set a runtime context (an agent id, a tenant, an injected client) silently lost it whenever the caller did not pass context on the per-call config, and the tool body saw null where its author had configured a value. Same class as the `kwargs`-recorded-but-never-read defects.' The fix added `context`. NINE other fields were never added, and at least one of them is read: `BaseLLM.php:105`, `:155` and `BaseChatModel.php:304` all read `$config?->runId[0]` for parent-run attribution, so a `defaultConfig` that sets `runId` loses it on every call that does not repeat it.",
+  "#WHAT IS NOT YET ESTABLISHED IS WHICH OF THE NINE MATTER, and saying so is the point rather than a hedge. `runId`, `checkpointId` and `recursionLimit` are the plausible real cases \u2014 they are per-run identity and bound state that a `defaultConfig` would plausibly set. `verbose`, `maxConcurrency` and `signal` are plausibly NOT, because they are per-call controls a caller would want to override rather than inherit, and inheriting a `signal` or a concurrency cap from a default would be wrong. `toolCall` is identity set by the framework and must not be merged at all. So the finding narrows to THREE candidates plus the question of whether the merge should be exhaustive or deliberately partial \u2014 and that second question is the one worth answering, because a deliberate partial merge with a comment saying which fields are inherited and which are not would be CORRECT, while the current state is a partial merge with a comment about only the field that was fixed.",
+  "#THE NEXT STEP IS SPECIFIED AND IT IS SMALLER THAN IT LOOKS: a test that sets `runId` on a `defaultConfig`, invokes with a per-call config that omits it, and asserts it survives. If it fails, that is a one-line fix of the same shape as the `context` fix at :370, and the right fix is to make the merge EXHAUSTIVE with a comment naming the two fields deliberately excluded. If it passes, the merge is already exhaustive in the way that matters and the nine-field list is a list of fields nobody merges by design."
+ ],
+ "probe-302": [
+  "REAL GAP FOUND via #2: mergeConfig handles 7 of RunnableConfig's 16 fields - NOT merged: runId, maxConcurrency, recursionLimit, signal, verbose, runIdParent, checkpointId, checkpointMap, toolCall. This is the EXACT shape of the fixed 'context' bug (:362-371), fixed for ONE field. BaseLLM:105/155 + BaseChatModel:304 read $config?->runId[0]"
  ]
 }
