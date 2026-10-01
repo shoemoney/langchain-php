@@ -392,3 +392,6 @@ reports on purpose — each says what is missing and what it would need, not why
 Each OPEN row is a task, not an excuse. The two `OPEN` rows that would need new *capability* rather than
 a new class (`withListeners`, `streamEvents`) should be attempted as their own change with their own
 mutation check — bundling a structural addition with a diagnosis is what cost iteration 374.
+
+<!-- fix:0793e6b -->
+| five `batch()` implementations hand-rolled their own loop | `returnExceptions` honoured by one and ignored by four; `RunnableSequence`/`RunnableWithFallbacks` also PRESERVED string keys where upstream's `inputs.map` + `Promise.all` yields a list | one `Runnable::batchEach()` helper, all five delegate | 0793e6b |
