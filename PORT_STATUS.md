@@ -316,6 +316,9 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:3e74392 -->
 | 434 | `RunnableBranchWriter::stream()` fataled on a scalar input | `yield from $this->invoke(...)` with `invoke()` returning the scalar `$input` raised `Error: Can use "yield from" only with arrays and Traversables`, killing the process on any streamed conditional edge | changed to `yield $this->invoke(...)`, mirroring `ChannelWrite::stream()`; **the pair-vs-raw yield SHAPE is deliberately unpinned and remains an open question** — `Runnable::stream()` yields a pair, upstream `base.ts:297-302` yields raw | guarded by `RunnableBranchWriterStreamTest` | fatal removed; shape unresolved |
 
+<!-- fix:07486a5 -->
+| 436 | message-chunk `concat()` inverted the `id` precedence in all six chunk types | the port read `$other->id ?? $this->id`, so a streamed message took its id from the LAST chunk; upstream reads `id: this.id ?? chunk.id` at all seven sites (`ai.ts:445`, `chat.ts:122`, `function.ts:74`, `human.ts:77`, `system.ts:62`/`:112`, `tool.ts:206`), so the accumulated chunk keeps it | swapped in all six types; guarded by `MessageChunkConcatIdPrecedenceTest` | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
