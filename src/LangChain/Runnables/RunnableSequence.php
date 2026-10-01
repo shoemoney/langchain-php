@@ -163,7 +163,6 @@ class RunnableSequence extends Runnable
         // no stream() of its own and yields a single chunk either way — which
         // is why the suite never saw it.
         $lastOutput = null;
-        $haveOutput = false;
         $stepInput = $input;
 
         foreach ($steps as $i => $step) {
@@ -175,7 +174,6 @@ class RunnableSequence extends Runnable
                 $sawChunk = true;
                 if ($channel === self::CHANNEL_DEFAULT) {
                     $lastOutput = $chunk;
-                    $haveOutput = true;
                 }
 
                 yield $pair;
@@ -186,23 +184,29 @@ class RunnableSequence extends Runnable
             // chain does not silently lose a link.
             if (!$sawChunk) {
                 $lastOutput = $step->invoke($stepInput, $stepConfig);
-                $haveOutput = true;
                 yield [self::CHANNEL_DEFAULT, $lastOutput];
             }
 
             $stepInput = $lastOutput;
         }
 
-        // Emitted on the "did a value come out" question, NOT on
-        // `$lastOutput !== null`. A chain whose last step legitimately returns
-        // `null` produced a result — `invoke()` returns that `null` faithfully
-        // — so dropping it here made `stream()` disagree with `invoke()` and
-        // left a consumer unable to tell "the chain returned null" from "the
-        // chain returned nothing". Upstream has the same shape with an explicit
-        // sentinel (`finalOutput === undefined`, base.ts:2126), where JS `null`
-        // and `undefined` are distinct and only the latter means "absent"; PHP
-        // has one null, so the flag stands in for the sentinel.
-        unset($haveOutput);
+        // `$lastOutput` is what the NEXT step receives. No "did a value come out" flag is consulted,
+        // and none is needed here: this method yields whatever the steps yielded, so a chain whose last
+        // step legitimately returns `null` yields that `null` faithfully and `stream()` agrees with
+        // `invoke()`.
+        //
+        // A `$haveOutput` flag used to sit here, assigned three times and read by NOTHING, under a comment
+        // claiming it was "emitted on the did-a-value-come-out question". Removed in 445: the comment
+        // documented a mechanism the code never implemented, and a green suite after removal is the proof
+        // it was dead rather than merely unread.
+        //
+        // The gap that flag was evidently meant to cover is REAL and still open: `$lastOutput` is not reset
+        // per step, so a step yielding only NON-DEFAULT channels leaves the previous step's value in place
+        // and the step after it is handed that stale value. Upstream cannot hit this because it chains
+        // each step's `transform()` onto the PREVIOUS STEP'S GENERATOR and never feeds a return value
+        // forward (`base.ts:2110-2124`) — there is no `$stepInput = $lastOutput` there at all. Fixing it
+        // means adopting generator piping, not reviving this flag. See PORT_STATUS rows 443/444 and 442,
+        // which are one design question.
     }
 
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
