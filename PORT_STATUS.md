@@ -329,6 +329,9 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:5bdf2ec -->
 | 438 | `ToolMessageChunk::concat()` let the INCOMING `tool_call_id` win | the port read `$other->toolCallId !== '' ? $other->toolCallId : $this->toolCallId`, re-pointing a concatenated tool RESULT at a different CALL; upstream `tool.ts:205` is `tool_call_id: this.tool_call_id`, unconditional and with no fallback | changed to `$this->toolCallId`; guarded by `ToolMessageChunkConcatCallIdTest` | identical |
 
+| 439 | `ai.ts` merges `response_metadata` with `mergeResponseMetadata`, not `_mergeDicts` | looked like a behavioural difference | **REJECTED.** `messages/metadata.ts:11-17` reads `const output = _mergeDicts(a, b) ?? {}; return output;` — a typed wrapper with identical behaviour, so the port's `mergeDicts(...) ?? []` is equivalent (in PHP both empties are `[]`) | no change needed |
+| 439 | the port nests `usage_metadata` inside `response_metadata`; upstream has it top-level and merges it with `mergeUsageMetadata`, which SUMS counts | looked like counts would be overwritten instead of summed | **REJECTED by execution.** Two chunks carrying `input_tokens` 10 and 5 concat to **15** (`output_tokens` 2 and 3 -> **5**), matching `mergeUsageMetadata` exactly. `MessageMerge::mergeDicts` recurses into nested arrays and ADDS numeric values, so the nesting is behaviourally invisible | no change needed |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
