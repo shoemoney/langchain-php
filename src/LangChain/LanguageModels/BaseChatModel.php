@@ -717,6 +717,20 @@ abstract class BaseChatModel extends BaseLanguageModel
             return false;
         }
 
+        // A stream's TERMINAL chunk normally carries the stop reason and nothing else: empty content,
+        // no additional kwargs, no tool calls. Both providers put that reason in `generationInfo` and
+        // NOT in `response_metadata` (OpenAI `finish_reason`, Anthropic `stop_reason`), and every check
+        // above reads `$chunk->message` only — so such a chunk satisfied all of them, was classified
+        // metadata-only, and was skipped at the call site. The caller therefore never learned why the
+        // stream ended, which for a truncated or length-capped completion is the one piece of
+        // information that matters.
+        foreach (['finish_reason', 'stop_reason'] as $reasonKey) {
+            $reason = $chunk->generationInfo[$reasonKey] ?? null;
+            if ($reason !== null && $reason !== '') {
+                return false;
+            }
+        }
+
         if ($message instanceof AIMessage && $message->toolCalls !== []) {
             return false;
         }
