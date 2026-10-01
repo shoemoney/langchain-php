@@ -111,6 +111,30 @@ abstract class Runnable implements RunnableInterface
     }
 
     /**
+     * Bind a config that every subsequent call on the returned runnable carries.
+     *
+     * Port of `Runnable.withConfig` (`libs/langchain-core/src/runnables/base.ts:175-183`), which is
+     * literally `new RunnableBinding({ bound: this, config, kwargs: {} })` — that is, `bind([], $config)`.
+     *
+     * It was MISSING here, and the absence had consequences beyond the missing method: three separate
+     * reviews reported that a bound `runName` never reached the traced run, because they reached for a
+     * way to set config on a runnable, found none, and concluded the value was being silently dropped.
+     * The premise was right — there was no way to do it — and the conclusion was wrong; the value was
+     * not being dropped, there was simply no method to bind it with. (`withStructuredOutput(['name' =>
+     * ...])` is a different thing: `BaseChatModel::withStructuredOutput()` reads `$config['name']` as the
+     * PARSER'S LOOKUP KEY, which is correct upstream behaviour.)
+     *
+     * Declared here rather than on `RunnableInterface` because `bind()` is declared here, and a binding
+     * that persists config is a property of `RunnableBinding`, not of every runnable.
+     *
+     * @param array<string, mixed> $config
+     */
+    public function withConfig(array $config): RunnableBinding
+    {
+        return $this->bind([], $config);
+    }
+
+    /**
      * Try each runnable in turn, returning the first that succeeds.
      *
      * @param list<RunnableInterface> $fallbacks
