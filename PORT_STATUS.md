@@ -128,7 +128,8 @@ These are MEASURED ZEROS, not assumptions. Each was re-run on this commit.
 | `class_exists()` on each entry's class-shaped name (both casings) | returns `false`, no fatal | 426's `function_exists()` guard made the probe HONEST, not merely quiet. It also removed a platform divergence: before the fix macOS raised `Cannot redeclare` where Linux returned `false`; both now agree. |
 | Non-`_once` `include`/`require` statements under `src/` | 0 | The generalized form of the 426 hazard. A regex sweep returns 9 hits, all prose ("must include it", "does not require a real tool") — see the detector note below. |
 | Declared class name vs PSR-4 implied name, case-insensitive | 231 exact, 0 case-only, 0 different | The dev box is case-INSENSITIVE APFS and CI is case-SENSITIVE Linux. A file whose class name differs from its path only by case autoloads locally and fatals on CI. `SourceConventionTest` already enforces the exact match; this sweep confirms it holds at 231/231. |
-| Case-insensitive FQCN collisions across `src/` + `tests/` | 0 | Two files differing only by case would collide on macOS and not on Linux. |
+| Case-insensitive FQCN collisions across `src/` + `tests/` | 0 |
+| `catch` blocks under `src/` that are empty in full | 0 of 122 scanned | Swallowed errors are invisible to every other signal. Enforced by `NoSilentlySwallowedErrorsTest` using `token_get_all()` — a commented catch is permitted (that IS the declaration of intent), an unexplained one is not. The single src/ catch is `JsonUtils::strictParsePartialJson()`, verified faithful to upstream `utils/json.ts:35-38`. | Two files differing only by case would collide on macOS and not on Linux. |
 
 ### Detector note — three ad-hoc detectors, three 100% false-positive rates
 
@@ -356,7 +357,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4175** |
+| **Total so far** | | **4181** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
