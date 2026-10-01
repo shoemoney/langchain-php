@@ -260,5 +260,12 @@
   "file": ".loop/advisory/ling-3-0-flash-vl.md",
   "chars": 15242,
   "cost": 0.001
+ },
+ "amazon/nova-2-lite-v1": {
+  "status": "ok",
+  "at": "2026-10-01T09:39:35.957428+00:00",
+  "file": ".loop/advisory/nova-2-lite-v1.md",
+  "chars": 4797,
+  "cost": 0.0054
  }
 }
