@@ -107,14 +107,42 @@ final class DocsMatchRealityTest extends TestCase
     /**
      * The Size row's LINE counts must be current.
      *
-     * Added because they were not. This guard checks test counts, assertion
-     * counts and file counts — and a line count is none of those — so
-     * HANDOFF.md sat claiming 33,493 src and 21,361 test lines against a real
-     * 33,984 and 23,776: 491 and 2,415 lines out of date, suite green
-     * throughout, because sync_docs.py had ZERO mentions of "lines" and so
-     * could never update them.
+     * Added because they were not. This guard checks test counts and file
+     * counts — and a line count is none of those — so HANDOFF.md sat claiming
+     * 33,493 src and 21,361 test lines against a real 33,984 and 23,776: 491 and
+     * 2,415 lines out of date, suite green throughout, because sync_docs.py had
+     * ZERO mentions of "lines" and so could never update them.
      *
      * A number nothing measures is a number nothing keeps true.
+     *
+     * CORRECTION (486): this docblock previously read "This guard checks test
+     * counts, ASSERTION counts and file counts". That was false, and the same
+     * false claim stood in sync_docs.py:139 — so two comments agreed that an
+     * assertion-count guard existed, and believing them is precisely why the
+     * assertion count was the LAST number in HANDOFF.md with nothing checking
+     * it. It drifted by one (9,328 claimed, 9,329 measured) and nothing said so.
+     *
+     * Why there is still no assertion assertion HERE, honestly stated: this
+     * class measures the suite with `--list-tests`, which yields a test COUNT
+     * and no assertion count. An assertion count exists only after the suite
+     * has actually RUN, so a test cannot check its own assertion total without
+     * recursively running the suite from inside a suite.
+     *
+     * And the vestige proves the omission was an oversight, not a decision:
+     * `testHandoffStatesACurrentSuiteSize()`'s regex captures BOTH numbers —
+     * `(\d+) passing, (\d+) assertions` — so the assertion count IS parsed into
+     * `$m[2]`… and that method then reads only `$m[1]` (verified: its two
+     * asserts, at the `assertGreaterThanOrEqual`/`assertLessThanOrEqual` pair,
+     * both interpolate `$m[1]`). The `$m[2]` uses elsewhere in this file belong
+     * to the FILE-count and LINE-count regexes, not this one. Captured,
+     * bound, never read — the "written-but-never-read" shape this repo's own
+     * hard rules name first, sitting in the guard that was supposed to catch it.
+     *
+     * The number is written by `sync_docs.py` (which runs the suite via a JUnit
+     * log) and is therefore correct whenever that script is run — and
+     * unguarded whenever it is not. CI does not run sync_docs.py either.
+     * Closing that needs a CI step (`sync_docs.py` then `git diff --exit-code`),
+     * not a fourth assertion here.
      */
     public function testTheSizeRowLineCountsAreCurrent(): void
     {

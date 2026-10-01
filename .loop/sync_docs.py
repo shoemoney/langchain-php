@@ -136,9 +136,21 @@ def main() -> None:
     # src and 21,361 test lines against a real 33,984 and 23,776 — 491 and 2,415
     # lines out of date, on a row that is supposed to describe the code as it is.
     #
-    # It survived because DocsMatchRealityTest checks test counts, assertion
-    # counts and FILE counts, and a line count is none of those. A number nothing
-    # measures is a number nothing keeps true.
+    # It survived because DocsMatchRealityTest checks test counts and FILE
+    # counts, and a line count is none of those. A number nothing measures is a
+    # number nothing keeps true.
+    #
+    # CORRECTED (486): this comment previously said DocsMatchRealityTest checks
+    # test counts, ASSERTION counts and file counts. It does not check assertion
+    # counts — there is no such assertion in that class. The identical false
+    # claim stood in its own docblock, so the two agreed with each other and
+    # neither was true, which is the strongest way for a comment to be believed.
+    # Consequence, measured rather than argued: this script is the ONLY thing
+    # that writes the assertion count, and nothing verifies it, so it was the
+    # last number in HANDOFF.md to drift — it sat at 9,328 against a measured
+    # 9,329. It cannot be guarded from inside the suite (a test cannot observe an
+    # assertion total without recursively running the suite); the guard belongs
+    # in CI as `sync_docs.py && git diff --exit-code`. Not added in 486.
     def measure_tree(where: str) -> tuple[int, int]:
         files = sorted(p for p in (ROOT / where).rglob("*.php") if p.is_file())
         lines = 0
