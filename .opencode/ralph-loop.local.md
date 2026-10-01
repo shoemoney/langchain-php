@@ -1,6 +1,6 @@
 ---
 active: true
-iteration: 484
+iteration: 487
 maxIterations: 1000
 sessionId: ses_f13553186ffepdQcWupZglIwmo
 ---
@@ -37,7 +37,32 @@ The OpenRouter key is at /Users/shoemoney/.config/openrouter/key — `export OPE
   2. The test MUST fail on pre-fix code. Prove it: revert the fix, expect RED, restore, expect GREEN. Report which fixes you mutation-verified and which you could NOT.
   3. composer test must be green. Run it TWICE — a failure that moves is a nondeterminism bug.
   4. php -l every new file.
-  5. Then: composer dump-autoload -o, PSR-4/duplicate-FQCN check, composer test twice, sync HANDOFF.md + PORT_STATUS.md to the MEASURED counts (DocsMatchRealityTest enforces this — it will fail you if you guess), git commit with a conventional message + emoji, git push, and check CI with `gh run watch $(gh run list --branch main --limit 1 --json databaseId -q '.[0].databaseId') --exit-status`.
+  5. Then: composer dump-autoload -o, PSR-4/duplicate-FQCN check (`.loop/psr4_check.php`), composer test twice, sync HANDOFF.md + PORT_STATUS.md to the MEASURED counts (DocsMatchRealityTest enforces this — it will fail you if you guess), then commit and PUSH AS ONE STEP — see the push-batching rule below. Check CI with `gh run watch $(gh run list --branch main --limit 1 --json databaseId -q '.[0].databaseId') --exit-status`.
+
+=== PUSH THE PAIR, NOT THE FIX (measured 487: 7 red CI runs, every one a `fix:` commit) ===
+  A `fix:` commit touching src/ needs a `<!-- fix:HASH -->` row in PORT_STATUS.md, and
+  the hash does not exist until the commit is made — so the guard is UNSATISFIABLE at the
+  instant you would want to push. `FixesAreDocumentedTest` scans `git log`, so it cannot
+  see a commit that has not happened yet: the suite is GREEN when you run it, and RED the
+  moment that commit exists.
+
+  Measured on main: 7 of the last 60 runs failed, and all 7 are `fix:` commits — each one
+  the fix half of a fix+ledger pair, with the ledger commit right behind it going green.
+  c0a53af (485) is the most recent. It is not a flake and not a bad test; it is this
+  instruction, which said "git commit ..., git push" as a single step.
+
+  THE FIX IS THE PUSH, NOT THE GUARD. Make both commits, then push ONCE:
+
+      git commit -F -   # the fix
+      git add PORT_STATUS.md && git commit -F -   # the <!-- fix:HASH --> row
+      git push          # ONE push — CI only ever sees the final state
+
+  GitHub Actions runs per PUSH, on the pushed SHA. An intermediate commit that never
+  reaches the remote never gets a run, so the pair goes green in one pass. Do NOT
+  "fix" this by relaxing the guard to skip HEAD: that leaves a `fix:` commit permanently
+  exempt the moment anything is committed after it, which trades a red run for a guard
+  that no longer checks. Batch the push instead — the guard stays strict and the
+  impossible state is never created.
 
 === HARD RULES (learned the hard way — do not regress them) ===
 * A green suite proves LESS than it appears. Hunt what a test cannot see: written-but-never-read, parsed-but-dropped, swallowed errors, falsy-vs-absent (0, "", [] are legitimate), and DOCS THAT CONTRADICT THE CODE.
