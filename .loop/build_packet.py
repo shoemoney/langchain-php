@@ -11,6 +11,9 @@ Deliberately built from the live repo every iteration, never hand-written: a
 packet that drifts from the code is worse than no packet.
 """
 import json, os, re, subprocess, sys, collections
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from framing import framing  # noqa: E402
 from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -307,45 +310,7 @@ ported ONLY when converted tests exist and pass, and it carries a
 "Known non-exact behaviours" table where every deliberate PHP-vs-JS divergence
 is recorded with the reason.
 
-**BOTH FILES BELOW ARE A RECORD OF WORK ALREADY DONE — NOT A LIST OF OPEN DEFECTS.**
-This matters because reviews have got it backwards. A `<!-- fix:HASH -->` row in
-PORT_STATUS.md means a defect was found, fixed and pinned by a test. Reporting one
-of those rows back as a new finding is a FALSE POSITIVE, and it has happened:
-
-  - review 66 re-reported the empty-object-encodes-as-`[]` checkpoint bug, which
-    PORT_STATUS records as fixed at fix `fce8bc4` — and it cited
-    `src/LangGraph/Pregel/Checkpoint/JsonPlusEncoder.php`, a path that does not exist
-    (the real one is `src/LangGraph/Checkpoint/Serde/JsonPlusEncoder.php`).
-  - the 340 advisory padded one `RunnableBinding` claim across all seven of its
-    sections, citing PORT_STATUS as its only evidence.
-
-So, precisely:
-  - Do NOT cite a PORT_STATUS or HANDOFF line as evidence for a finding. They are
-    the ledger of CLOSED work, not a defect list.
-  - If you believe a recorded fix is wrong or regressed, you MUST quote the code
-    location that contradicts the recorded fix. Without a code citation it is not
-    a finding.
-  - A file path that does not exist is not a finding. Check it.
-  - Prefer evidence from `## Source in focus` below, which is the live repository.
-
-**AND THE SAME IS TRUE OF THE COMMENTS IN THE SOURCE ITSELF.** This port documents its
-deliberate decisions inline, quoting the upstream line and naming the symptom the bug
-produced. A comment like "upstream writes `!input` (chat.ts:144) where an EMPTY ARRAY IS
-TRUTHY" is a FIXED divergence, not a live bug — reading it as a defect is the single most
-common false positive this loop now sees. Three reviews in a row have been refuted exactly
-this way:
-
-  - `MessagesPlaceholder.php:59-64` — the comment explains why `[]` is deliberately NOT
-    absent; the guard three lines below is the fix.
-  - `BasePromptTemplate.php:151-164` — the comment explains that an earlier `(string)` cast
-    corrupted a callable partial; the line below it is the corrected version.
-  - `ChatAnthropic.php:405` — the comment explains that `is_string()` on the content silently
-    returned `''` for every multi-block answer; the `stringifyText()` call below it is the fix.
-
-So: **if a comment explains WHY the code is the way it is and quotes the upstream line, the
-code below it is a completed decision.** A finding about it needs a specific reason why the
-comment's reasoning is wrong.
-
+{framing()}
 """)
 
     for f in ("HANDOFF.md", "PORT_STATUS.md"):

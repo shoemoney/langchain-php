@@ -24,6 +24,7 @@ Model:  python3 .loop/advisory.py                     # random eligible model
 """
 
 import argparse
+
 import base64
 import collections
 import json
@@ -36,6 +37,9 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from framing import framing  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LOOP = ROOT / ".loop"
@@ -216,6 +220,8 @@ def brief():
     top = sorted(inv.items(), key=lambda kv: -kv[1]["src"])[:22]
     edges = dep_edges()
     return f"""# ADVISORY BRIEF — langchain-php
+
+{framing()}
 
 A faithful PHP port of LangChain JS / LangGraph JS. Composer PSR-4, PHP >= 8.2 floor
 (CI: 8.2 / 8.3 / 8.4). Upstream TypeScript is READ-ONLY reference.
