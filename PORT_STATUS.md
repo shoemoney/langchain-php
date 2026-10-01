@@ -115,6 +115,9 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 
 | <!-- fix:7fe81e7 --> `7fe81e7` | Three more docblock/signature mismatches found by the new `DocblockParamTest` sweep: `Runnable::withFallbacks` documents `$runnables` against a `$fallbacks` parameter, `BaseChatModel::generatePrompt` documented `$messages` and `list<list<BaseMessage>>` while the signature takes `$promptValues` (the body calls `toMessages()` on each element, so the parameter name was right and the docblock was stale), and `PregelLoop::initialize` named two ARRAY KEYS as `@param` entries on a single-`$params` signature. The guard's parser also tracks quoting after a naive match reported a false positive on a default value containing `)`. |
 
+<!-- fix:74102a8 -->
+| 426 | `autoload.files` double-include fatal | `coerceToRunnable.php`, `createTool.php`, `interrupt.php` declare a function and are ALSO PSR-4-reachable as class names, so `class_exists()` re-includes them and PHP raises an uncatchable `Cannot redeclare` fatal | guarded each declaration with `function_exists()`; `FilesAutoloadRedeclarationTest` spawns a subprocess per case (both casings, derived from `composer.json`) | identical |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
