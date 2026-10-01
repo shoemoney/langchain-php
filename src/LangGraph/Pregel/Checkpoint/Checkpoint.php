@@ -74,7 +74,16 @@ class Checkpoint
             'ts' => $this->ts,
             'channelValues' => $this->channelValues,
             'channelVersions' => (object) $this->channelVersions,
-            'versionsSeen' => (object) $this->versionsSeen,
+            // Recurse ONE level. `versionsSeen` is typed `array<string, array<string, int|string>>` —
+            // every inner value is a map — so every inner value must be an object when empty, exactly
+            // like the outer level. Casting only the outer level fixed `versionsSeen: []` and left
+            // `versionsSeen: {"fan_out": []}` for any task whose only trigger is a `Send` push, because
+            // `json_encode` writes a PHP `[]` as a JSON array and a JavaScript reader cannot read that
+            // back as the map it is.
+            'versionsSeen' => (object) array_map(
+                static fn (array $inner): object => (object) $inner,
+                $this->versionsSeen,
+            ),
         ];
     }
 
