@@ -328,3 +328,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:9074bdb -->
 | `Schema::validatesOnlyStrings()` `allOf`/`anyOf` quantifiers | were swapped (allOf used .every, anyOf used .some) | `allOf` -> `.some()`, `anyOf`/`oneOf` -> `.every()` per upstream `json_schema.ts` | `9074bdb` |
+
+<!-- fix:54c37e3 -->
+| `SseParser::separatorLengthAt()` no-match fallback | returned a hardcoded `2` | returns `null`; `feed()` throws rather than consuming a guessed length | `54c37e3` |
