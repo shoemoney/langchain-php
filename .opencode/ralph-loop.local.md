@@ -64,6 +64,26 @@ The OpenRouter key is at /Users/shoemoney/.config/openrouter/key — `export OPE
   that no longer checks. Batch the push instead — the guard stays strict and the
   impossible state is never created.
 
+=== `git status --short` MUST BE EMPTY BEFORE YOU PUSH (measured 487: a red run) ===
+  The batching rule above stopped the fix/ledger pair from generating a red run — and
+  the very next push was red anyway, for a different reason: `sync_docs.py` rewrote
+  HANDOFF.md early in the iteration and I never staged it, so three commits and a push
+  went out carrying the OLD numbers. CI failed on 8.2/8.3/8.4 with
+  "HANDOFF.md test file count is stale — 150 is identical to 151".
+
+  The grep-verify rule did not catch it, and it cannot: that rule checks the phrases a
+  commit MESSAGE claims, and no message claimed a HANDOFF edit. Silence is not a claim.
+  **A guard that verifies what you said is not a guard on what you shipped.**
+
+  So, immediately before `git push`:
+
+      git status --short        # MUST print nothing
+
+  Any `M` line is a tracked file the remote is not seeing, and CI will read the
+  committed version while you measure the working one. Stage it, or revert it —
+  deliberately. An empty status is also the cheapest possible confirmation that the
+  mutation you think you applied is actually committed.
+
 === HARD RULES (learned the hard way — do not regress them) ===
 * A green suite proves LESS than it appears. Hunt what a test cannot see: written-but-never-read, parsed-but-dropped, swallowed errors, falsy-vs-absent (0, "", [] are legitimate), and DOCS THAT CONTRADICT THE CODE.
 * ASSERT ON THE REQUEST BODY and the RAW STORED BYTES, not just the response. Two real releases were broken by defects only visible when reading what actually goes on the wire — a Schema instance nested as a property (failed validation OPEN), and an empty object encoding as [] instead of {}. Both are now guarded by tests/Integration/GraphAndCheckpointIntegrationTest.php.
