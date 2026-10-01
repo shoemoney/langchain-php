@@ -325,3 +325,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
+
+<!-- fix:9074bdb -->
+| `Schema::validatesOnlyStrings()` `allOf`/`anyOf` quantifiers | were swapped (allOf used .every, anyOf used .some) | `allOf` -> `.some()`, `anyOf`/`oneOf` -> `.every()` per upstream `json_schema.ts` | `9074bdb` |
