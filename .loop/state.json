@@ -2371,9 +2371,9 @@
    "at": "2026-10-01T04:16:35"
   },
   "qwen/qwen3.8-27b:free": {
-   "count": 1,
+   "count": 3,
    "last": "429 rate limited; {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3.8-27b:free is temporarily rate-li",
-   "at": "2026-10-01T03:57:39"
+   "at": "2026-10-01T06:46:29"
   }
  }
 }
