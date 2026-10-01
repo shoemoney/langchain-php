@@ -553,7 +553,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4252** |
+| **Total so far** | | **4254** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |

@@ -297,6 +297,65 @@ final class MarkdownTableShapeTest extends TestCase
         self::assertSame([], self::unescapedPipesInCodeSpans($outside), 'a pipe outside code is a cell boundary');
     }
 
+    /**
+     * A table row must contain an EVEN number of unescaped backticks.
+     *
+     * The third rule in this family, and the same shape as 451's separator-width rule and 452's
+     * code-span-pipe rule: correct by construction rather than by counting against a baseline. An odd number
+     * of backticks means a code span that is never closed, and markdown then treats the REST OF THE ROW as
+     * code — so every cell after it renders as literal backticked text rather than as a cell.
+     *
+     * Measured clean on both documents at 453 (0 rows), so this is prevention rather than repair. It is
+     * worth having anyway: the failure is invisible in the source, silent in every existing guard, and
+     * lands in the one artefact that records every divergence this loop has found.
+     */
+    public function testEveryTableRowHasAnEvenNumberOfUnescapedBackticks(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $problems = [];
+
+        foreach (['PORT_STATUS.md', 'HANDOFF.md'] as $file) {
+            foreach (explode("\n", (string) file_get_contents($root . '/' . $file)) as $i => $line) {
+                $row = rtrim($line);
+                if (!str_starts_with($row, '|') || $row === '|') {
+                    continue;
+                }
+                $n = self::unescapedBacktickCount($row);
+                if ($n % 2 === 1) {
+                    $problems[] = sprintf('%s line %d: %d backticks — an unterminated code span makes the '
+                        . 'rest of the row render as code', $file, $i + 1, $n);
+                }
+            }
+        }
+
+        self::assertSame([], $problems, "every table row needs an even number of backticks:\n  "
+            . implode("\n  ", $problems));
+    }
+
+    private static function unescapedBacktickCount(string $row): int
+    {
+        $n = 0;
+        for ($i = 0, $len = \strlen($row); $i < $len; ++$i) {
+            if ($row[$i] === '\\') {
+                ++$i;
+                continue;
+            }
+            if ($row[$i] === '`') {
+                ++$n;
+            }
+        }
+
+        return $n;
+    }
+
+    /** Fires the detector, plus the escaped-backtick negative case. */
+    public function testTheUnterminatedCodeSpanRuleDetectsAnOddBacktickRow(): void
+    {
+        self::assertSame(1, self::unescapedBacktickCount('| A `B | C |'), 'one backtick is unterminated');
+        self::assertSame(2, self::unescapedBacktickCount('| A `B` | C |'), 'two is a closed code span');
+        self::assertSame(0, self::unescapedBacktickCount('| A \\` | C |'), 'an escaped backtick is literal');
+    }
+
     public function testItDetectsAFusedRow(): void
     {
         $fused = "| A | B | C |\n|---|---|---|\n"
