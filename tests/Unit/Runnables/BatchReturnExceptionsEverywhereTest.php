@@ -6,6 +6,7 @@ namespace LangChain\Tests\Unit\Runnables;
 
 use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableAssign;
+use LangChain\Runnables\RunnableBranch;
 use LangChain\Runnables\RunnableBinding;
 use LangChain\Runnables\RunnableInterface;
 use LangChain\Runnables\RunnableLambda;
@@ -57,6 +58,13 @@ final class BatchReturnExceptionsEverywhereTest extends TestCase
         // RunnableAssign wraps a RunnableParallel, so the parallel must actually contain
         // something that can fail — an empty one produces no results and no errors to count.
         yield 'RunnableAssign' => [new RunnableAssign(new RunnableParallel(['k' => $flaky()]))];
+        // RunnableBranch is here because 429 found it was the ONLY implementation still carrying a
+        // hand-rolled `array_map` over `invoke()`. Upstream does not override `batch` at all
+        // (branch.ts:67 — it inherits `Runnable.batch`), so the override was a port-local divergence
+        // that silently discarded `returnExceptions`: the third `$options` argument was accepted and
+        // never read. The condition must actually match, or the branch never reaches the flaky
+        // runnable and there is no Throwable to count — the wrong-fixture trap 409 recorded.
+        yield 'RunnableBranch' => [new RunnableBranch([[static fn (mixed $x): bool => true, $flaky()]])];
     }
 
     private static function makeFlaky(): Runnable

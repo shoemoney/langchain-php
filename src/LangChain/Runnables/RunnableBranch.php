@@ -133,12 +133,21 @@ class RunnableBranch extends Runnable
         return new \ReflectionFunction($condition);
     }
 
+    /**
+     * Upstream `RunnableBranch` does not override `batch` at all — `branch.ts:67` declares only
+     * `lc_name`, `lc_namespace`, `lc_serializable`, `default` and `branches`, so it inherits
+     * `Runnable.batch()`, which honours `batchOptions.returnExceptions` (`base.ts:281`, `base.ts:3081`).
+     *
+     * This port previously carried a hand-rolled `array_map` over `invoke()`. Because
+     * `array_map` aborts on the first Throwable, the third `$options` argument was accepted and then
+     * silently discarded: `batch($inputs, $config, ['returnExceptions' => true])` threw where upstream
+     * returns a list of results and errors. Delegating to the shared helper makes the behaviour identical
+     * to every other composition and to upstream, with no change to the non-exception path — the helper
+     * calls the same `$this->invoke($input, $config)` this override did.
+     */
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
     {
-        return array_map(
-            fn (mixed $input): mixed => $this->invoke($input, $config),
-            array_values($inputs)
-        );
+        return $this->batchEach($inputs, $config, $options);
     }
 
     /**
