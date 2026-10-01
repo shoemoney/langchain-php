@@ -86,6 +86,43 @@ final class DocsNamedClassesExistTest extends TestCase
         }
     }
 
+    /**
+     * Declared is not the same as LOADABLE — that is precisely what iteration 422 found.
+     *
+     * 424's version of this guard checked that each named class is DECLARED somewhere in the tree, which
+     * passed while `GraphAndCheckpointIntegrationTest` was still unautoloadable, because `autoload-dev`
+     * mapped only `tests/Unit/`. A declaration the autoloader cannot reach satisfies the weaker question
+     * and fails the one that matters.
+     *
+     * So this asserts `class_exists()` — which goes through the real autoloader — rather than a grep of
+     * the source tree. A class in a directory with no PSR-4 rule fails here.
+     */
+    #[DataProvider('namedOutsideProvider')]
+    public function testAClassNamedOutsideTheRepositoryIsAutoloadable(string $name): void
+    {
+        $fqcn = $this->fqcnFor($name);
+
+        self::assertTrue(
+            class_exists($fqcn) || interface_exists($fqcn) || trait_exists($fqcn),
+            $fqcn . ' is declared in the tree but the autoloader cannot reach it. Check that its '
+                . 'directory has a psr-4 rule in composer.json — a class that exists but cannot be '
+                . 'loaded is invisible until something references it.',
+        );
+    }
+
+    private function fqcnFor(string $short): string
+    {
+        foreach (['LangChain\\Tests\\Unit\\', 'LangChain\\Tests\\Integration\\',
+            'LangChain\\Tools\\', 'LangChain\\Utils\\', 'LangChain\\',
+            'LangGraph\\Pregel\\', 'LangGraph\\', ] as $ns) {
+            if (class_exists($ns . $short) || interface_exists($ns . $short) || trait_exists($ns . $short)) {
+                return $ns . $short;
+            }
+        }
+
+        return $short;
+    }
+
     /** Every class-shaped name the repository's own docs cite must also resolve. */
     public function testEveryClassShapedNameInOurOwnDocsResolves(): void
     {
