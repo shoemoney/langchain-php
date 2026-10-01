@@ -352,8 +352,18 @@ class MemorySaver extends PregelMemorySaver
                 'id' => $checkpoint->id,
                 'ts' => $checkpoint->ts,
                 'channel_values' => $checkpoint->channelValues,
-                'channel_versions' => $checkpoint->channelVersions,
-                'versions_seen' => $checkpoint->versionsSeen,
+                // Iterations 362/368 put these casts in `PregelCheckpoint::toArray()`; the hand-written
+                // branch here skipped them, so a saver stored `channel_versions: []` and
+                // `versions_seen: {"fan_out": []}` where a JS reader needs objects — the same
+                // release-breaking defect, returning. Mirrored verbatim from `toArray()`, INCLUDING the
+                // one-level recursion: `versionsSeen`'s inner values are themselves maps, so casting only
+                // the outer level leaves every empty inner map as `[]`, which is precisely what 465's RED
+                // bytes showed.
+                'channel_versions' => (object) $checkpoint->channelVersions,
+                'versions_seen' => (object) array_map(
+                    static fn (array $inner): object => (object) $inner,
+                    $checkpoint->versionsSeen,
+                ),
             ];
     }
 
