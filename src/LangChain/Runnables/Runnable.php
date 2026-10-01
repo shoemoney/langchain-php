@@ -56,10 +56,34 @@ abstract class Runnable implements RunnableInterface
      */
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
     {
-        return array_map(
-            fn (mixed $input): mixed => $this->invoke($input, $config),
-            array_values($inputs)
-        );
+        // `batchOptions.returnExceptions` (`runnables/base.ts:240-241`, honoured at `:281`).
+        //
+        // It was accepted and IGNORED here, and three reviewers reported that across cycles 3, 4 and 5.
+        // This loop refused all three on the grounds that the port's own docblock said the option was
+        // ignored — which is this same mistake a second time: A DOCBLOCK SAYING AN OPTION IS IGNORED IS
+        // A DESCRIPTION OF A GAP, NOT A JUSTIFICATION FOR IT. Upstream implements the option, so the
+        // port was simply missing it.
+        $returnExceptions = (bool) ($options['returnExceptions'] ?? false);
+
+        if (!$returnExceptions) {
+            return array_map(
+                fn (mixed $input): mixed => $this->invoke($input, $config),
+                array_values($inputs)
+            );
+        }
+
+        $out = [];
+        foreach (array_values($inputs) as $position => $input) {
+            try {
+                $out[$position] = $this->invoke($input, $config);
+            } catch (\Throwable $e) {
+                // Upstream returns "mixed RunOutputs and errors" — the Throwable takes the failed
+                // item's SLOT, and the remaining items still run.
+                $out[$position] = $e;
+            }
+        }
+
+        return $out;
     }
 
     public function transform(iterable $input, ?RunnableConfig $config = null): \Generator
