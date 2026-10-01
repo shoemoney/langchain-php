@@ -366,3 +366,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:8d82007 -->
 | `batch()` ignored `returnExceptions` | the option was accepted and silently discarded, so a batch with one failure threw and lost every other result | a `\Throwable` now takes the failed item's slot and remaining items still run, per `base.ts:281` | 8d82007 |
+
+<!-- fix:41375d7 -->
+| `Runnable::pick()` missing | one of five upstream `Runnable` methods absent and undeclared | delegates to a new `RunnablePick` via `pipe()`, per `base.ts:628`; the port-local private `pick()` helpers in `ChatOpenAI`/`ChatAnthropic` renamed to `pickOption()` to clear the collision | 41375d7 |
