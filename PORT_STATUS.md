@@ -603,6 +603,8 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 <!-- fix:229c1c5 -->
 | `Runnable::withRetry()` missing | second of five absent upstream `Runnable` methods | `RunnableRetry extends RunnableBinding` with a 3-attempt default, `onFailedAttempt`, and `retry:attempt:<n>` tagging; `stream()` deliberately not retried | 229c1c5 |
 
+| 454 | `SqliteSaver` aggregates pending writes with `CAST(pw.value AS TEXT)` | a long-standing open note on this loop claimed binary pending-write values pass through that cast with no discriminating fixture. **454 re-read upstream and CORRECTED the framing: the port's schema IS upstream's.** Upstream `checkpoint-sqlite/src/index.ts` declares `pending_writes: string` (line 25), writes `json_group_array(json_object(...)) ... as pending_writes` (line 64) and reads `JSON.parse(row.pending_writes)` (line 180); the port does the same at `SqliteSaver.php:493` and `:521`. The `writes` table is an internal storage detail behind that identical read path — **so this is not a schema divergence, and the cast has no upstream counterpart because upstream never has a per-value column to cast** | **not changed.** The cast is real and is the only point where a BLOB value could be mangled (`CAST(blob AS TEXT)` reinterprets bytes as text), but proving it needs a fixture that writes a genuinely binary pending-write value and reads it back — which is a bounded piece of work, not a schema change | cast retained; binary fidelity untested |
+
 ## Known-absent upstream API (declared gaps, not decisions)
 
 **Re-verified at 447 with a search wide enough to support the conclusion.** 446 produced one FALSE absence
