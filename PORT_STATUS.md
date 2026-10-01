@@ -340,3 +340,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:0f3e774 -->
 | Anthropic `tool_use` `input` shape | a no-arg call serialised as a JSON array (`"input":[]`) | casts to an object (`"input":{}`), mirroring `Completions::toolCallToWire()` | 0f3e774 |
+
+<!-- fix:816ce85 -->
+| Anthropic multi-block answer text | `generate()` returned `''` for any non-single-block payload (including the ordinary `thinking`+`text` shape) | `MessageOutputs::stringifyText()` concatenates every `text` block | 816ce85 |
