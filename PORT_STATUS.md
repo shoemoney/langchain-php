@@ -324,6 +324,8 @@ non-zero count from one should be treated as a claim about the detector until it
 <!-- fix:ce87ac0 -->
 | 437 | message-chunk `concat()` inverted the `name` precedence | the port read `$other->name ?? $this->name`; upstream reads `name: this.name ?? chunk.name` (`system.ts:63`) and `name: this.name ?? ""` (`function.ts:73`), so the accumulated chunk wins and function messages default to an empty string rather than null | swapped per type, each with the upstream line in a comment; guarded by `MessageChunkConcatNamePrecedenceTest` | identical |
 
+| 438 | `ToolMessageChunk` does not model `artifact` or `status` | upstream `tool.ts:192-208` builds `artifact: _mergeObj(this.artifact, chunk.artifact)` and `status: _mergeStatus(this.status, chunk.status)`; the port's `ToolMessageChunk` has no such properties, so both are dropped on construction rather than merged | **not added.** These are missing fields, not inverted ones — modelling them is a porting decision with schema and wire-shape consequences, not a fidelity patch, and nothing in the port currently reads either. Recorded rather than silently omitted | unported fields |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
@@ -532,7 +534,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4230** |
+| **Total so far** | | **4237** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |

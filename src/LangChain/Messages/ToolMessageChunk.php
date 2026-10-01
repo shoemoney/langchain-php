@@ -48,7 +48,10 @@ class ToolMessageChunk extends BaseMessageChunk
             'content' => MessageMerge::mergeContent($this->content, $other->content),
             'additional_kwargs' => MessageMerge::mergeDicts($this->additional_kwargs, $other->additional_kwargs) ?? [],
             'response_metadata' => MessageMerge::mergeDicts($this->response_metadata, $other->response_metadata) ?? [],
-            'tool_call_id' => $other->toolCallId !== '' ? $other->toolCallId : $this->toolCallId,
+            // Upstream `tool.ts:205`: `tool_call_id: this.tool_call_id` — unconditional, and with NO
+            // fallback to the incoming chunk. The port let the incoming id win unless it was empty,
+            // which re-points a concatenated tool RESULT at a different CALL.
+            'tool_call_id' => $this->toolCallId,
             'name' => $other->name ?? $this->name,
             'id' => $this->id ?? $other->id,
         ]);
