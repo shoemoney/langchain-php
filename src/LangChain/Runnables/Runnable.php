@@ -73,18 +73,39 @@ abstract class Runnable implements RunnableInterface
      *
      * @return list<mixed>
      */
+    /**
+     * The one implementation of `batchOptions.returnExceptions` in this port.
+     *
+     * Exposed as a static entry point because not every `RunnableInterface` implementation extends
+     * `Runnable`: `LangGraph\Pregel\ChannelWrite` and `LangGraph\Pregel\RunnableBranchWriter` declare
+     * `batch()` themselves and previously hand-rolled it with `array_map`, which reads neither `$options`
+     * nor `array_values($inputs)` — so `returnExceptions` was silently discarded and a string-keyed batch
+     * came back as a string-keyed array. Upstream's contract is `Runnable.batch` (`base.ts:281` and
+     * `:3081`), which every implementation inherits; keeping the logic in one place is what stops the
+     * next hand-rolled copy from diverging again.
+     */
+    public static function batchEachFor(RunnableInterface $r, array $inputs, ?RunnableConfig $config, ?array $options): array
+    {
+        return self::runBatch($r, $inputs, $config, $options);
+    }
+
     protected function batchEach(array $inputs, ?RunnableConfig $config, ?array $options): array
+    {
+        return self::runBatch($this, $inputs, $config, $options);
+    }
+
+    private static function runBatch(RunnableInterface $r, array $inputs, ?RunnableConfig $config, ?array $options): array
     {
         $inputs = array_values($inputs);
 
         if (!(bool) ($options['returnExceptions'] ?? false)) {
-            return array_map(fn (mixed $input): mixed => $this->invoke($input, $config), $inputs);
+            return array_map(fn (mixed $input): mixed => $r->invoke($input, $config), $inputs);
         }
 
         $out = [];
         foreach ($inputs as $position => $input) {
             try {
-                $out[$position] = $this->invoke($input, $config);
+                $out[$position] = $r->invoke($input, $config);
             } catch (\Throwable $e) {
                 // Upstream returns "mixed RunOutputs and errors": the Throwable takes the failed item's
                 // SLOT and the remaining items still run.

@@ -102,7 +102,13 @@ class RunnableBranchWriter implements RunnableInterface
 
     public function batch(array $inputs, ?RunnableConfig $config = null, ?array $options = null): array
     {
-        return array_map(fn (mixed $i): mixed => $this->invoke($i, $config), $inputs);
+        // Upstream inherits `Runnable.batch` (`base.ts:281`, `:3081`), which honours
+        // `batchOptions.returnExceptions` and always yields a list. This class implements
+        // `RunnableInterface` directly rather than extending `Runnable`, so it delegates to the port's
+        // single implementation instead of hand-rolling `array_map` over `invoke()` — the hand-rolled copy
+        // read neither `$options` nor `array_values($inputs)`, so `returnExceptions` was silently discarded
+        // and a string-keyed batch came back string-keyed. Found by iteration 432; see PORT_STATUS.
+        return \LangChain\Runnables\Runnable::batchEachFor($this, $inputs, $config, $options);
     }
 
     public function transform(iterable $input, ?RunnableConfig $config = null): \Generator
