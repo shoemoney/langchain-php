@@ -2086,6 +2086,50 @@
    "chars": 4300,
    "findings": 5,
    "severity_hits": 5
+  },
+  "xiaomi/mimo-v2.6-pro-ultraspeed": {
+   "model": "xiaomi/mimo-v2.6-pro-ultraspeed",
+   "at": "2026-10-01T03:47:14",
+   "actual_model": null,
+   "usage": null,
+   "finish_reason": null,
+   "reasoning_tokens": 0,
+   "status": "empty"
+  },
+  "mistralai/ministral-3b-2512": {
+   "model": "mistralai/ministral-3b-2512",
+   "at": "2026-10-01T03:50:56",
+   "actual_model": "mistralai/ministral-3b-2512",
+   "usage": {
+    "prompt_tokens": 57683,
+    "completion_tokens": 718,
+    "total_tokens": 58401,
+    "cost": 0.0058401,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.0058401,
+     "upstream_inference_prompt_cost": 0.0057683,
+     "upstream_inference_completions_cost": 7.18e-05
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/66-mistralai__ministral-3b-2512.md",
+   "chars": 3159,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2152,7 +2196,9 @@
   "anthropic/claude-sonnet-5.5",
   "perceptron/perceptron-mk1.5",
   "qwen/qwen3.8-flash",
-  "sakana/fugu-ultra-v2"
+  "sakana/fugu-ultra-v2",
+  "xiaomi/mimo-v2.6-pro-ultraspeed",
+  "mistralai/ministral-3b-2512"
  ],
  "next_index": 0,
  "attempts": {
@@ -2160,6 +2206,11 @@
    "count": 1,
    "last": "429 rate limited; {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-31b-it:free is temporarily ra",
    "at": "2026-10-01T01:25:03"
+  },
+  "google/gemma-4-26b-a4b-it:free": {
+   "count": 1,
+   "last": "429 rate limited; {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporaril",
+   "at": "2026-10-01T03:48:48"
   }
  }
 }
