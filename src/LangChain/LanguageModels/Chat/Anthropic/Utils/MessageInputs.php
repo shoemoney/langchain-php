@@ -186,8 +186,17 @@ final class MessageInputs
             $description = (string) ($tool->description ?? '');
             $schema = $tool->schema->toJsonSchema();
         } elseif (is_array($tool)) {
-            // Already provider-shaped.
-            if (isset($tool['input_schema']) || isset($tool['name'])) {
+            // Already provider-shaped — but ONLY when it really is. This used to short-circuit on
+            // `isset($tool['input_schema']) || isset($tool['name'])`, and the `||` meant the FLATTENED
+            // OpenAI shape `['name' => ..., 'parameters' => ...]` returned unchanged. Everything below
+            // this point was therefore skipped for that shape: the `function`-envelope unwrap, the
+            // empty-name guard, and the lift of `parameters` into `input_schema`.
+            //
+            // The tool still got sent, still looked well-formed, and the model was simply never told
+            // what arguments it takes — the same failure as the outer-`parameters` bug recorded in
+            // HANDOFF, reached through a different door. A non-empty `name` alone is not evidence of
+            // provider shape, so both parts are required.
+            if (isset($tool['input_schema']) && isset($tool['name']) && $tool['name'] !== '') {
                 return $tool;
             }
 
