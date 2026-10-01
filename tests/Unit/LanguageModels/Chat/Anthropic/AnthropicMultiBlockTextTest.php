@@ -29,18 +29,13 @@ use PHPUnit\Framework\TestCase;
  * `testASingleTextBlockIsUnchanged` is the control: it is the shape every existing Anthropic test
  * covers, and it is what an over-eager "concatenate everything" fix would break.
  *
- * KNOWN BLIND SPOT, RECORDED RATHER THAN PAPERED OVER: reverting `ChatAnthropic::generate()` to its old
- * `is_string($message->content) ? $message->content : ''` leaves every assertion in THIS file green,
- * because they all call `MessageOutputs::stringifyText()` directly. The helper being correct says
- * nothing about the call site using it, and the defect lived in the call site. A first attempt at a
- * wiring test was written and then REMOVED because it was itself defective (it half-invoked `generate()`
- * and half-reconstructed the generation, and failed against the FIXED code). Shipping a red suite to make
- * a mutation visible would be worse than shipping the blind spot honestly.
- *
- * THE OPEN TASK is therefore precise: drive the real `ChatAnthropic::generate()` over a thinking+text
- * payload with an injected HTTP response, and assert the resulting `ChatGeneration::$text`. That test
- * must fail when `generate()` is reverted. Until it exists, this fix is mutation-verified for the HELPER
- * and UNVERIFIED for the WIRING, and that is the accurate statement of its coverage.
+ * THIS FILE IS THE UNIT LEVEL, AND ITS LIMITATION IS NOW CLOSED ELSEWHERE. Reverting
+ * `ChatAnthropic::generate()` to `is_string($message->content) ? $message->content : ''` leaves every
+ * assertion HERE green, because they all call `MessageOutputs::stringifyText()` directly — the helper
+ * being correct says nothing about the call site using it, and the defect lived in the call site. That
+ * surviving mutation was recorded here rather than papered over, and `AnthropicGenerateTextWiringTest`
+ * now closes it by driving the real public path (`generatePrompt()`) over the same payloads. Keep the
+ * two files: this one pins the helper's block handling in isolation, that one pins the wiring.
  */
 #[CoversClass(MessageOutputs::class)]
 #[CoversClass(ChatAnthropic::class)]
