@@ -2051,6 +2051,41 @@
    "chars": 5625,
    "findings": 5,
    "severity_hits": 5
+  },
+  "sakana/fugu-ultra-v2": {
+   "model": "sakana/fugu-ultra-v2",
+   "at": "2026-10-01T02:56:32",
+   "actual_model": "sakana/fugu-ultra-v2",
+   "usage": {
+    "prompt_tokens": 472555,
+    "completion_tokens": 9850,
+    "total_tokens": 482405,
+    "cost": 5.155327,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 1497,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 5.155327,
+     "upstream_inference_prompt_cost": 4.712077,
+     "upstream_inference_completions_cost": 0.44325
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/64-sakana__fugu-ultra-v2.md",
+   "chars": 4300,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2116,7 +2151,8 @@
   "deepseek/deepseek-v4.1-flash",
   "anthropic/claude-sonnet-5.5",
   "perceptron/perceptron-mk1.5",
-  "qwen/qwen3.8-flash"
+  "qwen/qwen3.8-flash",
+  "sakana/fugu-ultra-v2"
  ],
  "next_index": 0,
  "attempts": {
