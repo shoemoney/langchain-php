@@ -219,6 +219,84 @@ final class MarkdownTableShapeTest extends TestCase
         self::assertSame(3, $flagged, 'a 5-cell row above a 3-cell separator must be flagged at line 3');
     }
 
+    /**
+     * A `|` inside a code span in a table row must be escaped as `\|`, or it splits the cell.
+     *
+     * Iteration 450 found a live instance: a row citing `CheckpointListOptions|int|null` rendered as five
+     * cells in a three-column table, because GitHub-flavoured markdown splits on `|` even inside backtick
+     * formatting. Escaping it fixed the rendering and NOTHING caught the class — re-introducing the exact
+     * defect leaves this file's guard green AND the full 4,250-test suite green.
+     *
+     * Like 451's separator rule, this one is correct by construction rather than by counting: markdown's
+     * own rule is that an unescaped pipe is always a cell boundary, so a pipe that is simultaneously inside
+     * a code span and unescaped is malformed by definition. No cell-count comparison, no baseline, no
+     * tolerance band — which matters because a count-based rule demonstrably did not fire here.
+     */
+    public function testNoUnescapedPipeSitsInsideACodeSpanInATableRow(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $problems = [];
+
+        foreach (['PORT_STATUS.md', 'HANDOFF.md'] as $file) {
+            foreach (explode("\n", (string) file_get_contents($root . '/' . $file)) as $i => $line) {
+                if (!str_starts_with(rtrim($line), '|')) {
+                    continue;
+                }
+                if (preg_match('/^\|[\s\-:|]+\|$/', trim($line)) === 1) {
+                    continue; // a separator has no code spans
+                }
+                foreach (self::unescapedPipesInCodeSpans($line) as $col) {
+                    $problems[] = sprintf('%s line %d, column %d: unescaped `|` inside a code span',
+                        $file, $i + 1, $col);
+                }
+            }
+        }
+
+        self::assertSame([], $problems, "a `|` inside a code span in a table row must be escaped as `\\|`:\n  "
+            . implode("\n  ", $problems));
+    }
+
+    /**
+     * Column indexes of pipes that are inside a code span and not backslash-escaped.
+     *
+     * @return list<int>
+     */
+    private static function unescapedPipesInCodeSpans(string $row): array
+    {
+        $found = [];
+        $inCode = false;
+        $len = \strlen($row);
+
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $row[$i];
+            if ($ch === '\\') {
+                ++$i; // skip the escaped character, whatever it is
+                continue;
+            }
+            if ($ch === '`') {
+                $inCode = !$inCode;
+                continue;
+            }
+            if ($ch === '|' && $inCode) {
+                $found[] = $i + 1;
+            }
+        }
+
+        return $found;
+    }
+
+    /** The detector must be shown to FIRE — this guard's normal output is silence. */
+    public function testTheCodeSpanPipeRuleDetectsAnUnescapedPipe(): void
+    {
+        $bad = '| A `X|Y` B | C |';
+        $good = '| A `X\\|Y` B | C |';
+        $outside = '| plain | text |';
+
+        self::assertSame([7], self::unescapedPipesInCodeSpans($bad), 'an unescaped pipe in a code span must be found');
+        self::assertSame([], self::unescapedPipesInCodeSpans($good), 'an escaped pipe must not be flagged');
+        self::assertSame([], self::unescapedPipesInCodeSpans($outside), 'a pipe outside code is a cell boundary');
+    }
+
     public function testItDetectsAFusedRow(): void
     {
         $fused = "| A | B | C |\n|---|---|---|\n"
