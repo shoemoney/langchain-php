@@ -292,21 +292,21 @@ class ChatOpenAI extends BaseChatModel
         $bound = $this->normaliseKeys($this->kwargs);
 
         $params = [
-            'model' => $this->pick($options, 'model') ?? $bound['model'] ?? $this->model,
-            'temperature' => $this->pick($options, 'temperature') ?? $bound['temperature'] ?? $this->temperature,
-            'top_p' => $this->pick($options, 'topP', 'top_p') ?? $bound['topP'] ?? $this->topP,
-            'frequency_penalty' => $this->pick($options, 'frequencyPenalty') ?? $bound['frequencyPenalty'] ?? $this->frequencyPenalty,
-            'presence_penalty' => $this->pick($options, 'presencePenalty') ?? $bound['presencePenalty'] ?? $this->presencePenalty,
-            'stop' => $this->pick($options, 'stop', 'stopSequences', 'stop_sequences')
+            'model' => $this->pickOption($options, 'model') ?? $bound['model'] ?? $this->model,
+            'temperature' => $this->pickOption($options, 'temperature') ?? $bound['temperature'] ?? $this->temperature,
+            'top_p' => $this->pickOption($options, 'topP', 'top_p') ?? $bound['topP'] ?? $this->topP,
+            'frequency_penalty' => $this->pickOption($options, 'frequencyPenalty') ?? $bound['frequencyPenalty'] ?? $this->frequencyPenalty,
+            'presence_penalty' => $this->pickOption($options, 'presencePenalty') ?? $bound['presencePenalty'] ?? $this->presencePenalty,
+            'stop' => $this->pickOption($options, 'stop', 'stopSequences', 'stop_sequences')
                 ?? $bound['stopSequences'] ?? $bound['stop'] ?? $this->stopSequences,
-            'max_tokens' => $this->pick($options, 'maxTokens', 'max_tokens') ?? $bound['maxTokens'] ?? $this->maxTokens,
+            'max_tokens' => $this->pickOption($options, 'maxTokens', 'max_tokens') ?? $bound['maxTokens'] ?? $this->maxTokens,
             // These read the middle layer like every other parameter. Reading
             // only `$options` meant a constructor-supplied `user` / `seed` /
             // `responseFormat` was recorded in `kwargs` — so it showed up in
             // every serialized trace — and then never went on the wire.
-            'user' => $this->pick($options, 'user') ?? ($bound['user'] ?? null),
-            'seed' => $this->pick($options, 'seed') ?? ($bound['seed'] ?? null),
-            'response_format' => $this->pick($options, 'responseFormat', 'response_format')
+            'user' => $this->pickOption($options, 'user') ?? ($bound['user'] ?? null),
+            'seed' => $this->pickOption($options, 'seed') ?? ($bound['seed'] ?? null),
+            'response_format' => $this->pickOption($options, 'responseFormat', 'response_format')
                 ?? ($bound['responseFormat'] ?? $bound['response_format'] ?? null),
             // Per-call tools go through the SAME conversion as bound ones.
             // Passing a `StructuredTool` here used to serialise it as a
@@ -323,7 +323,7 @@ class ChatOpenAI extends BaseChatModel
             // i.e. a serialised PHP object with the tool's name, description and
             // schema all absent. Converting again is idempotent for an already
             // -shaped array, so both arms can go through the same call.
-            'tools' => $this->convertTools($this->pick($options, 'tools'))
+            'tools' => $this->convertTools($this->pickOption($options, 'tools'))
                 ?? $this->convertTools($bound['tools'] ?? null)
                 ?? null,
             // The bound value goes through the same formatter as the per-call
@@ -332,7 +332,7 @@ class ChatOpenAI extends BaseChatModel
             // Reading the bound value raw made the same string mean two
             // different things depending on how it arrived.
             'tool_choice' => $this->toolChoiceOf($options) ?? $this->formatBoundToolChoice($bound),
-            'parallel_tool_calls' => $this->pick($options, 'parallelToolCalls', 'parallel_tool_calls')
+            'parallel_tool_calls' => $this->pickOption($options, 'parallelToolCalls', 'parallel_tool_calls')
                 ?? $bound['parallelToolCalls']
                 ?? null,
         ];
@@ -425,7 +425,7 @@ class ChatOpenAI extends BaseChatModel
      *
      * @param array<string, mixed> $options
      */
-    private function pick(array $options, string ...$keys): mixed
+    private function pickOption(array $options, string ...$keys): mixed
     {
         foreach ($keys as $key) {
             if (array_key_exists($key, $options) && $options[$key] !== null) {

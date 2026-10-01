@@ -202,12 +202,12 @@ class ChatAnthropic extends BaseChatModel
         $bound = $this->normaliseKeys($this->kwargs);
 
         $params = [
-            'model' => $this->pick($options, 'model') ?? $bound['model'] ?? $this->model,
-            'max_tokens' => $this->pick($options, 'maxTokens', 'max_tokens') ?? $bound['maxTokens'] ?? $this->maxTokens,
-            'temperature' => $this->pick($options, 'temperature') ?? $bound['temperature'] ?? $this->temperature,
-            'top_p' => $this->pick($options, 'topP', 'top_p') ?? $bound['topP'] ?? $this->topP,
-            'top_k' => $this->pick($options, 'topK', 'top_k') ?? $bound['topK'] ?? $this->topK,
-            'stop_sequences' => $this->pick($options, 'stopSequences', 'stop_sequences')
+            'model' => $this->pickOption($options, 'model') ?? $bound['model'] ?? $this->model,
+            'max_tokens' => $this->pickOption($options, 'maxTokens', 'max_tokens') ?? $bound['maxTokens'] ?? $this->maxTokens,
+            'temperature' => $this->pickOption($options, 'temperature') ?? $bound['temperature'] ?? $this->temperature,
+            'top_p' => $this->pickOption($options, 'topP', 'top_p') ?? $bound['topP'] ?? $this->topP,
+            'top_k' => $this->pickOption($options, 'topK', 'top_k') ?? $bound['topK'] ?? $this->topK,
+            'stop_sequences' => $this->pickOption($options, 'stopSequences', 'stop_sequences')
                 ?? $bound['stopSequences']
                 ?? $this->stopSequences,
             // Converted on BOTH arms. `bindTools()` converts on the way in, but
@@ -216,7 +216,7 @@ class ChatAnthropic extends BaseChatModel
             // `{"lc":1,"type":"constructor",...,"kwargs":[]}` with no `name`,
             // `description` or `input_schema` at all. `convertTool()` passes an
             // already-shaped array through unchanged, so this is safe for both.
-            'tools' => self::convertTools($this->pick($options, 'tools'))
+            'tools' => self::convertTools($this->pickOption($options, 'tools'))
                 ?? self::convertTools($bound['tools'] ?? null),
             // Formatted through the same path as a per-call choice, so the
             // "must name an offered tool" guard below cannot be stepped around
@@ -303,7 +303,7 @@ class ChatAnthropic extends BaseChatModel
     /**
      * @param array<string, mixed> $options
      */
-    private function pick(array $options, string ...$keys): mixed
+    private function pickOption(array $options, string ...$keys): mixed
     {
         foreach ($keys as $key) {
             if (array_key_exists($key, $options) && $options[$key] !== null) {

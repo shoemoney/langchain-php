@@ -98,6 +98,24 @@ abstract class Runnable implements RunnableInterface
     // ---- composition ----------------------------------------------------
 
     /**
+     * Select one or more named fields from this runnable's output.
+     *
+     * Port of `Runnable.pick` (`base.ts:628`), which upstream defines as
+     * `this.pipe(new RunnablePick(keys))` — so this is that exact wiring, and `RunnablePick` carries
+     * upstream's `_pick` semantics (string key → the field; array of keys → only the keys present; no
+     * surviving key → nothing yielded).
+     *
+     * One of five upstream `Runnable` methods this port was missing (see PORT_STATUS); `pick` is the
+     * smallest, needing only the `pipe()` this class already has.
+     *
+     * @param string|list<string> $keys
+     */
+    public function pick(string|array $keys): RunnableInterface
+    {
+        return $this->pipe(new RunnablePick($keys));
+    }
+
+    /**
      * Compose: run `$next` on this runnable's output.
      */
     public function pipe(RunnableInterface $next): RunnableSequence
