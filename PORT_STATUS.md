@@ -363,3 +363,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:49be3c3 -->
 | `Runnable::withConfig()` missing | no way to bind a config onto a runnable, so `runName`/`tags` had no affordance and three reviews misread the absence as a dropped value | delegates to `bind([], $config)`, matching upstream `base.ts:175-183` | 49be3c3 |
+
+<!-- fix:8d82007 -->
+| `batch()` ignored `returnExceptions` | the option was accepted and silently discarded, so a batch with one failure threw and lost every other result | a `\Throwable` now takes the failed item's slot and remaining items still run, per `base.ts:281` | 8d82007 |
