@@ -348,3 +348,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:01d99fc -->
 | Pregel `Checkpoint` skipped the empty-map cast | the `(object)` cast lived on the sibling `LangGraph\Checkpoint` class; the engine writes `LangGraph\Pregel\Checkpoint`, so `"channelVersions":[]` | added `toArray()` to the Pregel class; encoder `instanceof` matches both | 01d99fc |
+
+<!-- fix:afef553 -->
+| `RunnableLambda` config slot chosen by parameter COUNT | `fn(array $xs, string $sep = ' ')` had the config dropped into `$sep` and died; a required config slot also received `null` | chosen by the second parameter's declared TYPE (`RunnableConfig`/`mixed`/untyped = config slot); a real config is always supplied | afef553 |
