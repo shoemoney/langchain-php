@@ -351,3 +351,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:afef553 -->
 | `RunnableLambda` config slot chosen by parameter COUNT | `fn(array $xs, string $sep = ' ')` had the config dropped into `$sep` and died; a required config slot also received `null` | chosen by the second parameter's declared TYPE (`RunnableConfig`/`mixed`/untyped = config slot); a real config is always supplied | afef553 |
+
+<!-- fix:c1620c8 -->
+| `Completions::convertMessage()` forwarded content verbatim | an Anthropic `thinking`/`reasoning` block reached an OpenAI-compatible wire and a strict endpoint answered 400 | non-`text` blocks are filtered on the way out; tool calls still travel in `tool_calls` | c1620c8 |
