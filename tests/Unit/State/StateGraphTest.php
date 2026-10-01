@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LangGraph\Tests\Unit\State;
+namespace LangChain\Tests\Unit\State;
 
 use LangGraph\Channels\BinaryOperatorAggregate;
 use LangGraph\Channels\EphemeralValue;

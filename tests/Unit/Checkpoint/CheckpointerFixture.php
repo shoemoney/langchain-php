@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LangGraph\Tests\Unit\Checkpoint;
+namespace LangChain\Tests\Unit\Checkpoint;
 
 use LangGraph\Checkpoint\BaseCheckpointSaver;
 use LangGraph\Checkpoint\Checkpoint;

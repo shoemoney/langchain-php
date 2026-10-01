@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LangGraph\Tests\Unit\Checkpoint;
+namespace LangChain\Tests\Unit\Checkpoint;
 
 use LangGraph\Checkpoint\BaseCheckpointSaver;
 use LangGraph\Checkpoint\Checkpoint;
@@ -16,12 +16,6 @@ use LangGraph\Pregel\Checkpoint\CheckpointTuple as PregelCheckpointTuple;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-
-// The dev autoload map points `LangGraph\Tests\` at `tests/Unit/LangGraph/`,
-// which this repository does not use — its test classes are found by PHPUnit's
-// own directory scan instead. A second class in the test tree therefore needs an
-// explicit include.
-require_once __DIR__ . '/CheckpointerFixture.php';
 
 /**
  * The checkpointer contract, run against every saver.

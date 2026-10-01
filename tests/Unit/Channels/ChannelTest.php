@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LangGraph\Tests\Unit\Channels;
+namespace LangChain\Tests\Unit\Channels;
 
 use LangGraph\Channels\AnyValue;
 use LangGraph\Channels\BaseChannel;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LangGraph\Tests\Unit\Checkpoint;
+namespace LangChain\Tests\Unit\Checkpoint;
 
 use LangChain\Runnables\RunnableConfig;
 use LangGraph\Checkpoint\MemorySaver;

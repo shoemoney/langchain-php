@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LangGraph\Tests\Unit\Checkpoint\Serde;
+namespace LangChain\Tests\Unit\Checkpoint\Serde;
 
 use LangGraph\Channels\DeltaSnapshot;
 use LangGraph\Checkpoint\CheckpointId;

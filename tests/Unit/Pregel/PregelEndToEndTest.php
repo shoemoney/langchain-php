@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LangGraph\Tests\Unit\Pregel;
+namespace LangChain\Tests\Unit\Pregel;
 
 use LangGraph\Pregel\Constants;
 use LangGraph\State\StateGraph;
