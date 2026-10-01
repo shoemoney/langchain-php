@@ -161,6 +161,30 @@ because each represents a **class** of mistake that is easy to repeat.
 
 ---
 
+## Verify a documentation edit landed BEFORE committing a message that claims it
+
+Twice in eight iterations a PORT_STATUS edit threw an `AssertionError` on a wrong anchor, the shell carried
+on, and the commit landed asserting a documentation change that had never been applied. Both times the
+anchor was nearly right — a bold-marker mismatch, then a capitalisation mismatch — and both times the suite
+stayed green, because documentation is not exercised by it.
+
+The shell here has no `set -e`, so a failed step does not stop the later step that depends on it.
+
+**Before committing any message that describes an edit to a tracked file, grep for the phrase the message
+claims and abort if it is absent.** For a PORT_STATUS row, that is one line:
+
+    N=$(grep -c "<the phrase your message claims>" PORT_STATUS.md); [ "$N" -ge 1 ] || exit 1
+
+This is the same rule the rest of this file already encodes in a different form — *a mutation did not land*
+and *a sweep that reports zero is a broken sweep* — applied to the one signal that had no control at all:
+whether an edit happened.
+
+**More generally: one edit per verified step, never several in one script.** Three times now a multi-part
+edit has half-applied (a rename-and-move, a constructor anchor, a field anchor). The defence is identical
+each time and costs one `diff` against a pre-edit copy: confirm the file CHANGED, not merely that the
+command exited zero.
+
+
 ## House conventions
 
 **Read this line before trusting it: only the FIRST convention below is CI-enforced.** It used to
