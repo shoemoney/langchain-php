@@ -357,3 +357,6 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 <!-- fix:71ebf26 -->
 | `versionsSeen` inner maps serialised as arrays | the 362 fix cast the OUTER level only, so `{"fan_out":[]}` reached the bytes for any task triggered solely by a `Send` push | `toArray()` recurses one level; `channelVersions` scalars deliberately not cast | 71ebf26 |
+
+<!-- fix:998c87e -->
+| `BaseLanguageModel::invoke()` discarded 14 of 16 config fields | only `options` and `callbacks` crossed the boundary; `runName` and `tags` never reached the traced run and `Run::name()` fell back to the component id | `generatePrompt()` takes the config as a fourth argument and merges it | 998c87e |

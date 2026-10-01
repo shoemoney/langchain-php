@@ -111,8 +111,11 @@ final class StructuredOutput
             // one. Correcting only the key changed nothing observable, because a
             // correctly-spelled key in the kwargs slot is still just an option.
             //
-            // KNOWN RESIDUAL GAP, and it is NOT here: even bound this way the
-            // name does not reach `Run::name()`, which reads `$extra['__name']`
+            // RESIDUAL GAP — FIXED at iteration 375. It WAS here, and it was
+            // `BaseLanguageModel::invoke()`, which destructured the config down
+            // to `options` and `callbacks`. `generatePrompt()` now takes the
+            // config as a fourth argument and merges it, so a bound `runName`
+            // reaches `Run::name()`, which reads `$extra['__name']`
             // written only by `BaseTracer.php:282` from the `$runName` argument
             // of `handleChatModelStart`. Bound directly on the model with no pipe
             // in the way, `Run::name()` still falls back to the component id. So
