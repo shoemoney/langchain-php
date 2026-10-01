@@ -18,6 +18,8 @@ use LangChain\Tracers\CallbackManagerForToolRun;
  */
 final class DynamicStructuredTool extends StructuredTool
 {
+    use InjectsToolRuntime;
+
     /** @var callable(mixed, CallbackManagerForToolRun|null, RunnableConfig|null): mixed */
     private $func;
 
@@ -61,33 +63,6 @@ final class DynamicStructuredTool extends StructuredTool
         // tool signature and this port implements it correctly, so swapping the second argument
         // unconditionally would break every tool already written against that shape.
         return ($this->func)($arg, self::secondToolArgument($this->func, $runManager, $parentConfig), $parentConfig);
-    }
-
-    /**
-     * The run manager, unless the callable declares a `ToolRuntime` second parameter.
-     *
-     * Upstream injects the runtime by TYPE, so the type hint is the whole signal — there is no wrapper
-     * object to detect and no config flag to set.
-     */
-    private static function secondToolArgument(callable $func, mixed $runManager, ?RunnableConfig $config): mixed
-    {
-        try {
-            $ref = \is_array($func) ? new \ReflectionMethod($func[0], $func[1]) : new \ReflectionFunction($func);
-        } catch (\ReflectionException) {
-            return $runManager;
-        }
-
-        $params = $ref->getParameters();
-        if (!isset($params[1])) {
-            return $runManager;
-        }
-
-        $type = $params[1]->getType();
-        if (!$type instanceof \ReflectionNamedType || $type->getName() !== ToolRuntime::class) {
-            return $runManager;
-        }
-
-        return ToolRuntime::fromConfig($config) ?? new ToolRuntime();
     }
 
 }
