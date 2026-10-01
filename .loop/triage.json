@@ -2431,5 +2431,18 @@
  ],
  "probe-253": [
   "sonar #1 REFUTED: upstream message_inputs.ts:467-471 MAPS with an explicit cast-passthrough for non-text blocks - identical to the port. NEW loose thread: upstream returns [] for non-array content (:463) but my reflection probe on formatContent gave ['just a string'] - SCOPE-UNCERTAIN, first self-generated divergence candidate in 5 iterations"
+ ],
+ "string-content-divergence-254": [
+  "#THE FIRST DIVERGENCE CANDIDATE THIS LOOP HAS GENERATED ITSELF, AND IT IS ON THE WIRE. Upstream `libs/providers/langchain-anthropic/src/utils/message_inputs.ts:442-447`:",
+  "#  const { content } = message;",
+  "#  if (typeof content === 'string') { return content; }            <-- a string stays a STRING",
+  "#  return Array.from(_formatContentBlocks(content, toolCalls));",
+  "#The port, measured at 252 through `MessageInputs::formatContent()`, returns `[\"just a string\"]` \u2014 it WRAPS a bare string into a one-element array. So a message whose content is a plain string is serialised as `[\"just a string\"]` where upstream serialises it as `\"just a string\"`.",
+  "#THE CALL PATH IS CONFIRMED, SO THIS IS NOT A PROBE ARTEFACT. `MessageInputs.php:166` reads `return ['role' => $role, 'content' => self::formatContent($message->content)];` \u2014 the content reaches `formatContent` DIRECTLY, with no caller guard to normalise it first. 253 recorded this as SCOPE-UNCERTAIN on the grounds that a reflection probe might bypass an entry condition; reading the call site settles that, and the suspicion survives: the measured behaviour is what a real caller gets. The `!Array.isArray(content) return []` guard at upstream :463 is a DIFFERENT branch further down, documented 'rare case: message.content could be undefined', and it is not the branch a string takes.",
+  "#WHAT IS STILL NOT DECIDED IS WHETHER IT MATTERS, and the honest position is that a wire-shape difference is a defect only when it changes what the receiver does. Anthropic's API accepts both a bare string and a one-element array of content blocks, so the most likely reading is that this is COSMETIC \u2014 same text reaches the model either way \u2014 and a port that reproduces the shape exactly is still preferable to one that does not, because a receiver that inspects the shape would see a difference. The decision therefore needs either an upstream test that pins the string case or a statement of what the API guarantees, and this loop has neither. It is recorded as a CANDIDATE with its evidence, not as a finding, and the cheap next step is to search upstream's test files for a string-content case rather than to change the port.",
+  "#AND THE METHOD THAT FOUND IT IS THE ONE 237 ESTABLISHED, NOW PAYING OFF IN A DIRECTION NOBODY PREDICTED. 237's finding was a defect in the HARNESS, found by running a command instead of reading a file. 253's loose thread came from a probe whose scope this loop flagged as uncertain rather than trusting. 254 settled it by reading the CALL SITE \u2014 the one place a reflection probe cannot reach \u2014 and the result is a divergence that no reviewer in fifty-two reviews had reported and that 252's own measurement had produced without interpreting. The chain is: a reviewer's permissive claim, a probe, a scope doubt, a call-site read, a divergence. Five steps, four of them verification, and the only finding in twenty-five iterations that this loop originated rather than received."
+ ],
+ "probe-254": [
+  "FIRST SELF-GENERATED DIVERGENCE: upstream message_inputs.ts:444 returns a string content AS A STRING; the port's formatContent WRAPS it as ['just a string']. Call path confirmed at MessageInputs:166 (no caller guard). Candidate, not finding - Anthropic likely accepts both"
  ]
 }
