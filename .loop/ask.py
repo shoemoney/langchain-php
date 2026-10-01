@@ -222,6 +222,27 @@ def save_state(s):
     json.dump(s, open(STATE, "w"), indent=1)
 
 
+def output_budget(ctx, input_tokens, default=24000):
+    """The completion budget that actually FITS.
+
+    `max_tokens` was a flat 24,000 regardless of the model's context, while the packet trim only ever
+    shrank the INPUT. For any model with a small context the two together could not fit and the request
+    400'd no matter how small the packet became - measured on `perceptron/perceptron-mk1.5`
+    (ctx 36,864): 12,033 text + 1,445 image + 24,000 reserved output = 37,478 > 36,864.
+
+    A provider counts the reserved completion against the same window as the prompt, so the reservation
+    is DERIVED from what is left. 512 tokens of headroom covers disagreement between this estimate and
+    the provider's tokenizer. Returns None when nothing fits, so the caller can skip rather than send a
+    request that is certain to fail.
+    """
+    if not ctx:
+        return default
+    room = int(ctx) - int(input_tokens) - 512
+    if room <= 0:
+        return None
+    return max(512, min(default, room))
+
+
 def call(model, content, max_tokens=24000, temperature=0.2):
     payload = {
         "model": model,
@@ -431,7 +452,17 @@ def main():
         print(f"    (context {ctx:,} tokens — packet trimmed to ~{budget_chars:,} chars)", flush=True)
 
     try:
-        resp = call(model, content)
+        # The trim above only ever shrank the INPUT while `max_tokens` stayed a flat 24,000, so the
+        # two could not fit any small-context model. Derive the reservation from what is left.
+        # ~3.6 chars/token is the ratio reka measured on a 40k-char packet.
+        fitted = output_budget(ctx, PROMPT_TOKENS + IMAGE_TOKENS + int(len(packet) / 3.6))
+        if fitted is None:
+            print(f"    skipped: ctx {ctx:,} cannot hold prompt+image+packet for this model", flush=True)
+            return
+
+        resp = call(model, content, max_tokens=fitted)
+        print(f"    (ctx {ctx:,} - input ~{PROMPT_TOKENS + IMAGE_TOKENS + int(len(packet) / 3.6):,} "
+              f"= max_tokens {fitted:,})", flush=True)
         text = text_of(resp)
         rec["actual_model"] = resp.get("model")
         rec["usage"] = resp.get("usage")

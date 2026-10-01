@@ -2010,6 +2010,47 @@
    "chars": 3845,
    "findings": 5,
    "severity_hits": 5
+  },
+  "perceptron/perceptron-mk1.5": {
+   "model": "perceptron/perceptron-mk1.5",
+   "at": "2026-10-01T02:24:19",
+   "status": "http_400",
+   "error": "{\"error\":{\"message\":\"This endpoint's maximum context length is 36864 tokens. However, you requested about 37478 tokens (12033 of text input, 1445 of image input, 24000 in the output). Please reduce the length of either one, or use the context-compression plugin to compress your prompt automatically.\",\"code\":400,\"metadata\":{\"provider_name\":null}}}"
+  },
+  "qwen/qwen3.8-flash": {
+   "model": "qwen/qwen3.8-flash",
+   "at": "2026-10-01T02:26:43",
+   "actual_model": "qwen/qwen3.8-flash",
+   "usage": {
+    "prompt_tokens": 49161,
+    "completion_tokens": 5404,
+    "total_tokens": 54565,
+    "cost": 0.00991403,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 0,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.00991403,
+     "upstream_inference_prompt_cost": 0.00737415,
+     "upstream_inference_completions_cost": 0.00253988
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 4000,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 4000,
+   "status": "ok",
+   "file": ".loop/reviews/63-qwen__qwen3.8-flash.md",
+   "chars": 5625,
+   "findings": 5,
+   "severity_hits": 5
   }
  },
  "order": [
@@ -2073,7 +2114,9 @@
   "perplexity/sonar-reasoning-pro",
   "amazon/nova-premier-v1",
   "deepseek/deepseek-v4.1-flash",
-  "anthropic/claude-sonnet-5.5"
+  "anthropic/claude-sonnet-5.5",
+  "perceptron/perceptron-mk1.5",
+  "qwen/qwen3.8-flash"
  ],
  "next_index": 0,
  "attempts": {
