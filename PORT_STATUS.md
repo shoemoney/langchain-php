@@ -107,6 +107,8 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 
 | <!-- fix:b5dda88 --> `b5dda88` | `RunnableInterface::batch()`'s second docblock omitted `@param $config` on a three-parameter signature. Invisible to static analysis, which parses the first block in a stack; misleading to the human who reads the second. Found by a reviewer reading the docblock in the previously-unread `**Finding N:**` corpus — the first accepted finding in 34 iterations. The guard 234 named swept all 520 methods and found 3 further name mismatches, still open. |
 
+| <!-- fix:7fe81e7 --> `7fe81e7` | Three more docblock/signature mismatches found by the new `DocblockParamTest` sweep: `Runnable::withFallbacks` documents `$runnables` against a `$fallbacks` parameter, `BaseChatModel::generatePrompt` documented `$messages` and `list<list<BaseMessage>>` while the signature takes `$promptValues` (the body calls `toMessages()` on each element, so the parameter name was right and the docblock was stale), and `PregelLoop::initialize` named two ARRAY KEYS as `@param` entries on a single-`$params` signature. The guard's parser also tracks quoting after a naive match reported a false positive on a default value containing `)`. |
+
 ## Known non-exact behaviours
 
 Two kinds of divergence live in this one table, and the previous version of this
