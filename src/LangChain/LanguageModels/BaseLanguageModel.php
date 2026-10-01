@@ -110,7 +110,7 @@ abstract class BaseLanguageModel extends BaseLangChain
      * @param list<PromptValue>  $promptValues
      * @param array<string, mixed> $options
      */
-    abstract public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null): LLMResult;
+    abstract public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null, ?RunnableConfig $config = null): LLMResult;
 
     /**
      * Run the model and return the single first completion.
@@ -123,7 +123,12 @@ abstract class BaseLanguageModel extends BaseLangChain
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
         $promptValue = self::convertInputToPromptValue($input);
-        $result = $this->generatePrompt([$promptValue], $config?->options ?? [], $config?->callbacks);
+        // The config goes across as a FOURTH argument, not folded into `$options`. `$options` is the
+        // INVOCATION options (max_tokens, stop, tools, failOnDemand) — aliasing the two is what broke
+        // four tests when this was first attempted. `invoke()` used to destructure the whole
+        // `RunnableConfig` down to `options` and `callbacks`, silently discarding the other fourteen
+        // fields: a caller who bound a `runName` or a tag got neither, and nothing reported it.
+        $result = $this->generatePrompt([$promptValue], $config?->options ?? [], $config?->callbacks, $config);
         $this->lastResult = $result;
 
         return $this->narrowResult($result);

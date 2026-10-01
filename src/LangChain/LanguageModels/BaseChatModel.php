@@ -271,7 +271,7 @@ abstract class BaseChatModel extends BaseLanguageModel
      * @param array<string, mixed>      $options
      * @param list<object>|null         $callbacks
      */
-    public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null): LLMResult
+    public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null, ?RunnableConfig $config = null): LLMResult
     {
         $promptMessages = [];
         foreach ($promptValues as $promptValue) {
@@ -280,7 +280,13 @@ abstract class BaseChatModel extends BaseLanguageModel
                 : self::convertInputToPromptValue($promptValue)->toMessages();
         }
 
-        $config = new RunnableConfig(callbacks: $callbacks ?? []);
+        // Merge, don't rebuild. `new RunnableConfig(callbacks: ...)` discarded every other field the
+        // caller set — the per-call `runName` and `tags` never reached the traced run and `Run::name()`
+        // fell back to the component id silently. Later config wins.
+        $config = RunnableConfig::mergeConfigs(
+            new RunnableConfig(callbacks: $callbacks ?? []),
+            $config ?? new RunnableConfig(),
+        );
 
         return $this->generateMessages($promptMessages, $config, $options);
     }

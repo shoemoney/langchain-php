@@ -72,7 +72,7 @@ abstract class BaseLLM extends BaseLanguageModel
      * @param array<string, mixed>  $options
      * @param list<object>|null     $callbacks
      */
-    public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null): LLMResult
+    public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null, ?RunnableConfig $config = null): LLMResult
     {
         $prompts = [];
         foreach ($promptValues as $promptValue) {
