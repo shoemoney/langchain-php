@@ -260,11 +260,16 @@ abstract class BaseChatModel extends BaseLanguageModel
     }
 
     /**
-     * Run the model over message lists.
+     * Run the model over prompt values, converting each to messages.
      *
-     * @param list<list<BaseMessage>> $messages
-     * @param array<string, mixed>     $options
-     * @param list<object>|null        $callbacks
+     * The parameter is `$promptValues`, NOT upstream's `$messages`: the body calls
+     * `toMessages()` on every element, so a caller passing message lists gets them
+     * re-wrapped. The docblock said "message lists" and typed `list<list<BaseMessage>>`
+     * until 236, which is the drift class the `DocblockParamTest` guard now sweeps for.
+     *
+     * @param list<PromptValue|mixed>   $promptValues
+     * @param array<string, mixed>      $options
+     * @param list<object>|null         $callbacks
      */
     public function generatePrompt(array $promptValues, array $options = [], ?array $callbacks = null): LLMResult
     {

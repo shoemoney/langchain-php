@@ -114,7 +114,7 @@ abstract class Runnable implements RunnableInterface
     /**
      * Try each runnable in turn, returning the first that succeeds.
      *
-     * @param list<RunnableInterface> $runnables
+     * @param list<RunnableInterface> $fallbacks
      */
     public function withFallbacks(array $fallbacks): RunnableWithFallbacks
     {

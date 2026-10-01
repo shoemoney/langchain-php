@@ -102,10 +102,12 @@ class PregelLoop
      *  - The step counter is `metadata.step + 1`. A fresh checkpoint is stored
      *    at step `-2` ("input"), so the first real superstep is `0`.
      *
-     * @param  array<string, BaseChannel>        $channelSpecs
-     * @param  string|list<string>               $outputKeys
-     * @param  array<string, PregelNode>         $nodes
-     * @param  list<string>|string               $interruptAfter
+     * @param  array<string, mixed>              $params Keys: `channelSpecs`
+     *         (array<string, BaseChannel>), `outputKeys` (string|list<string>),
+     *         `nodes` (array<string, PregelNode>), `interruptAfter`
+     *         (list<string>|string). These are ARRAY KEYS, not parameters —
+     *         the signature takes one `$params` array, so naming them as
+     *         `@param` told a reader to pass four arguments.
      */
     public static function initialize(array $params): self
     {
