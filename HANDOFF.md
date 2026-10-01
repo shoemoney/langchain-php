@@ -4,6 +4,13 @@
 "State". Do not trust it if the repo has moved on — re-run `composer test`
 first and believe the suite, not this file.
 
+> **Counts live HERE; the per-fix ledger lives in `PORT_STATUS.md`.**
+> The `Tests` row below is the one `DocsMatchRealityTest` reads, so run
+> `python3 .loop/sync_docs.py` BEFORE the first `composer test` of any
+> iteration that changes a count — otherwise that guard correctly reports
+> a stale ledger and the run goes red for a reason unrelated to the code
+> (reproduced on demand in iteration 277).
+
 ---
 
 ## The task

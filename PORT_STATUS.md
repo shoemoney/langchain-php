@@ -2,6 +2,10 @@
 
 Live accounting of what has been ported, verified by the converted test suite.
 
+> **The per-fix ledger lives HERE; the test/assertion counts live in
+> `HANDOFF.md`.** `sync_docs.py` writes both — run it before testing, or
+> `DocsMatchRealityTest` will read a stale count and fail correctly.
+
 **Rule:** a subsystem is only marked ported when its tests exist in this repo
 and pass. Nothing is marked on the strength of the TypeScript source alone.
 
