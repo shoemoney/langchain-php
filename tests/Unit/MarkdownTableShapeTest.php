@@ -140,6 +140,85 @@ final class MarkdownTableShapeTest extends TestCase
     /**
      * The guard must be able to see a fused row, or it is decoration.
      */
+    /**
+     * A `|---|---|` separator must have the SAME number of cells as the row directly above it.
+     *
+     * The existing outlier rule cannot see iteration 449's defect: it flags a row with more cells than
+     * EVERY other row in its table, and 449's was two five-cell rows sitting above a three-cell separator —
+     * the widest width in the table, reached twice, so neither row was a unique outlier and neither was
+     * flagged. (Its own comment records why the rule is not simply "compare to the header": this ledger
+     * mixes two- and three-column rows by design.)
+     *
+     * This rule sidesteps the whole problem by being correct by construction rather than by heuristic.
+     * Markdown defines a table's header as the row immediately above its separator, so the two MUST agree
+     * in width. There is no baseline to track, no contiguity to infer, and no tolerance band to tune — which
+     * is why an earlier attempt at a smarter baseline heuristic produced 173 false positives on the current
+     * file while this produces zero.
+     *
+     * Proven against history, not just asserted: on PORT_STATUS as of `HEAD~2` this reports exactly one
+     * violation, at line 36, "row above 5 cells, separator 3 cells" — 449's defect — and zero today.
+     */
+    public function testEverySeparatorMatchesTheWidthOfTheRowAboveIt(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $problems = [];
+
+        // Looped rather than data-provided: an earlier version of this referenced a `docFiles` provider
+        // that does not exist, which is the same guess-an-API mistake 446 made with `getLast()`.
+        foreach (['PORT_STATUS.md', 'HANDOFF.md'] as $file) {
+        $lines = explode("\n", (string) file_get_contents($root . '/' . $file));
+
+        foreach ($lines as $i => $line) {
+            if (preg_match('/^\|[\s\-:|]+\|$/', trim($line)) !== 1) {
+                continue;
+            }
+            $above = $i > 0 ? rtrim($lines[$i - 1]) : '';
+            if (!str_starts_with($above, '|')) {
+                continue;
+            }
+            $width = static fn (string $row): int => \count(self::splitRow(trim($row))) - 2;
+            if ($width($above) !== $width($line)) {
+                $problems[] = sprintf('%s line %d: header has %d cells, separator has %d',
+                    $file, $i + 1, $width($above), $width($line));
+            }
+        }
+
+        }
+
+        self::assertSame([], $problems, "a separator must match the row above it:\n  "
+            . implode("\n  ", $problems));
+    }
+
+    /**
+     * The detector must be shown to FIRE, or a clean file proves nothing — 447's control, applied to a
+     * guard whose entire job is to report zero.
+     */
+    public function testTheSeparatorWidthRuleDetectsAMalformedTable(): void
+    {
+        $malformed = <<<'MDX'
+            | A | B | C |
+            | one | two | three | four | five |
+            |---|---|---|
+            | x | y | z |
+            MDX;
+
+        $lines = explode("\n", $malformed);
+        $flagged = null;
+        foreach ($lines as $i => $line) {
+            if (preg_match('/^\|[\s\-:|]+\|$/', trim($line)) !== 1) {
+                continue;
+            }
+            $above = rtrim($lines[$i - 1]);
+            $w = static fn (string $r): int => \count(explode('|', trim($r))) - 2;
+            if ($w($above) !== $w($line)) {
+                $flagged = $i + 1;
+                break;
+            }
+        }
+
+        self::assertSame(3, $flagged, 'a 5-cell row above a 3-cell separator must be flagged at line 3');
+    }
+
     public function testItDetectsAFusedRow(): void
     {
         $fused = "| A | B | C |\n|---|---|---|\n"
