@@ -454,6 +454,29 @@ class SqliteSaver extends PregelMemorySaver
     checkpoint,
     metadata,
     (
+      -- READ THIS BEFORE REWRITING THE ORDER BY.
+      --
+      -- `ORDER BY` BESIDE AN AGGREGATE IS INERT IN SQLite. It does not order what
+      -- `json_group_array` returns; the aggregate consumes rows in whatever order the
+      -- plan produces. Measured on a scratch table, with and without an index on
+      -- (task_id, idx): insertion order both times.
+      --
+      -- The output IS ordered, but not because of this clause: the ordering comes from
+      -- this being a CORRELATED subquery over `checkpoints`, which is a property of the
+      -- execution plan, not of anything written here.
+      --
+      -- Measured through the real saver — `fromConnString(':memory:')`, `put()`, then
+      -- `putWrites()` with 'taskB' written FIRST — the result is already grouped by
+      -- task_id then idx. Rewriting this as an ordered subquery with `LIMIT -1`
+      -- produces BYTE-IDENTICAL output, so both forms are behaviourally equivalent
+      -- today and neither is a bug fix.
+      --
+      -- It is documented rather than rewritten because a rewrite here would look like
+      -- a behaviour change and could not be distinguished from one by any test: the
+      -- ordering is identical either way, so no assertion can tell the two forms
+      -- apart. If the plan ever stops ordering this, the subquery form becomes
+      -- necessary — that is the day to change it, with a test that writes tasks out
+      -- of order first.
       SELECT json_group_array(
         json_object(
           'task_id', pw.task_id,
