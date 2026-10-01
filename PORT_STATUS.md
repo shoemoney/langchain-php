@@ -30,9 +30,12 @@ composer test
 
 ## langchain-core
 
-| Subsystem | Status | Notes |
+| Subsystem | Status | Behaviour | Upstream evidence | Date |
+|---|---|---|---|---|
 | RunnableConfig merge | `signal` combined | later `signal` wins | upstream `mergeConfigs` calls `AbortSignal.any([a,b])`, which has no PHP equivalent — there is no signal type to compose | 2026-10-01 |
 | RunnableConfig merge | `timeout` rule absent | not ported | upstream applies `Math.min` across configs; `RunnableConfig` in this port has no `timeout` field, so there is nothing to minimise | 2026-10-01 |
+
+| Subsystem | Status | Notes |
 |---|---|---|
 | `utils/promise` + event loop | ✅ | `Promise`, `Await` (fiber scheduler) |
 | `utils/stream` (Observable) | ✅ | `Observable` |
