@@ -474,7 +474,7 @@
    "image"
   ],
   "ctx": 1048576,
-  "price": "0.0000003"
+  "price": "0.00000003"
  },
  {
   "id": "deepseek/deepseek-v4.1-flash:batch",
@@ -929,7 +929,7 @@
    "video"
   ],
   "ctx": 262144,
-  "price": "0.00000009"
+  "price": "0.0000000765"
  },
  {
   "id": "google/gemma-4-26b-a4b-it:free",
@@ -1291,7 +1291,7 @@
    "image"
   ],
   "ctx": 262144,
-  "price": "0.00000065"
+  "price": "0.00000043415"
  },
  {
   "id": "moonshotai/kimi-k2.7-code",
@@ -1312,7 +1312,7 @@
    "video"
   ],
   "ctx": 1048576,
-  "price": "0.000003"
+  "price": "0.000000415"
  },
  {
   "id": "moonshotai/kimi-k3:batch",
@@ -2219,28 +2219,6 @@
   "price": "0.000002"
  },
  {
-  "id": "openai/gpt-6.1-sol-pro:batch",
-  "name": "OpenAI: GPT-6.1 Sol Pro (batch)",
-  "in": [
-   "file",
-   "image",
-   "text"
-  ],
-  "ctx": 1050000,
-  "price": "0.000001"
- },
- {
-  "id": "openai/gpt-6.1-sol:batch",
-  "name": "OpenAI: GPT-6.1 Sol (batch)",
-  "in": [
-   "file",
-   "image",
-   "text"
-  ],
-  "ctx": 1050000,
-  "price": "0.000001"
- },
- {
   "id": "openai/gpt-chat-latest",
   "name": "OpenAI: GPT Chat Latest",
   "in": [
@@ -2892,6 +2870,16 @@
   "price": "0.0000025"
  },
  {
+  "id": "unbiased/pareto-26.10-preview",
+  "name": "Pareto 26.10 Preview",
+  "in": [
+   "text",
+   "image"
+  ],
+  "ctx": 1048576,
+  "price": "0.0000008"
+ },
+ {
   "id": "x-ai/grok-4.20",
   "name": "SpaceXAI: Grok 4.20",
   "in": [
@@ -3000,7 +2988,7 @@
    "video",
    "audio"
   ],
-  "ctx": 1048576,
+  "ctx": 1050000,
   "price": "0.00000014"
  },
  {
@@ -3144,7 +3132,7 @@
    "image"
   ],
   "ctx": 1048576,
-  "price": "0.00000002"
+  "price": "0.0000000264"
  },
  {
   "id": "~google/gemini-flash-latest",
@@ -3181,7 +3169,7 @@
    "video"
   ],
   "ctx": 1048576,
-  "price": "0.0000003654"
+  "price": "0.000000415"
  },
  {
   "id": "~openai/gpt-astra-latest",

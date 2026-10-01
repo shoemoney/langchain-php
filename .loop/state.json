@@ -2282,6 +2282,41 @@
    "chars": 3853,
    "findings": 5,
    "severity_hits": 5
+  },
+  "unbiased/pareto-26.10-preview": {
+   "model": "unbiased/pareto-26.10-preview",
+   "at": "2026-10-01T16:37:31",
+   "actual_model": "unbiased/pareto-26.10-preview",
+   "usage": {
+    "prompt_tokens": 148208,
+    "completion_tokens": 19537,
+    "total_tokens": 167745,
+    "cost": 0.12494949,
+    "is_byok": false,
+    "prompt_tokens_details": {
+     "cached_tokens": 72903,
+     "cache_write_tokens": 0,
+     "audio_tokens": 0,
+     "video_tokens": 0
+    },
+    "cost_details": {
+     "upstream_inference_cost": 0.12494949,
+     "upstream_inference_prompt_cost": 0.06243109,
+     "upstream_inference_completions_cost": 0.0625184
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0,
+     "image_tokens": 0,
+     "audio_tokens": 0
+    }
+   },
+   "finish_reason": "stop",
+   "reasoning_tokens": 0,
+   "status": "ok",
+   "file": ".loop/reviews/73-unbiased__pareto-26.10-preview.md",
+   "chars": 13682,
+   "findings": 10,
+   "severity_hits": 10
   }
  },
  "order": [
@@ -2356,7 +2391,8 @@
   "mistralai/ministral-14b-2512",
   "meta/muse-glimmer-30b",
   "amazon/nova-lite-v1",
-  "~x-ai/grok-latest"
+  "~x-ai/grok-latest",
+  "unbiased/pareto-26.10-preview"
  ],
  "next_index": 0,
  "attempts": {
