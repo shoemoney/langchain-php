@@ -215,7 +215,7 @@ NOT_A_REVIEWER = (
 def load_state():
     if os.path.exists(STATE):
         return json.load(open(STATE))
-    return {"asked": {}, "order": [], "next_index": 0}
+    return {"asked": {}, "order": [], "next_index": 0, "attempts": {}}
 
 
 def save_state(s):
@@ -306,6 +306,28 @@ def slug(mid):
 MORE_RETRIES = 1            # one top-up ask for the findings a short answer missed
 RATE_LIMIT_RETRIES = 3
 RATE_LIMIT_BACKOFF = 20
+# A rate-limited model is deliberately NOT written to `asked` (see the 429 handler), which is
+# correct bookkeeping — it must not consume a roster slot for a provider that was briefly
+# unwilling. The cost of that choice was that the ATTEMPT left no trace at all, so a permanently
+# rate-limited free endpoint stayed in `pending` forever and was re-pickable — measurably, in the
+# SAME invocation, because the pick index is derived from `len(asked)`. Two 429s burned 2 minutes
+# each inside a single iteration as a result.
+#
+# `attempts` is that missing trace, and it is deliberately NOT `asked`: it records that a pick was
+# spent without claiming the model was reviewed. A model that accumulates RETIRE_AFTER_ATTEMPTS
+# attempts without ever reaching `asked` is not transiently rate-limited, it is dead weight, and it
+# gets moved off the pending list.
+RETIRE_AFTER_ATTEMPTS = 3
+# Permanent HTTP failures recorded in `asked` are also not worth re-offering.
+PERMANENT_STATUSES = ("http_403", "http_404", "http_401", "error")
+
+
+def is_retired(state, model):
+    """True when a model is known-dead and should stop being offered."""
+    rec = state.get("asked", {}).get(model) or {}
+    if str(rec.get("status", "")) in PERMANENT_STATUSES:
+        return True
+    return int(state.get("attempts", {}).get(model, {}).get("count", 0)) >= RETIRE_AFTER_ATTEMPTS
 
 
 def retry_on_429() -> bool:
@@ -342,6 +364,7 @@ def main():
             m for m in roster
             if m["id"] not in state["asked"]
             and not any(k in m["id"] for k in NOT_A_REVIEWER)
+            and not is_retired(state, m["id"])
         ]
         if not pending:
             print("every reviewer in the roster has been asked.")
@@ -540,6 +563,14 @@ def main():
             # the model as asked.
             rec["status"] = "rate_limited"
             rec["error"] = f"429 rate limited; {body[:120]}"
+            # Record the ATTEMPT, not the review. `asked` stays untouched so no roster slot is
+            # consumed, but the attempt is now visible and can retire a model that is permanently
+            # rate-limited instead of re-picking it forever.
+            att = state.setdefault("attempts", {}).setdefault(model, {"count": 0})
+            att["count"] += 1
+            att["last"] = rec["error"]
+            att["at"] = rec["at"]
+            save_state(state)
             # Retryable: let the caller re-pick WITHOUT recording, so the
             # roster is not consumed by a provider that was briefly unwilling.
             return
