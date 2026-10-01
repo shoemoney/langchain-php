@@ -280,6 +280,38 @@ final class RunnableTest extends TestCase
 
     // ---- config ----------------------------------------------------------
 
+    /**
+     * `transform()` yields one pair per inner chunk — it does NOT gather.
+     *
+     * Upstream's base `Runnable.transform` (langchainjs
+     * `libs/langchain-core/src/runnables/base.ts:659-671`) accumulates every
+     * chunk through `_concatOutputChunks` and then yields the SINGLE gathered
+     * result. The port's `Runnable::transform` (Runnable.php:66-73) is a pure
+     * pass-through, so a three-item input yields three pairs where upstream
+     * yields one.
+     *
+     * This pins the port's CURRENT behaviour rather than endorsing it. The
+     * divergence is real and recorded; what it does not decide is whether a
+     * caller can OBSERVE it, because a consumer that CONCATENATES sees the same
+     * text either way while one that counts chunks or reads the first value
+     * early does not. The port's own standard, stated in
+     * `BaseTransformOutputParser`'s docblock, is to match "the contract the
+     * TypeScript original exposes" — so the open question is which observable
+     * contract `transform` presents, and this test makes the present one
+     * explicit instead of leaving it unstated. An unstated contract is what let
+     * the divergence survive two portings unnoticed.
+     */
+    public function testTransformYieldsOnePairPerInnerChunk(): void
+    {
+        $lambda = RunnableLambda::from(static fn (string $s): string => strtoupper($s));
+
+        $pairs = iterator_to_array($lambda->transform(['a', 'b', 'c']), false);
+
+        self::assertCount(3, $pairs, 'one pair per input item — the port streams rather than gathers');
+        self::assertSame(['A', 'B', 'C'], array_map(static fn (array $p): mixed => $p[1], $pairs));
+    }
+
+
     public function testConfigFromArrayAcceptsBothKeyStyles(): void
     {
         $c = RunnableConfig::fromArray(['tags' => ['a'], 'recursion_limit' => 5, 'maxConcurrency' => 3]);
