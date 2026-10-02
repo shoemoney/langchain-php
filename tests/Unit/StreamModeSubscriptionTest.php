@@ -355,4 +355,80 @@ final class StreamModeSubscriptionTest extends TestCase
         }
         self::assertCount(count($viaForeach), $chunks, 'foreach and iterator_to_array must see the same chunks');
     }
+
+    /**
+     * The `debug` mode's expected events, pinned as a SPECIFICATION not a result.
+     *
+     * `debug` is not implemented, so this does not assert that the port emits
+     * anything — it asserts that the committed oracle still says what it said when
+     * the implementation is written. A fixture nothing reads is a dead artifact, and
+     * this repository has already shipped two of those by accident.
+     *
+     * Pinning it here means the next implementation is written against a CHECKED
+     * contract: if the fixture is regenerated from a different LangGraph version and
+     * the event types change, this fails first and says so, rather than the
+     * implementation being written against stale bytes nobody looked at again.
+     *
+     * The `checkpoint` payload keys are a `StateSnapshot`'s seven minus one — the
+     * first checkpoint has no `parentConfig` because there is no parent.
+     */
+    public function testTheDebugModeSpecificationIsPinnedAndUnimplemented(): void
+    {
+        $path = dirname(__DIR__, 2) . '/tests/Fixtures/langgraph/debug-stream-events.json';
+        self::assertFileExists($path, 'the debug-mode oracle is the specification');
+
+        /** @var array<string, mixed> $fixture */
+        $fixture = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertStringContainsString(
+            'LangGraph JS',
+            (string) $fixture['_provenance'],
+            'the specification must name what produced it',
+        );
+        self::assertSame(
+            ['checkpoint', 'task', 'task_result'],
+            $fixture['types'],
+            'debug emits exactly these three event types upstream; if this changed, the '
+            . 'implementation written against it will be wrong',
+        );
+
+        $byType = [];
+        foreach ($fixture['summary'] as $row) {
+            $byType[$row['type']] ??= [];
+            $byType[$row['type']][] = $row['payloadKeys'];
+        }
+
+        // A LATER checkpoint carries all seven — it is a StateSnapshot.
+        self::assertSame(
+            ['config', 'metadata', 'next', 'parentConfig', 'tasks', 'values'],
+            $byType['checkpoint'][1],
+            'a checkpoint debug payload is a StateSnapshot',
+        );
+        self::assertSame(
+            ['id', 'input', 'interrupts', 'metadata', 'name', 'triggers'],
+            $byType['task'][0],
+        );
+        self::assertSame(['id', 'interrupts', 'name', 'result'], $byType['task_result'][0]);
+
+        // The FIRST checkpoint predates any parent, so it carries no parentConfig —
+        // which is exactly why the index above is 1 and not 0. Asserted because the
+        // ordering is the whole reason there are two different shapes here, and an
+        // off-by-one would silently compare a later checkpoint against the earlier
+        // one's keys and report a mismatch that looks like a fixture problem.
+        self::assertSame(
+            ['config', 'metadata', 'next', 'tasks', 'values'],
+            $byType['checkpoint'][0],
+            'the FIRST checkpoint has no parent, so no parentConfig key',
+        );
+
+        // And the mode is still genuinely unimplemented, so this cannot be read as a
+        // claim that the port satisfies it.
+        self::assertNotContains(
+            'debug',
+            Pregel::SUPPORTED_STREAM_MODES,
+            'debug is specified but NOT implemented; adding it to SUPPORTED_STREAM_MODES '
+            . 'without emitting these events would make resolveStreamModes() accept a mode '
+            . 'that produces nothing',
+        );
+    }
 }
