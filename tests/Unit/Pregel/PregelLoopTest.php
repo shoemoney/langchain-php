@@ -592,9 +592,9 @@ final class PregelLoopTest extends TestCase
 
         $state = $graph->getState($thread);
 
-        $this->assertSame(['items' => ['seed', 'a', 'b']], $state['values']);
-        $this->assertSame([], $state['next'], 'the graph ran to completion, so nothing is pending');
-        $this->assertNotSame([], $state['config']);
+        $this->assertSame(['items' => ['seed', 'a', 'b']], $state->values);
+        $this->assertSame([], $state->next, 'the graph ran to completion, so nothing is pending');
+        $this->assertNotSame([], $state->config);
     }
 
     public function testGetStateOnAnUnknownThreadIsEmpty(): void
@@ -608,8 +608,8 @@ final class PregelLoopTest extends TestCase
 
         $state = $graph->getState(self::cfg('never-seen'));
 
-        $this->assertSame([], $state['values']);
-        $this->assertSame([], $state['next']);
+        $this->assertSame([], $state->values);
+        $this->assertSame([], $state->next);
     }
 
     public function testACheckpointerRequiresConfigurableKeys(): void
@@ -671,8 +671,8 @@ final class PregelLoopTest extends TestCase
         $graph->invoke(['items' => ['one']], self::cfg('t1'));
         $graph->invoke(['items' => ['two']], self::cfg('t2'));
 
-        $this->assertSame(['items' => ['one', 'a']], $graph->getState(self::cfg('t1'))['values']);
-        $this->assertSame(['items' => ['two', 'a']], $graph->getState(self::cfg('t2'))['values']);
+        $this->assertSame(['items' => ['one', 'a']], $graph->getState(self::cfg('t1'))->values);
+        $this->assertSame(['items' => ['two', 'a']], $graph->getState(self::cfg('t2'))->values);
     }
 
     public function testGraphStateIsCheckpointedOnEveryStep(): void

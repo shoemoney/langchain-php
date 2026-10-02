@@ -127,9 +127,9 @@ final class PregelCheckpointerIntegrationTest extends TestCase
         $graph->invoke(['value' => 1], $config);
 
         $snapshot = $graph->getState(['configurable' => ['thread_id' => 'state-1']]);
-        self::assertSame(2, $snapshot['values']['value'], $name);
-        self::assertSame([], $snapshot['next'], $name);
-        self::assertArrayHasKey('checkpoint_id', $snapshot['config']['configurable'], $name);
+        self::assertSame(2, $snapshot->values['value'], $name);
+        self::assertSame([], $snapshot->next, $name);
+        self::assertArrayHasKey('checkpoint_id', $snapshot->config['configurable'], $name);
 
         $history = $graph->getStateHistory(['configurable' => ['thread_id' => 'state-1']]);
         self::assertNotEmpty($history, $name);
@@ -168,8 +168,8 @@ final class PregelCheckpointerIntegrationTest extends TestCase
         self::assertSame(['a'], $runs, $name);
 
         $paused = $graph->getState(['configurable' => ['thread_id' => 'interrupt-1']]);
-        self::assertSame(1, $paused['values']['value'], $name);
-        self::assertSame(['b'], $paused['next'], $name);
+        self::assertSame(1, $paused->values['value'], $name);
+        self::assertSame(['b'], $paused->next, $name);
 
         $result = $graph->invoke(null, $config);
 

@@ -170,6 +170,35 @@ final class TriageStatedStatusLeadsTest extends TestCase
     }
 
     /**
+     * A self-marked note needs no `--status=`, and must not be stamped over.
+     *
+     * The second door into the same defect. `triage_add.py` originally stamped
+     * `#OPEN - status not stated` above any new `audit/` key, so an entry whose
+     * first line was `#CLOSED - ...` began by claiming no status had been stated.
+     * The first fix handled `--status=RESOLVED`; this path — where the caller states
+     * the status in the note text — was missed and produced exactly that entry.
+     *
+     * Found by writing such a note and reading the tool's report back, which said
+     * "10 notes" for an entry whose status was in its first three words.
+     */
+    public function testASelfMarkedFirstNoteIsNotStampedOver(): void
+    {
+        [$rc, $notes] = $this->runWriter(
+            'audit/probe-self-marked',
+            '#CLOSED - stated in the note itself.',
+            null,
+        );
+
+        self::assertSame(0, $rc);
+        self::assertSame('#CLOSED - stated in the note itself.', $notes[0] ?? '');
+        self::assertStringNotContainsString(
+            'status not stated',
+            $notes[0] ?? '',
+            'a note that opens with a marker HAS stated a status, whatever --status says',
+        );
+    }
+
+    /**
      * A note that already carries its own marker is not double-prefixed.
      *
      * The writer's guard is `not notes[0].startswith("#")`, so a caller who writes

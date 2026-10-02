@@ -78,12 +78,20 @@ def main(argv: list[str]) -> int:
 
     existing = triage.setdefault(key, [])
     # The auto-stamp exists for a note that genuinely does NOT state a status.
-    # A caller who passed --status= has stated one, so stamping OPEN above it
-    # reproduced the exact defect this entry was written about: an entry whose
-    # first line reads #OPEN while its resolution sits underneath. The stamp is
-    # therefore conditional on the absence of a stated status, not on the key
-    # being new.
-    if key.startswith("audit/") and not existing and status is None:
+    # A caller has stated one in EITHER of two ways, and both suppress the stamp:
+    #
+    #   1. `--status=RESOLVED`, which this file already handled;
+    #   2. a first note that opens with a marker itself — writing
+    #      `#OPEN - ...` as the opening line IS stating a status, and stamping
+    #      "status not stated" above it says the opposite.
+    #
+    # Case 2 was missed the first time this was fixed, and it is the same defect
+    # arriving by the other door: an entry whose first line reads `#OPEN - status
+    # not stated` above a note that opens `#CLOSED - ...`. Found by writing such a
+    # note and reading the tool's own report back, which said "10 notes" for an
+    # entry whose status had been stated in its first three words.
+    stated = status is not None or (bool(notes) and notes[0].lstrip().startswith("#"))
+    if key.startswith("audit/") and not existing and not stated:
         existing.append(AUTO_STAMP)
     existing.extend(notes)
 

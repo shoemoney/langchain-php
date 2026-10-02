@@ -276,7 +276,7 @@ class Pregel extends Runnable
      *
      * @return array{values: mixed, next: list<string>, config: array<string, mixed>, metadata: array<string, mixed>, tasks: list<array<string, mixed>>}
      */
-    public function getState(RunnableConfig|array $config): array
+    public function getState(RunnableConfig|array $config): StateSnapshot
     {
         $configArr = $config instanceof RunnableConfig ? $config->configurable : $config;
         $checkpointer = $this->checkpointer;
@@ -286,13 +286,19 @@ class Pregel extends Runnable
 
         $saved = $checkpointer->getTuple($configArr);
         if ($saved === null) {
-            return [
-                'values' => [],
-                'next' => [],
-                'config' => $configArr,
-                'metadata' => [],
-                'tasks' => [],
-            ];
+            // A thread that has never been written is a saver saying "no such
+            // thread", not a corrupt record — upstream's `getState` returns an
+            // empty snapshot for it. `config` still echoes what was asked for, so a
+            // caller can act on the answer without re-deriving the thread id.
+            return new StateSnapshot(
+                values: [],
+                next: [],
+                config: $configArr,
+                metadata: [],
+                createdAt: null,
+                parentConfig: null,
+                tasks: [],
+            );
         }
 
         $channels = ChannelRegistry::emptyChannels($this->channels, $saved->checkpoint->channelValues);
@@ -336,20 +342,23 @@ class Pregel extends Runnable
 
         $descriptions = [];
         foreach ($tasks as $task) {
-            $descriptions[] = [
-                'id' => $task->id,
-                'name' => $task->name,
-                'interrupts' => $task->interrupts,
-            ];
+            $descriptions[] = new PregelTaskDescription(
+                id: $task->id,
+                name: $task->name,
+                interrupts: $task->interrupts,
+                path: $task->path,
+            );
         }
 
-        return [
-            'values' => IO::readChannels($channels, $this->outputChannels),
-            'next' => $next,
-            'config' => $saved->config,
-            'metadata' => $saved->metadata,
-            'tasks' => $descriptions,
-        ];
+        return new StateSnapshot(
+            values: IO::readChannels($channels, $this->outputChannels),
+            next: $next,
+            config: $saved->config,
+            metadata: $saved->metadata,
+            createdAt: $saved->checkpoint->ts !== '' ? $saved->checkpoint->ts : null,
+            parentConfig: $saved->parentConfig,
+            tasks: $descriptions,
+        );
     }
 
     /**
