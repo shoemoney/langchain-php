@@ -3776,5 +3776,23 @@
   "#     FIXED: Pregel\\\\Checkpoint\\\\Checkpoint::toArray() now emits channel_values / channel_versions / versions_seen, so there is one shape and the savers hand-written branches are now redundant with it.",
   "#     THE COST OF THE ERROR, which is the part worth keeping. Seven existing tests asserted the camelCase spelling as the expected wire format - EmptyCheckpointMapsSerializeAsObjectsTest and InnerVersionsSeenMapsTest - and all seven were green. They passed because they asserted the ports OWN output rather than the upstream contract, so a wrong format could be pinned as the right one and the pin would protect it. Every wire-format assertion in this repository should be checked against the JS oracle rather than against what the port happens to emit; that is the whole argument for the oracle fixtures, demonstrated by the fixtures themselves being the thing that was wrong.",
   "#     The pinned assertNotSame is now assertSame, and the message records that it was a warning about a divergence that never reached disk. Suite 4421 tests, 9721 assertions; composer lint clean."
+ ],
+ "audit/stream-mode-debug": [
+  "#OPEN - STREAM MODE \"debug\" IS NOT IMPLEMENTED, AND THE FIX IS NOW FULLY SPECIFIED BY A COMMITTED ORACLE. Pregel::SUPPORTED_STREAM_MODES declares [updates, values] and resolveStreamModes() refuses the other six upstream modes by name. debug is the cheapest of them and the most useful: it is how a caller sees task boundaries, which values and updates both hide.",
+  "#     MEASURED FROM LANGGRAPH JS 1.4.18, committed as tests/Fixtures/langgraph/debug-stream-events.json. A two-node MessagesAnnotation graph streamed with streamMode \"debug\" produces 8 events in 3 types:",
+  "#       step  type           payload keys",
+  "#        -1  checkpoint     config, metadata, next, tasks, values          (no parentConfig - it is the first)",
+  "#         0  checkpoint     config, metadata, next, parentConfig, tasks, values",
+  "#         1  task           id, input, interrupts, metadata, name, triggers",
+  "#         1  task_result    id, interrupts, name, result",
+  "#         1  checkpoint     config, metadata, next, parentConfig, tasks, values",
+  "#         2  task           ...",
+  "#         2  task_result    ...",
+  "#         2  checkpoint     ...",
+  "#     Every event is {step, type, timestamp, payload}.",
+  "#     THE checkpoint PAYLOAD IS A StateSnapshot - config, metadata, next, parentConfig, tasks, values - so the value object landed this iteration is the payload type, and building it was not incidental. That is the strongest available evidence that introducing StateSnapshot was the right order of work.",
+  "#     WHERE THE EMITS GO, already located: checkpoint events at PregelLoop::putCheckpoint() (called from the tick() path at 375 plus fork/input at 574/586/622); task events where PregelRunner starts a task; task_result at PregelLoop::outputWrites() (738). PregelLoop::emit() already takes a mode and gates on it, so no new plumbing is needed - only new emit CALLS and the mode added to SUPPORTED_STREAM_MODES.",
+  "#     NOT STARTED, and the reason is budget rather than difficulty: this is 3 event types across 3 call sites in 2 files plus a fixture-comparison test, and half of it is worse than none of it. The fixture is committed so the next pass has the exact expected bytes rather than a description of them.",
+  "#     THE OTHER FIVE MODES (messages, checkpoints, tasks, custom, tools) remain unimplemented and are not scoped here. tasks in particular is close to the task/task_result payloads already captured here."
  ]
 }

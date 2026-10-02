@@ -1,0 +1,485 @@
+{
+  "_provenance": "LangGraph JS 1.4.18, streamMode \"debug\", two-node MessagesAnnotation graph. Emitted events recorded verbatim; only ids/timestamps scrubbed.",
+  "scenario": "MessagesAnnotation, nodes a and b, one stream, streamMode: \"debug\"",
+  "types": [
+    "checkpoint",
+    "task",
+    "task_result"
+  ],
+  "summary": [
+    {
+      "step": -1,
+      "type": "checkpoint",
+      "payloadKeys": [
+        "config",
+        "metadata",
+        "next",
+        "tasks",
+        "values"
+      ]
+    },
+    {
+      "step": 0,
+      "type": "checkpoint",
+      "payloadKeys": [
+        "config",
+        "metadata",
+        "next",
+        "parentConfig",
+        "tasks",
+        "values"
+      ]
+    },
+    {
+      "step": 1,
+      "type": "task",
+      "payloadKeys": [
+        "id",
+        "input",
+        "interrupts",
+        "metadata",
+        "name",
+        "triggers"
+      ]
+    },
+    {
+      "step": 1,
+      "type": "task_result",
+      "payloadKeys": [
+        "id",
+        "interrupts",
+        "name",
+        "result"
+      ]
+    },
+    {
+      "step": 1,
+      "type": "checkpoint",
+      "payloadKeys": [
+        "config",
+        "metadata",
+        "next",
+        "parentConfig",
+        "tasks",
+        "values"
+      ]
+    },
+    {
+      "step": 2,
+      "type": "task",
+      "payloadKeys": [
+        "id",
+        "input",
+        "interrupts",
+        "metadata",
+        "name",
+        "triggers"
+      ]
+    },
+    {
+      "step": 2,
+      "type": "task_result",
+      "payloadKeys": [
+        "id",
+        "interrupts",
+        "name",
+        "result"
+      ]
+    },
+    {
+      "step": 2,
+      "type": "checkpoint",
+      "payloadKeys": [
+        "config",
+        "metadata",
+        "next",
+        "parentConfig",
+        "tasks",
+        "values"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "step": -1,
+      "type": "checkpoint",
+      "timestamp": "<volatile>",
+      "payload": {
+        "config": {
+          "configurable": {
+            "checkpoint_ns": "",
+            "thread_id": "<volatile>",
+            "checkpoint_id": "<volatile>"
+          },
+          "metadata": {
+            "ls_integration": "langgraph",
+            "thread_id": "<volatile>"
+          },
+          "recursion_limit": 25,
+          "tags": []
+        },
+        "values": {
+          "messages": []
+        },
+        "metadata": {
+          "source": "input",
+          "step": -1,
+          "parents": {}
+        },
+        "next": [
+          "__start__"
+        ],
+        "tasks": [
+          {
+            "id": "<volatile>",
+            "name": "__start__",
+            "path": [
+              "__pregel_pull",
+              "__start__"
+            ],
+            "interrupts": []
+          }
+        ]
+      }
+    },
+    {
+      "step": 0,
+      "type": "checkpoint",
+      "timestamp": "<volatile>",
+      "payload": {
+        "config": {
+          "configurable": {
+            "checkpoint_ns": "",
+            "thread_id": "<volatile>",
+            "checkpoint_id": "<volatile>"
+          },
+          "metadata": {
+            "ls_integration": "langgraph",
+            "thread_id": "<volatile>"
+          },
+          "recursion_limit": 25,
+          "tags": []
+        },
+        "values": {
+          "messages": [
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "q",
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            }
+          ]
+        },
+        "metadata": {
+          "source": "loop",
+          "step": 0,
+          "parents": {}
+        },
+        "next": [
+          "a"
+        ],
+        "tasks": [
+          {
+            "id": "<volatile>",
+            "name": "a",
+            "path": [
+              "__pregel_pull",
+              "a"
+            ],
+            "interrupts": []
+          }
+        ],
+        "parentConfig": {
+          "configurable": {
+            "checkpoint_ns": "",
+            "thread_id": "<volatile>",
+            "checkpoint_id": "<volatile>"
+          },
+          "metadata": {
+            "ls_integration": "langgraph",
+            "thread_id": "<volatile>"
+          },
+          "recursion_limit": 25,
+          "tags": []
+        }
+      }
+    },
+    {
+      "step": 1,
+      "type": "task",
+      "timestamp": "<volatile>",
+      "payload": {
+        "id": "<volatile>",
+        "name": "a",
+        "input": {
+          "messages": [
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "q",
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            }
+          ]
+        },
+        "triggers": [
+          "branch:to:a"
+        ],
+        "interrupts": [],
+        "metadata": {
+          "ls_integration": "langgraph"
+        }
+      }
+    },
+    {
+      "step": 1,
+      "type": "task_result",
+      "timestamp": "<volatile>",
+      "payload": {
+        "id": "<volatile>",
+        "name": "a",
+        "result": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "A"
+            }
+          ]
+        },
+        "interrupts": []
+      }
+    },
+    {
+      "step": 1,
+      "type": "checkpoint",
+      "timestamp": "<volatile>",
+      "payload": {
+        "config": {
+          "configurable": {
+            "checkpoint_ns": "",
+            "thread_id": "<volatile>",
+            "checkpoint_id": "<volatile>"
+          },
+          "metadata": {
+            "ls_integration": "langgraph",
+            "thread_id": "<volatile>"
+          },
+          "recursion_limit": 25,
+          "tags": []
+        },
+        "values": {
+          "messages": [
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "q",
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            },
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "A",
+                "tool_calls": [],
+                "invalid_tool_calls": [],
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            }
+          ]
+        },
+        "metadata": {
+          "source": "loop",
+          "step": 1,
+          "parents": {}
+        },
+        "next": [
+          "b"
+        ],
+        "tasks": [
+          {
+            "id": "<volatile>",
+            "name": "b",
+            "path": [
+              "__pregel_pull",
+              "b"
+            ],
+            "interrupts": []
+          }
+        ],
+        "parentConfig": {
+          "configurable": {
+            "checkpoint_ns": "",
+            "thread_id": "<volatile>",
+            "checkpoint_id": "<volatile>"
+          },
+          "metadata": {
+            "ls_integration": "langgraph",
+            "thread_id": "<volatile>"
+          },
+          "recursion_limit": 25,
+          "tags": []
+        }
+      }
+    },
+    {
+      "step": 2,
+      "type": "task",
+      "timestamp": "<volatile>",
+      "payload": {
+        "id": "<volatile>",
+        "name": "b",
+        "input": {
+          "messages": [
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "q",
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            },
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "A",
+                "tool_calls": [],
+                "invalid_tool_calls": [],
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            }
+          ]
+        },
+        "triggers": [
+          "branch:to:b"
+        ],
+        "interrupts": [],
+        "metadata": {
+          "ls_integration": "langgraph"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "type": "task_result",
+      "timestamp": "<volatile>",
+      "payload": {
+        "id": "<volatile>",
+        "name": "b",
+        "result": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "B"
+            }
+          ]
+        },
+        "interrupts": []
+      }
+    },
+    {
+      "step": 2,
+      "type": "checkpoint",
+      "timestamp": "<volatile>",
+      "payload": {
+        "config": {
+          "configurable": {
+            "checkpoint_ns": "",
+            "thread_id": "<volatile>",
+            "checkpoint_id": "<volatile>"
+          },
+          "metadata": {
+            "ls_integration": "langgraph",
+            "thread_id": "<volatile>"
+          },
+          "recursion_limit": 25,
+          "tags": []
+        },
+        "values": {
+          "messages": [
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "q",
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            },
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "A",
+                "tool_calls": [],
+                "invalid_tool_calls": [],
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            },
+            {
+              "lc": 1,
+              "type": "constructor",
+              "id": "<volatile>",
+              "kwargs": {
+                "content": "B",
+                "tool_calls": [],
+                "invalid_tool_calls": [],
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "id": "<volatile>"
+              }
+            }
+          ]
+        },
+        "metadata": {
+          "source": "loop",
+          "step": 2,
+          "parents": {}
+        },
+        "next": [],
+        "tasks": [],
+        "parentConfig": {
+          "configurable": {
+            "checkpoint_ns": "",
+            "thread_id": "<volatile>",
+            "checkpoint_id": "<volatile>"
+          },
+          "metadata": {
+            "ls_integration": "langgraph",
+            "thread_id": "<volatile>"
+          },
+          "recursion_limit": 25,
+          "tags": []
+        }
+      }
+    }
+  ]
+}
