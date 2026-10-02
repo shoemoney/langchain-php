@@ -39,10 +39,10 @@ final class EmptyCheckpointMapsSerializeAsObjectsTest extends TestCase
     {
         $bytes = $this->encode(CheckpointFunctions::emptyCheckpoint());
 
-        self::assertStringContainsString('"channelVersions":{}', $bytes, $bytes);
-        self::assertStringContainsString('"versionsSeen":{}', $bytes, $bytes);
-        self::assertStringNotContainsString('"channelVersions":[]', $bytes, $bytes);
-        self::assertStringNotContainsString('"versionsSeen":[]', $bytes, $bytes);
+        self::assertStringContainsString('"channel_versions":{}', $bytes, $bytes);
+        self::assertStringContainsString('"versions_seen":{}', $bytes, $bytes);
+        self::assertStringNotContainsString('"channel_versions":[]', $bytes, $bytes);
+        self::assertStringNotContainsString('"versions_seen":[]', $bytes, $bytes);
     }
 
     /** A hand-built one, same shape, so the assertion is not tied to one factory. */
@@ -50,8 +50,8 @@ final class EmptyCheckpointMapsSerializeAsObjectsTest extends TestCase
     {
         $bytes = $this->encode(new Checkpoint());
 
-        self::assertStringContainsString('"channelVersions":{}', $bytes, $bytes);
-        self::assertStringContainsString('"versionsSeen":{}', $bytes, $bytes);
+        self::assertStringContainsString('"channel_versions":{}', $bytes, $bytes);
+        self::assertStringContainsString('"versions_seen":{}', $bytes, $bytes);
     }
 
     /** Control: a POPULATED checkpoint was always right, and must stay right. */
@@ -62,8 +62,8 @@ final class EmptyCheckpointMapsSerializeAsObjectsTest extends TestCase
             versionsSeen: ['b' => ['node' => 2]],
         ));
 
-        self::assertStringContainsString('"channelVersions":{"a":1}', $bytes, $bytes);
-        self::assertStringContainsString('"versionsSeen":{"b":{"node":2}}', $bytes, $bytes);
+        self::assertStringContainsString('"channel_versions":{"a":1}', $bytes, $bytes);
+        self::assertStringContainsString('"versions_seen":{"b":{"node":2}}', $bytes, $bytes);
     }
 
     /** Control: the sibling class that carries the cast must be unaffected by widening the match. */

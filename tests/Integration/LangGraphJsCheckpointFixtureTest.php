@@ -111,15 +111,29 @@ final class LangGraphJsCheckpointFixtureTest extends TestCase
         );
         sort($phpKeys);
 
-        self::assertNotSame(
+        // WAS a pinned divergence. `assertNotSame` here recorded that this port wrote
+        // camelCase where LangGraph JS writes snake_case, and the message said it would
+        // fail once the port was fixed.
+        //
+        // IT WAS WRONG, and the correction matters more than the fix. The finding
+        // measured `dumpsTyped()` on a checkpoint object READ BACK from a saver — which
+        // walks PHP property names, not the stored bytes. Reading the raw sqlite row
+        // showed the SAVED JSON was snake_case all along, because both savers'
+        // `wireCheckpoint()` hand-write the snake_case array rather than calling
+        // `toArray()`. Nothing on the save path was ever broken; the port agreed with
+        // upstream.
+        //
+        // So `assertNotSame` is now `assertSame`, and the defect it described was real
+        // but different in kind: `toArray()` and the savers disagreed, leaving the wrong
+        // shape on the method every other caller reaches for. That is fixed, and this
+        // assertion now pins agreement rather than a warning about it.
+        self::assertSame(
             $jsKeys,
             $phpKeys,
-            'KNOWN DIVERGENCE, asserted so it stays visible: this port writes camelCase '
-            . '(`channelVersions`) where LangGraph JS writes snake_case (`channel_versions`, '
-            . 'checkpoint/src/base.ts:41). A JS saver reading a port-written checkpoint finds '
-            . 'no `channel_versions` and reads the thread as empty instead of failing. '
-            . 'This assertion is EXPECTED TO FAIL until the wire keys are renamed — that is '
-            . 'why it is written as assertNotSame rather than deleted.',
+            'this port must write the same key names LangGraph JS writes. It previously '
+            . 'emitted camelCase from Pregel\Checkpoint\Checkpoint::toArray() while the savers '
+            . 'hand-wrote snake_case; the STORED bytes were always snake_case, so this is '
+            . 'now pinning agreement rather than recording a divergence that never reached disk.',
         );
     }
 
@@ -206,9 +220,9 @@ final class LangGraphJsCheckpointFixtureTest extends TestCase
     {
         $bytes = (new JsonPlusSerializer())->dumpsTyped(CheckpointFunctions::emptyCheckpoint())[1];
 
-        self::assertStringContainsString('"versionsSeen":{}', $bytes, 'an empty versions_seen must be {}');
-        self::assertStringNotContainsString('"versionsSeen":[]', $bytes, 'an empty versions_seen must never be []');
-        self::assertStringNotContainsString('"channelVersions":[]', $bytes, 'an empty channel_versions must never be []');
+        self::assertStringContainsString('"versions_seen":{}', $bytes, 'an empty versions_seen must be {}');
+        self::assertStringNotContainsString('"versions_seen":[]', $bytes, 'an empty versions_seen must never be []');
+        self::assertStringNotContainsString('"channel_versions":[]', $bytes, 'an empty channel_versions must never be []');
 
         // Now the nested case: one level in, exactly as the JS tuple 2 carries
         // versions_seen: {"__input__": {}}. A one-level cast passes the assertion
@@ -219,7 +233,7 @@ final class LangGraphJsCheckpointFixtureTest extends TestCase
 
         $nested = (new JsonPlusSerializer())->dumpsTyped($checkpoint)[1];
         self::assertStringContainsString(
-            '"versionsSeen":{"__input__":{}}',
+            '"versions_seen":{"__input__":{}}',
             $nested,
             'a map nested inside versions_seen must also be {} — the case JS writes as '
             . 'versions_seen: {"__input__": {}}',

@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  * The outer cast landed at iteration 362 and fixed `versionsSeen: []` → `{}`. It did not recurse, and
  * `json_encode` writes a PHP `[]` as a JSON array, so:
  *
- *     versionsSeen: ['fan_out' => []]   ->   "versionsSeen":{"fan_out":[]}
+ *     versionsSeen: ['fan_out' => []]   ->   "versions_seen":{"fan_out":[]}
  *
  * That shape is not an edge case: the algorithm creates an inner entry for any task whose only trigger
  * is a `Send` push (no entry in `channel_versions`), and never fills it. A JavaScript reader handed
@@ -37,7 +37,7 @@ final class InnerVersionsSeenMapsTest extends TestCase
     {
         $bytes = $this->encode(new Checkpoint(versionsSeen: ['fan_out' => []]));
 
-        self::assertStringContainsString('"versionsSeen":{"fan_out":{}}', $bytes, $bytes);
+        self::assertStringContainsString('"versions_seen":{"fan_out":{}}', $bytes, $bytes);
         self::assertStringNotContainsString('"fan_out":[]', $bytes, $bytes);
     }
 
@@ -46,8 +46,8 @@ final class InnerVersionsSeenMapsTest extends TestCase
     {
         $bytes = $this->encode(new Checkpoint());
 
-        self::assertStringContainsString('"versionsSeen":{}', $bytes, $bytes);
-        self::assertStringContainsString('"channelVersions":{}', $bytes, $bytes);
+        self::assertStringContainsString('"versions_seen":{}', $bytes, $bytes);
+        self::assertStringContainsString('"channel_versions":{}', $bytes, $bytes);
     }
 
     /** CONTROL: a populated inner map keeps its entries — the case that always worked. */
@@ -55,7 +55,7 @@ final class InnerVersionsSeenMapsTest extends TestCase
     {
         $bytes = $this->encode(new Checkpoint(versionsSeen: ['node' => ['__pregel_tasks' => 1]]));
 
-        self::assertStringContainsString('"versionsSeen":{"node":{"__pregel_tasks":1}}', $bytes, $bytes);
+        self::assertStringContainsString('"versions_seen":{"node":{"__pregel_tasks":1}}', $bytes, $bytes);
     }
 
     /** CONTROL: `channelVersions` holds scalars, so its values must NOT be turned into objects. */
@@ -63,6 +63,6 @@ final class InnerVersionsSeenMapsTest extends TestCase
     {
         $bytes = $this->encode(new Checkpoint(channelVersions: ['a' => 1]));
 
-        self::assertStringContainsString('"channelVersions":{"a":1}', $bytes, $bytes);
+        self::assertStringContainsString('"channel_versions":{"a":1}', $bytes, $bytes);
     }
 }

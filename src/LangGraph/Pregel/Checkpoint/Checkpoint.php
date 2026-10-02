@@ -72,15 +72,29 @@ class Checkpoint
             'v' => $this->v,
             'id' => $this->id,
             'ts' => $this->ts,
-            'channelValues' => $this->channelValues,
-            'channelVersions' => (object) $this->channelVersions,
+            // SNAKE_CASE, because that is what upstream writes. Measured against a
+            // LangGraph JS run's stored checkpoint:
+            //   {"v":4,"id":...,"ts":...,"channel_values":{...},"channel_versions":{...},"versions_seen":{...}}
+            // This method emitted camelCase, which meant the savers could not simply
+            // call it — `MemorySaver::wireCheckpoint()` and `SqliteSaver::wireCheckpoint()`
+            // each HAND-WRITE the snake_case array instead, with a comment explaining
+            // why. Two shapes for one checkpoint, one of them correct, and the wrong
+            // one sitting on the method every other caller reaches for.
+            //
+            // The savers were right and this was wrong: the STORED bytes are
+            // snake_case (verified by reading the raw sqlite row), so nothing on the
+            // save path was broken. What was broken is that the obvious call — ask the
+            // checkpoint for its array — produced a different format from the one
+            // actually persisted. One shape now.
+            'channel_values' => $this->channelValues,
+            'channel_versions' => (object) $this->channelVersions,
             // Recurse ONE level. `versionsSeen` is typed `array<string, array<string, int|string>>` —
             // every inner value is a map — so every inner value must be an object when empty, exactly
             // like the outer level. Casting only the outer level fixed `versionsSeen: []` and left
             // `versionsSeen: {"fan_out": []}` for any task whose only trigger is a `Send` push, because
             // `json_encode` writes a PHP `[]` as a JSON array and a JavaScript reader cannot read that
             // back as the map it is.
-            'versionsSeen' => (object) array_map(
+            'versions_seen' => (object) array_map(
                 static fn (array $inner): object => (object) $inner,
                 $this->versionsSeen,
             ),
