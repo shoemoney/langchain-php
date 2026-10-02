@@ -148,10 +148,15 @@ final class LayeringInstrumentScansCodeTest extends TestCase
             $source,
             'dep_edges() must scan code with comments removed',
         );
+        // Composed, not a bare call: the scan wraps the comment strip in the string
+        // strip, so asserting `body = strip_php_comments(` would fail against the
+        // CORRECT instrument and pass against a weaker one. What must hold is that
+        // both strips reach the body the scan reads.
         self::assertMatchesRegularExpression(
-            '/body\s*=\s*strip_php_comments\(/',
+            '/body\s*=\s*strip_php_strings\(\s*strip_php_comments\(/s',
             $source,
-            'the scan itself must use the stripped body, not the raw file text',
+            'the scan must strip comments AND string literals before counting edges: a '
+            . 'docblock naming the other package, or a class name inside a literal, is a mention',
         );
     }
 

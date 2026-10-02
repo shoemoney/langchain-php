@@ -132,6 +132,64 @@ final class ReferenceCountInstrumentTest extends TestCase
     }
 
     /**
+     * NAMING a class must not count as USING it.
+     *
+     * This test's own predecessor found the bug by accident. The sweep reported
+     * **3** orphans; adding the assertion above — which names `BaseToolkit`,
+     * `FakeTool` and `Observable` as string literals — made the very next run report
+     * **0**. Nothing about the port had changed. The sweep had been changed by the
+     * act of testing it.
+     *
+     * A test naming a class is a *mention*. Counting mentions produces a number that
+     * looks like evidence of wiring and is not, and a clean sweep is believed where
+     * a wrong one gets checked. So the regression is asserted in the only direction
+     * that can catch it: the three classes stay at zero referrers *even though this
+     * file and HANDOFF both name them*.
+     *
+     * This is the shape the project has hit repeatedly — a fixture mirroring the
+     * bug, a test that agrees with the defect — one level up. Those encoded the wrong
+     * behaviour; this one encodes the RIGHT behaviour and still corrupts the
+     * measurement of a third thing.
+     */
+    public function testNamingAClassDoesNotCountAsReferencingIt(): void
+    {
+        $source = (string) file_get_contents(self::root() . '/' . self::ADVISORY);
+
+        self::assertStringContainsString(
+            'def strip_php_strings(',
+            $source,
+            'the instrument must have a string-literal stripper',
+        );
+        self::assertMatchesRegularExpression(
+            '/bodies\[p\]\s*=\s*strip_php_strings\(/',
+            $source,
+            'reference_counts() must strip string literals before counting; a class name '
+            . 'inside a literal is a mention, not a use',
+        );
+
+        // The three orphans, named in this very file and in HANDOFF, must still read
+        // as unreferenced. The sweep is re-implemented here rather than shelled out
+        // to, so the expectation is checkable inside the suite and does not depend
+        // on Node/Python being present on the CI runner.
+        foreach ([
+            'LangChain\\Tools\\BaseToolkit' => 'src/LangChain/Tools/BaseToolkit.php',
+            'LangChain\\Utils\\Testing\\FakeTool' => 'src/LangChain/Utils/Testing/FakeTool.php',
+            'LangChain\\Utils\\Observable' => 'src/LangChain/Utils/Observable.php',
+        ] as $class => $path) {
+            $short = substr((string) strrchr('\\' . $class, '\\'), 1);
+
+            self::assertSame(
+                0,
+                $this->codeReferrers($short, self::root() . '/' . $path),
+                $short . ' is still an orphan. This file names it in a string literal and '
+                . 'HANDOFF names it in prose; neither is a reference. If this now fails, '
+                . 'something genuinely wired it up - update the HANDOFF table rather than '
+                . 'the instrument.',
+            );
+        }
+    }
+
+    /**
      * The instrument must count CODE referrers.
      *
      * Comments are stripped before counting, because `Runnable.php` names two
@@ -258,12 +316,27 @@ final class ReferenceCountInstrumentTest extends TestCase
         return $found;
     }
 
+    /**
+     * Strip comments, docblocks, attributes AND string literals.
+     *
+     * The string strip is the point of this helper and was added after it failed:
+     * it mirrored `strip_php_comments` only, so it counted the class names this
+     * very file mentions in string literals as references — reproducing in PHP the
+     * exact blind spot the Python instrument had. A re-implementation of a sweep
+     * that does not share its semantics will disagree with it, and here it agreed
+     * with the BUG rather than with the fix.
+     *
+     * Single quotes are matched first, and `\\'` counts as an escaped quote inside
+     * them; matching the double-quoted pattern first would split such a string in
+     * two and leave its tail looking like code.
+     */
     private function stripComments(string $src): string
     {
         $src = (string) preg_replace('#/\*.*?\*/#s', '', $src);
         $src = (string) preg_replace('#//[^\n]*#', '', $src);
+        $src = (string) preg_replace('/#\[[^\]]*\]/s', '', $src);
 
-        return (string) preg_replace('/#\[[^\]]*\]/s', '', $src);
+        return (string) preg_replace('/"(?:\\\\.|[^"\\\\])*"|\'(?:\\\\.|[^\'\\\\])*\'/s', "''", $src);
     }
 
     private static function root(): string

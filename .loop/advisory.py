@@ -162,10 +162,15 @@ def dep_edges():
     that one distinction takes `LangChain -> LangGraph` from 1 to 0 — the port
     has no upward dependency at all, which is what upstream's
     `@langchain/core` having no dependency on `@langchain/langgraph` requires.
+
+    String literals are stripped too, for the same reason one level down: a class
+    name inside `'...'` is a mention, not an edge. See {@see strip_php_strings}.
     """
     edges = collections.Counter()
     for p in (ROOT / "src").rglob("*.php"):
-        body = strip_php_comments(p.read_text(encoding="utf-8", errors="replace"))
+        body = strip_php_strings(
+            strip_php_comments(p.read_text(encoding="utf-8", errors="replace"))
+        )
         own = p.relative_to(ROOT / "src").parts[0]
         for target in ("LangChain", "LangGraph"):
             if target == own:
@@ -262,6 +267,43 @@ def declared_class(path: Path) -> str | None:
     return m.group(1) if m else None
 
 
+def strip_php_strings(src: str) -> str:
+    """Blank out string literals so a class NAME inside one is not a reference.
+
+    A bare-name scan counts `'BaseToolkit'` as a use of `BaseToolkit`. It is not —
+    it is a mention, and the difference is not academic: this repository's own
+    `ReferenceCountInstrumentTest` asserts that three orphan classes are *named* in
+    HANDOFF, so the sole "referrer" for all three was a string literal in a test.
+
+    That made `reference_counts()` report **0 orphans** immediately after the same
+    instrument reported **3** (`BaseToolkit`, `FakeTool`, `Observable`). Nothing was
+    fixed between the two runs. The sweep had been changed by the act of testing it,
+    which is a worse failure than a wrong number: a wrong number gets checked, and a
+    clean sweep is believed.
+
+    Which is the general shape this loop keeps meeting — a fixture mirroring the bug,
+    a test that agrees with the defect — one level up. There, the test encoded the
+    wrong behaviour. Here the test encoded the right behaviour and still corrupted
+    the measurement of a third thing.
+
+    WHAT THIS DELIBERATELY MISSES: a dynamic reference (`class_exists('Foo')`, a
+    factory keyed by name, a deserialiser resolving a class string) stops counting.
+    That is the correct trade for this instrument, because its own output already
+    frames a zero as "a QUESTION, not a verdict — the class may be reached by a name
+    string, a factory, or serialization". A number that counts mentions looks like
+    evidence of wiring and is not; a number that counts real uses is honest about
+    what it cannot see.
+
+    Heredoc/nowdoc bodies are not stripped; a class name inside one would still
+    count. There are none in this tree, and the limitation is stated rather than
+    papered over.
+    """
+    # Single-quoted first: \' is an escaped quote inside a single-quoted string, and
+    # handling the double-quoted pattern first would split such a string in two and
+    # leave the tail looking like code.
+    return re.sub(r"'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"", "''", src)
+
+
 def reference_counts() -> dict[str, int]:
     """How many files reference each src class, counting CODE only.
 
@@ -282,13 +324,19 @@ def reference_counts() -> dict[str, int]:
     Comments and docblocks are stripped, because a sentence ABOUT a class is not
     a reference to it: `Runnable.php` names two LangGraph classes in a docblock
     and that is prose about the architecture, not a dependency (see
-    `strip_php_comments`).
+    `strip_php_comments`). STRING LITERALS ARE STRIPPED TOO — see
+    {@see strip_php_strings}. Without that second strip this sweep reported 0
+    orphans one run after reporting 3, because the test which names those three
+    classes in HANDOFF assertions supplied their only "referrer" as a literal.
     """
     src_files = sorted((ROOT / "src").rglob("*.php"))
-    # One pass over every file, remembering the stripped text for reuse.
+    # One pass over every file, remembering the stripped text for reuse. Comments
+    # AND strings: a mention in either is prose about the code, not code using it.
     bodies: dict[Path, str] = {}
     for p in src_files + sorted((ROOT / "tests").rglob("*.php")):
-        bodies[p] = strip_php_comments(p.read_text(encoding="utf-8", errors="replace"))
+        bodies[p] = strip_php_strings(
+            strip_php_comments(p.read_text(encoding="utf-8", errors="replace"))
+        )
 
     counts: dict[str, int] = {}
     for p in src_files:
