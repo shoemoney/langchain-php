@@ -779,7 +779,7 @@ final class Algorithm
                     (string) $step,
                     $name,
                     Constants::PULL,
-                    $trigger,
+                    [$trigger],
                 ]),
                 $checkpoint->id
             );
