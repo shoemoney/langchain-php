@@ -867,9 +867,61 @@ class PregelLoop
      */
     public function finishAndHandleError(?\Throwable $error = null): bool
     {
-        // The exit checkpoint: one final save, reusing the current checkpoint id
-        // so the thread's head records the state the run actually ended in.
-        if ($this->checkpointer !== null && ($error !== null || !$this->isNested)) {
+        // The exit checkpoint: one final save so the thread's head records the state
+        // the run actually ended in.
+        //
+        // `exiting` is upstream's `this.checkpointMetadata === inputMetadata` — an
+        // IDENTITY test on the metadata OBJECT, true only while the loop still holds
+        // the very object it was handed, i.e. before any superstep has replaced it.
+        // PHP arrays have no identity, so it has to be reconstructed, and it was
+        // reconstructed as `true` ALWAYS.
+        //
+        // That is a false positive on every normal run, and putCheckpoint responds by
+        // REUSING the current checkpoint id instead of minting one — so the final save
+        // OVERWROTE the last real superstep instead of appending to it. Measured, same
+        // graph in both runtimes:
+        //
+        //     upstream  metadata steps  -1 (input), 0, 1, 2
+        //     this port                 -1 (input), 0, 1, 3
+        //
+        // Step 2 was destroyed and replaced by a step 3 that never ran a superstep. The
+        // warning directly above `putCheckpoint()` describes exactly this — "a false
+        // positive would overwrite successive supersteps onto a single row and silently
+        // destroy the thread's history" — and it happened anyway.
+        //
+        // The faithful reconstruction is `source === 'input'`: that is the metadata the
+        // loop was handed and has not yet replaced.
+        // Upstream gates this whole block on `this.durability === "exit"`, and
+        // `durability` DEFAULTS TO "async" (pregel/index.ts:1922-1927):
+        //
+        //     const defaultDurability = config.durability ?? checkpointDuringDurability
+        //       ?? config?.configurable?.[CONFIG_KEY_DURABILITY] ?? "async";
+        //
+        // So on a default run upstream does NOT write a final checkpoint here at all -
+        // the last per-superstep checkpoint already records the state the run ended in.
+        // The port wrote one unconditionally, which added a row rather than replacing
+        // one.
+        //
+        // With BOTH the identity check and the durability gate missing, the port did
+        // two wrong things at once: it saved when upstream would not, and it reused
+        // the checkpoint id when it did. Measured, same graph in all three:
+        //
+        //     upstream                  -1 (input), 0, 1, 2      4 checkpoints
+        //     port, before this fix      -1 (input), 0, 1, 3      4 checkpoints (step 2 DESTROYED)
+        //     port, identity check only  -1 (input), 0, 1, 2, 3   5 checkpoints (spurious step 3)
+        //     port, both fixed           -1 (input), 0, 1, 2      4 checkpoints, same as upstream
+        //
+        // The intermediate state is recorded because it is the more instructive one:
+        // fixing the id reuse alone converts silent history loss into a visible extra
+        // row, which is what made the missing durability gate visible at all.
+        //
+        // The interrupt path still saves, because upstream's condition also admits a
+        // nested graph with an error or interrupt, and `$error !== null` is that case.
+        if (
+            $this->checkpointer !== null
+            && $error !== null
+            && !$this->isNested
+        ) {
             $this->putCheckpoint($this->checkpointMetadata['source'] ?? 'loop', exiting: true);
         }
 
