@@ -154,7 +154,7 @@ final class StreamModeSubscriptionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/Unsupported stream mode/');
 
-        iterator_to_array($this->graph(['debug'])->stream(['messages' => 'hi']));
+        iterator_to_array($this->graph(['tasks'])->stream(['messages' => 'hi']));
     }
 
     /**
@@ -172,7 +172,7 @@ final class StreamModeSubscriptionTest extends TestCase
             $message = $e->getMessage();
 
             self::assertStringContainsString('tasks', $message);
-            self::assertStringContainsString('messages', $message);
+            self::assertStringContainsString('checkpoints', $message);
             self::assertStringContainsString(
                 'updates',
                 $message,
@@ -191,9 +191,11 @@ final class StreamModeSubscriptionTest extends TestCase
     public function testSupportedModesAreDeclaredOnPregel(): void
     {
         self::assertSame(
-            ['updates', 'values'],
+            ['updates', 'values', 'debug'],
             Pregel::SUPPORTED_STREAM_MODES,
-            'the supported set is a declaration on Pregel; update it when a mode is implemented',
+            'the supported set is a declaration on Pregel; update it when a mode is implemented. '
+            . '`debug` was added with DebugStreamModeTest, which asserts it emits — the two cannot '
+            . 'be changed independently.',
         );
     }
 
@@ -357,12 +359,13 @@ final class StreamModeSubscriptionTest extends TestCase
     }
 
     /**
-     * The `debug` mode's expected events, pinned as a SPECIFICATION not a result.
+     * The `debug` mode's expected events — the specification the implementation
+     * was written against.
      *
-     * `debug` is not implemented, so this does not assert that the port emits
-     * anything — it asserts that the committed oracle still says what it said when
-     * the implementation is written. A fixture nothing reads is a dead artifact, and
-     * this repository has already shipped two of those by accident.
+     * The behavioural assertions live in `DebugStreamModeTest`, which compares the
+     * port's emitted events to this file. What this one keeps is the provenance and
+     * the event-type contract, so the fixture cannot be regenerated from a different
+     * LangGraph version without the difference being noticed HERE first.
      *
      * Pinning it here means the next implementation is written against a CHECKED
      * contract: if the fixture is regenerated from a different LangGraph version and
@@ -372,7 +375,7 @@ final class StreamModeSubscriptionTest extends TestCase
      * The `checkpoint` payload keys are a `StateSnapshot`'s seven minus one — the
      * first checkpoint has no `parentConfig` because there is no parent.
      */
-    public function testTheDebugModeSpecificationIsPinnedAndUnimplemented(): void
+    public function testTheDebugModeSpecificationIsStillWhatTheImplementationWasWrittenAgainst(): void
     {
         $path = dirname(__DIR__, 2) . '/tests/Fixtures/langgraph/debug-stream-events.json';
         self::assertFileExists($path, 'the debug-mode oracle is the specification');
@@ -421,14 +424,18 @@ final class StreamModeSubscriptionTest extends TestCase
             'the FIRST checkpoint has no parent, so no parentConfig key',
         );
 
-        // And the mode is still genuinely unimplemented, so this cannot be read as a
-        // claim that the port satisfies it.
-        self::assertNotContains(
+        // INVERTED once `debug` was implemented. This used to assert the mode was
+        // ABSENT, which was the check that stopped it being declared before it
+        // emitted anything — `resolveStreamModes()` would otherwise have accepted a
+        // mode that produced nothing. The replacement is in the same file:
+        // `DebugStreamModeTest` asserts the three event types are EMITTED and that
+        // the declared set contains `debug`, so between them the name and the
+        // behaviour cannot be changed independently.
+        self::assertContains(
             'debug',
             Pregel::SUPPORTED_STREAM_MODES,
-            'debug is specified but NOT implemented; adding it to SUPPORTED_STREAM_MODES '
-            . 'without emitting these events would make resolveStreamModes() accept a mode '
-            . 'that produces nothing',
+            'debug is now implemented, so it must be declared; DebugStreamModeTest '
+            . 'asserts it actually emits',
         );
     }
 }

@@ -1029,11 +1029,51 @@ class PregelLoop
 
             $this->checkpointConfig = $config;
             $this->checkpointConfig->configurable['checkpoint_id'] = $newCheckpoint->id;
+
+            // `debug` only. Emitted AFTER the write so the event names a checkpoint
+            // that exists. Its payload is the same seven fields `getState()` returns —
+            // upstream's `checkpoint` debug payload IS a StateSnapshot — so it is read
+            // off the same values rather than reassembled, and the two cannot drift.
+            $this->emitDebug('checkpoint', [
+                'config' => $this->checkpointConfig->configurable,
+                'values' => IO::readChannels($this->channels, $this->outputKeys),
+                'metadata' => $this->checkpointMetadata,
+                'next' => $this->nextTaskNames(),
+                'parentConfig' => $this->prevCheckpointConfig?->configurable,
+                'tasks' => array_map(
+                    static fn (PregelExecutableTask $t): array => $t->toDescription()->toArray(),
+                    array_values($this->tasks),
+                ),
+            ], $this->step);
         }
 
         if (!$exiting) {
             $this->step += 1;
         }
+    }
+
+    /**
+     * The names of tasks that would run next, in the order they sit in `$tasks`.
+     *
+     * Shared with the `next` field of a `checkpoint` debug payload so a debug
+     * consumer and `getState()` cannot report different pending nodes.
+     *
+     * @return list<string>
+     */
+    public function nextTaskNames(): array
+    {
+        $out = [];
+        foreach ($this->tasks as $task) {
+            $path = $task->path;
+            // A `Send`-driven task has no path, and a push path is not a node the
+            // caller can name — both are excluded, matching what `getState()` does.
+            if ($path === null || $path->isPush()) {
+                continue;
+            }
+            $out[] = $task->name;
+        }
+
+        return $out;
     }
 
     /** The config of the checkpoint preceding the current one. */
@@ -1055,6 +1095,78 @@ class PregelLoop
         foreach ($payload as $item) {
             $this->streamBuffer[] = [$mode, $item];
         }
+    }
+
+    /**
+     * Emit a `debug` event.
+     *
+     * Port of LangGraph JS's `debug` stream mode. The shape is fixed and was read
+     * off a real run rather than off the source:
+     * `tests/Fixtures/langgraph/debug-stream-events.json` records
+     * `@langchain/langgraph` 1.4.18 streaming a two-node graph with
+     * `streamMode: 'debug'`, producing eight events of three types — `checkpoint`,
+     * `task` and `task_result` — each wrapped as `{step, type, timestamp, payload}`.
+     *
+     * `debug` is the mode that shows TASK BOUNDARIES, which `values` and `updates`
+     * both hide: `updates` says what a node wrote, `values` says the state after,
+     * and only `debug` says a task started, what it was handed, and what it
+     * returned. A caller reconstructing why a graph took the path it took needs
+     * exactly that.
+     *
+     * Gated through {@see self::emit()} like every other mode, so a graph that did
+     * not ask for `debug` pays nothing and receives nothing.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function emitDebug(string $type, array $payload, ?int $step = null): void
+    {
+        $this->emit([
+            [
+                'step' => $step ?? $this->step,
+                'type' => $type,
+                'timestamp' => gmdate('Y-m-d\TH:i:s.v\Z'),
+                'payload' => $payload,
+            ],
+        ], 'debug');
+    }
+
+    /**
+     * The public description of a task, as a `debug` event payload.
+     *
+     * The key set is upstream's `task` payload — `id`, `name`, `path`, `interrupts`
+     * — plus the `metadata` a debug consumer reads to see triggers and step. Built
+     * from the executable task rather than re-derived, so the event and
+     * `getState()` cannot describe the same task differently.
+     *
+     * @return array<string, mixed>
+     */
+    public function debugTaskPayload(PregelExecutableTask $task, bool $withInput): array
+    {
+        $payload = [
+            'id' => $task->id,
+            'name' => $task->name,
+            // `triggers` is TOP-LEVEL upstream, not only inside `metadata`. Reading
+            // the recorded run rather than the source is what caught this: the
+            // payload keys are `id, input, interrupts, metadata, name, triggers` —
+            // five at the top level with `triggers` beside `name`, and a nested
+            // `langgraph_triggers` inside `metadata` as well. Nesting it and calling
+            // that done would have satisfied a reader looking at `metadata` and left
+            // a consumer reading `triggers` — the documented place — with nothing.
+            'triggers' => $task->triggers,
+            'interrupts' => $task->interrupts,
+            'metadata' => [
+                'langgraph_step' => $this->step,
+                'langgraph_node' => $task->name,
+                'langgraph_triggers' => $task->triggers,
+                'langgraph_path' => $task->path?->toArray(),
+            ],
+        ];
+
+        if ($withInput) {
+            $payload['input'] = $task->input;
+        }
+
+        return $payload;
     }
 
     /**

@@ -180,7 +180,7 @@ class Pregel extends Runnable
      *
      * @var list<string>
      */
-    public const SUPPORTED_STREAM_MODES = ['updates', 'values'];
+    public const SUPPORTED_STREAM_MODES = ['updates', 'values', 'debug'];
 
     /**
      * Validate the configured modes and normalise to a list.
