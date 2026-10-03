@@ -3815,5 +3815,21 @@
   "#     MUTATION-VERIFIED: removing the task emit fails 3, removing the checkpoint emit fails 2, breaking the subscription gate fails 1. src/ restored.",
   "#     My own sequence-comparison test was wrong twice first - a nonsense trailing-event loop, then a skip that kept the FIRST checkpoint when a LATER one was needed - and both are recorded because the fix (compare the recorded prefix, allow only trailing checkpoints) is the part that makes the check able to fail.",
   "#     Suite 4422 -> 4432 tests, 9731 -> 9979 assertions; composer lint clean. Remaining unimplemented: messages, checkpoints, tasks, custom, tools."
+ ],
+ "audit/update-state-not-ported": [
+  "#OPEN - updateState() IS STILL NOT PORTED, AND IT IS NOW SCOPED TO ITS ACTUAL STEPS RATHER THAN TO ITS SIZE. advisory/claude-fable-5-1 ranked finding 3 called this \"no updateState() - high impact on HITL\". method_exists(Pregel::class, \"updateState\") is false and has been across two iterations of saying so. Upstream pregel/index.ts:1804 is a three-line delegation:",
+  "#     updateState(inputConfig, values, asNode?) { return this.bulkUpdateState(inputConfig, [{updates: [{values, asNode}]}]); }",
+  "#     So the work is bulkUpdateState (pregel/index.ts:1193), whose measured shape is:",
+  "#       1. resolve the checkpointer (config override else this.checkpointer); refuse with MISSING_CHECKPOINTER if none",
+  "#       2. refuse an empty supersteps array, and refuse any superstep with zero updates",
+  "#       3. SUBGRAPH DELEGATION: if checkpoint_ns is non-empty and no checkpointer was passed on the config, recast the namespace, find the matching subgraph and recurse into ITS bulkUpdateState; refuse if no subgraph matches",
+  "#       4. per superstep, in updateSuperStep: getTuple the last checkpoint or emptyCheckpoint(); copy it; step = saved.metadata.step ?? -1",
+  "#       5. checkpointConfig = patchConfigurable(config, saved.config.configurable); checkpointMetadata = {...saved.metadata, ...config.metadata}",
+  "#       6. resolve TRIGGERS: if asNode is given use that nodes triggers, else every trigger the graph declares - this is the step that decides which channels an updateState write lands on, and getting it wrong writes state a node never reads",
+  "#       7. build a synthetic task carrying the updates as writes and run _applyWrites against the copied checkpoint",
+  "#       8. put the new checkpoint, and return the config that locates it",
+  "#     Steps 1-2 and 4-5 are mechanical and the port already has every primitive they need (mergeConfigs, getTuple, copyCheckpoint, applyWrites). Step 3 is the subgraph case and step 6 is the one that carries real semantics.",
+  "#     WHY IT IS STILL OPEN rather than half-done: this writes to the persisted checkpoint through the engines own step counter, which also orders applyWrites and the recursion limit. A partial updateState that skipped step 6 or misnumbered the step would write state that LOOKS successful and is invisible until a much later run - the same failure class as the checkpoint-timestamp bug this project has already fixed twice. Every one of those primitives has a test, so a partial version would not be caught by the suite; it would be caught by whoever needed it weeks later. Refusing is cheaper than that.",
+  "#     RELATED AND SEPARATE: audit/getstate-interrupts-empty records why getState cannot currently show pending interrupts, and its Measurement 2 (task ids are derived with a scalar trigger where upstream wraps it in an array) means a task id written here is unreadable upstream. updateState does not depend on that mismatch, but a future implementation that tried to RESUME a specific task by id would - so the two should be sequenced together, not independently."
  ]
 }
