@@ -85,7 +85,10 @@ use LangGraph\Utils\RunnableCallable;
  * failures). **Divergence:** upstream schedules the handler as a separate checkpointed task; this
  * engine has no such scheduling, so the compiled node runs its retries and then its handler inline
  * (see {@see self::withErrorHandler()}). The hidden `__error_handler__<node>` nodes are still
- * registered, so the graph's shape matches upstream's.
+ * registered, so the graph's shape matches upstream's. Routing matches upstream: a handled result is
+ * marked ({@see HandledOutcome}) so the failed node's static edges, join writes and conditional edges
+ * do not fire; only the state write-back and the `Command` goto do. The `updates` stream and the
+ * checkpoint writes are still attributed to the failed node, not `__error_handler__<node>`.
  */
 class StateGraph extends Graph
 {
@@ -795,6 +798,7 @@ class StateGraph extends Graph
 
         // Ordinary nodes: read their input channels, write their return value back.
         $defaults = $this->nodeDefaults;
+        $guardedStarts = [];
         foreach ($this->nodes as $rawKey => $spec) {
             $key = (string) $rawKey;
             $nodeSpec = $this->nodeSpecs[$key];
@@ -824,6 +828,7 @@ class StateGraph extends Graph
                 );
                 // The retries now run inside the wrapper, so the engine must not retry a second time.
                 $compiledRetry = null;
+                $guardedStarts[$key] = true;
             }
 
             $inputKeysOfNode = array_map(strval(...), array_keys($nodeSpec->input));
@@ -890,6 +895,9 @@ class StateGraph extends Graph
                 [['channel' => self::branchTo($end), 'value' => $start]],
                 [Constants::TAG_HIDDEN],
             );
+            if (isset($guardedStarts[$start])) {
+                $writer = new SkipWhenHandled($writer);
+            }
 
             if ($start === Constants::START) {
                 $startNode->writers[] = $writer;
@@ -905,10 +913,11 @@ class StateGraph extends Graph
             $compiledNodes[$end]->triggers[] = $joinChannel;
             $triggerToNodes[$joinChannel] = [$end];
             foreach ($starts as $start) {
-                $compiledNodes[$start]->writers[] = new ChannelWrite(
+                $joinWriter = new ChannelWrite(
                     [['channel' => $joinChannel, 'value' => $start]],
                     [Constants::TAG_HIDDEN],
                 );
+                $compiledNodes[$start]->writers[] = isset($guardedStarts[$start]) ? new SkipWhenHandled($joinWriter) : $joinWriter;
             }
         }
 
@@ -919,6 +928,9 @@ class StateGraph extends Graph
             $start = (string) $rawStart;
             foreach ($branches as $name => $branch) {
                 $writer = $this->makeConditionalEdgeWriter($branch, $start, $streamChannels);
+                if (isset($guardedStarts[$start])) {
+                    $writer = new SkipWhenHandled($writer);
+                }
                 if ($start === Constants::START) {
                     $startNode->writers[] = $writer;
                 } else {
@@ -1005,12 +1017,12 @@ class StateGraph extends Graph
                     $handlerConfig = clone $config;
                     $handlerConfig->configurable[Constants::CONFIG_KEY_NODE_ERROR] = new NodeError($nodeName, $error);
 
-                    return self::runWithRetry(
+                    return new HandledOutcome(self::runWithRetry(
                         static fn (RunnableConfig $c): mixed => $handler->invoke($input, $c),
                         $handlerConfig,
                         $handlerRetryPolicy,
                         $handler->getName(),
-                    );
+                    ));
                 }
             },
             name: $bound->getName(),
@@ -1150,6 +1162,7 @@ class StateGraph extends Graph
      */
     private function collectUpdates(mixed $input, string $nodeKey, array $outputKeys): ?array
     {
+        $input = HandledOutcome::unwrap($input);
         if ($input === null || $input === []) {
             return null;
         }
@@ -1225,6 +1238,7 @@ class StateGraph extends Graph
      */
     private function controlBranch(mixed $value): array
     {
+        $value = HandledOutcome::unwrap($value);
         if ($value instanceof Send) {
             return [$value];
         }

@@ -26,6 +26,8 @@ use function LangGraph\Pregel\interrupt;
  *    across a checkpoint resume" interrupts *before* the `__error_handler__<node>` task and resumes
  *    into it. Here the handler runs inline after the node's retries, so there is no such task to stop
  *    before; the case is converted to "the handled outcome is what gets checkpointed";
+ *  - routing matches upstream (the failed node's edges do not fire after a handler) but the `updates`
+ *    stream and checkpoint writes are attributed to the failed node, not `__error_handler__<node>`;
  *  - the two async-handler cases collapse into the synchronous ones (PHP has no async functions);
  *    the second is kept as "the handler also receives the config and the NodeError in it".
  */
@@ -356,5 +358,48 @@ final class NodeErrorHandlerTest extends TestCase
 
         $builder->validate();
         $this->addToAssertionCount(1);
+    }
+
+    public function testAHandlerWithAPlainUpdateDoesNotFireTheFailedNodesEdges(): void
+    {
+        $graph = (new StateGraph(self::foo()))
+            ->addNode('a', static function (): array {
+                throw new \RuntimeException('boom');
+            }, ['errorHandler' => static fn (array $state, NodeError $error): array => ['foo' => 'handled']])
+            ->addNode('b', static fn (array $state): array => ['foo' => $state['foo'] . '_b'])
+            ->addEdge(Constants::START, 'a')
+            ->addEdge('a', 'b')
+            ->compile();
+
+        self::assertSame('handled', $graph->invoke(['foo' => ''])['foo']);
+    }
+
+    public function testAHandlerCommandGotoRunsOnlyTheRecoveryNodeNotTheFailedNodesEdge(): void
+    {
+        $graph = (new StateGraph(self::foo()))
+            ->addNode('a', static function (): array {
+                throw new \RuntimeException('boom');
+            }, ['errorHandler' => static fn (array $state, NodeError $error): Command => new Command(update: ['foo' => 'handled'], goto: 'recovery')])
+            ->addNode('b', static fn (array $state): array => ['foo' => $state['foo'] . '_b'])
+            ->addNode('recovery', static fn (array $state): array => ['foo' => $state['foo'] . '_recovery'])
+            ->addEdge(Constants::START, 'a')
+            ->addEdge('a', 'b')
+            ->compile();
+
+        self::assertSame('handled_recovery', $graph->invoke(['foo' => ''])['foo']);
+    }
+
+    public function testAHandlerDoesNotFireTheFailedNodesConditionalEdges(): void
+    {
+        $graph = (new StateGraph(self::foo()))
+            ->addNode('a', static function (): array {
+                throw new \RuntimeException('boom');
+            }, ['errorHandler' => static fn (array $state, NodeError $error): array => ['foo' => 'handled']])
+            ->addNode('b', static fn (array $state): array => ['foo' => $state['foo'] . '_b'])
+            ->addEdge(Constants::START, 'a')
+            ->addConditionalEdges('a', static fn (array $state): string => 'b')
+            ->compile();
+
+        self::assertSame('handled', $graph->invoke(['foo' => ''])['foo']);
     }
 }
