@@ -12,8 +12,11 @@ use LangChain\Runnables\RunnableInterface;
  * Port of `ConfigurableModelInterface` from `react_agent_executor.ts`, which upstream detects by duck-typing
  * `_queuedMethodOperations` and `_model` (what `initChatModel` returns). `ReactAgent` looks through such a
  * model to the one it wraps before deciding whether tools still need binding.
+ *
+ * It does not extend `RunnableInterface`: an implementing class is a runnable already (a chat model), and
+ * re-inheriting the interface alongside `Runnable` makes its shared constants ambiguous.
  */
-interface ConfigurableModelInterface extends RunnableInterface
+interface ConfigurableModelInterface
 {
     /**
      * The method calls (`bindTools`, ...) queued on the wrapper, keyed by method name.
