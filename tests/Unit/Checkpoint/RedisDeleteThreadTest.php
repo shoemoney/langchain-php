@@ -66,8 +66,8 @@ final class RedisDeleteThreadTest extends TestCase
             (new RedisSaver($client))->deleteThread('*');
             self::fail('Expected the glob thread id to be refused');
         } catch (\InvalidArgumentException) {
-            self::assertSame(['checkpoint:thread-2:cp-1'], $client->allKeys());
             self::assertSame([], $client->callsTo('keys'));
+            self::assertSame(['checkpoint:thread-2:cp-1'], $client->allKeys());
         }
     }
 }
