@@ -180,6 +180,16 @@ final class ResponsesToolsTest extends TestCase
         ]], ResponsesTools::reduceTools([$chatTool], false, true));
     }
 
+    public function testReduceLetsTopLevelExtraKeysOverrideComputedOnes(): void
+    {
+        $reduced = ResponsesTools::reduceTools([
+            ['type' => 'function', 'function' => ['name' => 'f', 'parameters' => ['type' => 'object', 'properties' => ['a' => ['type' => 'string']]]], 'strict' => true, 'name' => 'renamed'],
+        ]);
+
+        self::assertTrue($reduced[0]['strict']);
+        self::assertSame('renamed', $reduced[0]['name']);
+    }
+
     public function testReduceLeavesStrictNullWhenUnspecified(): void
     {
         $reduced = ResponsesTools::reduceTools([
@@ -247,8 +257,10 @@ final class ResponsesToolsTest extends TestCase
 
     public function testFormatToolChoiceFlattensFunctionChoicesAndPassesBuiltInsThrough(): void
     {
-        self::assertSame('required', ResponsesTools::formatToolChoice('any'));
-        self::assertSame('auto', ResponsesTools::formatToolChoice('auto'));
+        self::assertNull(ResponsesTools::formatToolChoice('any'));
+        self::assertNull(ResponsesTools::formatToolChoice('required'));
+        self::assertNull(ResponsesTools::formatToolChoice('auto'));
+        self::assertNull(ResponsesTools::formatToolChoice('none'));
         self::assertSame(['type' => 'function', 'name' => 'get_weather'], ResponsesTools::formatToolChoice('get_weather'));
         self::assertSame(
             ['type' => 'function', 'name' => 'get_weather'],

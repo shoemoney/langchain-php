@@ -310,13 +310,13 @@ final class ResponsesTools
                 /** @var array<string, mixed> $function */
                 $function = $tool['function'];
 
-                $reduced[] = [
+                $reduced[] = array_merge([
                     'type' => 'function',
                     'name' => $function['name'],
                     'parameters' => self::objectifyParameters($function['parameters'] ?? null),
                     ...(isset($function['description']) ? ['description' => $function['description']] : []),
                     'strict' => $strict,
-                ] + $extra;
+                ], $extra);
                 continue;
             }
 
@@ -335,11 +335,15 @@ final class ResponsesTools
      * {@see Tools::formatToolChoice()} and then flattened: Responses wants
      * `{type: "function", name}`, not `{type: "function", function: {name}}`.
      *
+     * Like upstream, only function, allowed_tools and custom choices survive;
+     * the string choices ("auto", "required", "none") yield null, so a string
+     * tool_choice is dropped from a Responses request.
+     *
      * @param string|array<string, mixed> $toolChoice
      *
-     * @return array<string, mixed>|string
+     * @return array<string, mixed>|null
      */
-    public static function formatToolChoice(string|array $toolChoice): array|string
+    public static function formatToolChoice(string|array $toolChoice): ?array
     {
         if (self::isBuiltInToolChoice($toolChoice)) {
             return $toolChoice;
@@ -347,7 +351,7 @@ final class ResponsesTools
 
         $formatted = Tools::formatToolChoice($toolChoice);
         if (!is_array($formatted)) {
-            return $formatted;
+            return null;
         }
 
         return match ($formatted['type'] ?? null) {
@@ -358,7 +362,7 @@ final class ResponsesTools
                 'tools' => $formatted['allowed_tools']['tools'] ?? null,
             ],
             'custom' => ['type' => 'custom', 'name' => $formatted['custom']['name'] ?? ''],
-            default => $formatted,
+            default => null,
         };
     }
 
