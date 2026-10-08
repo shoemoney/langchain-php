@@ -27,7 +27,7 @@ final class AgentAssertions
     /** A scripted chat model that does not wait (upstream's default is a 50ms sleep). */
     public static function fakeChat(array $responses = [], array $extra = []): FakeToolCallingChatModel
     {
-        return new FakeToolCallingChatModel(['sleep' => 0, 'responses' => $responses] + $extra);
+        return new FakeToolCallingChatModel(array_merge(['sleep' => 0, 'responses' => $responses], $extra));
     }
 
     /**

@@ -89,12 +89,12 @@ final class ReactAgent
     {
         $this->options = $options;
 
-        $this->defaultConfig = RunnableConfig::mergeConfigs(
-            $defaultConfig ?? new RunnableConfig(),
+        $this->defaultConfig = self::mergeConfigs(
+            $defaultConfig instanceof RunnableConfig ? $defaultConfig : (RunnableConfig::fromArray($defaultConfig) ?? new RunnableConfig()),
             ['metadata' => ['ls_integration' => 'langchain_create_agent'], 'configurable' => ['ls_agent_type' => 'root']],
         );
         if (isset($options['name']) && $options['name'] !== '') {
-            $this->defaultConfig = RunnableConfig::mergeConfigs(
+            $this->defaultConfig = self::mergeConfigs(
                 $this->defaultConfig,
                 ['metadata' => ['lc_agent_name' => $options['name']]],
             );
@@ -481,20 +481,39 @@ final class ReactAgent
      */
     public function withConfig(RunnableConfig|array $config): self
     {
-        return new self($this->options, RunnableConfig::mergeConfigs($this->defaultConfig, $config));
+        return new self($this->options, self::mergeConfigs($this->defaultConfig, $config));
     }
 
     /**
-     * The config for a graph call: the defaults (callbacks aside, which are applied per call) under the call's.
+     * The config for a graph call: the defaults under the call's.
      *
      * @param RunnableConfig|array<string, mixed>|null $config
      */
     private function getGraphConfig(RunnableConfig|array|null $config = null): RunnableConfig
     {
-        $defaults = clone $this->defaultConfig;
-        $defaults->callbacks = [];
+        return self::mergeConfigs($this->defaultConfig, $config);
+    }
 
-        return RunnableConfig::mergeConfigs($defaults, $config);
+    /**
+     * `mergeConfigs` with the callbacks of both sides kept (the plain merge lets a later list replace an
+     * earlier one; upstream's combines them), without delivering the same handler twice.
+     *
+     * @param RunnableConfig|array<string, mixed>|null $override
+     */
+    private static function mergeConfigs(RunnableConfig $base, RunnableConfig|array|null $override): RunnableConfig
+    {
+        $merged = RunnableConfig::mergeConfigs($base, $override);
+
+        $incoming = $override instanceof RunnableConfig ? $override->callbacks : (array) ($override['callbacks'] ?? []);
+        $callbacks = $base->callbacks;
+        foreach ($incoming as $handler) {
+            if (!\in_array($handler, $callbacks, true)) {
+                $callbacks[] = $handler;
+            }
+        }
+        $merged->callbacks = $callbacks;
+
+        return $merged;
     }
 
     /**
