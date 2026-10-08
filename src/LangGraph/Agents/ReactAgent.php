@@ -49,8 +49,10 @@ use LangGraph\State\StateGraph;
  * Known differences from upstream:
  *
  *  - upstream stamps the static config (`withConfig` defaults) onto the compiled graph with
- *    `graph.withConfig(...)`; a compiled graph here has no config of its own, so the defaults are merged into
- *    every `invoke` / `stream` / `streamEvents` call only (the agent itself is always the entry point);
+ *    `graph.withConfig(...)` and strips the callbacks from the per-call merge so they fire once; a compiled
+ *    graph here has no config of its own, so the defaults (callbacks included) are merged into every `invoke` /
+ *    `stream` / `streamEvents` call instead, and a handler present in both is delivered once;
+ *  - a graph run reports chain callbacks (`handleChainStart`/`End`) only through `streamEvents`;
  *  - `version: "v3"` event streaming and stream transformers have no PHP counterpart (there is no transformer
  *    protocol), so `streamTransformers` are accepted and ignored;
  *  - structured responses (`responseFormat`) belong to WP-21c;

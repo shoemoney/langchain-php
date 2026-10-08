@@ -14,10 +14,12 @@ use LangGraph\Agents\Agent;
 use LangGraph\Agents\Middleware;
 use LangGraph\Agents\ReactAgent;
 use LangGraph\Checkpoint\MemorySaver;
+use LangGraph\Pregel\Command;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 use function LangChain\Tools\tool;
+use function LangGraph\Pregel\interrupt;
 
 /**
  * An agent running a real provider client (`ChatOpenAI`, over a scripted transport) through the whole stack:
@@ -153,5 +155,39 @@ final class ReactAgentEndToEndTest extends TestCase
         self::assertContains('updates', $modes);
         $updates = array_values(array_filter($chunks, static fn (array $chunk): bool => $chunk[0] === 'updates'));
         self::assertArrayHasKey('model_request', $updates[0][1]);
+    }
+
+    public function testAToolThatInterruptsPausesTheRunAndACommandResumesIt(): void
+    {
+        $calls = 0;
+        $askTool = tool(
+            static function (array $in) use (&$calls): string {
+                $calls++;
+                $answer = interrupt(['question' => $in['question']]);
+
+                return 'The user said: ' . $answer;
+            },
+            ['name' => 'ask_user', 'description' => 'Ask the user', 'schema' => Schema::object(['question' => ['type' => 'string']], ['question'])],
+        );
+
+        $agent = Agent::create([
+            'model' => new Support\FakeToolCallingModel(['toolCalls' => [[['name' => 'ask_user', 'args' => ['question' => 'Color?'], 'id' => 'ask_1']], []]]),
+            'tools' => [$askTool],
+            'middleware' => [Middleware::create(['name' => 'pass', 'wrapToolCall' => static fn (array $request, callable $handler): mixed => $handler($request)])],
+            'checkpointer' => new MemorySaver(),
+        ]);
+        $thread = ['configurable' => ['thread_id' => 'interrupt-thread']];
+
+        // The first run pauses at the tool.
+        $interrupts = Support\AgentAssertions::interrupts($agent, ['messages' => [new HumanMessage('Pick one')]], $thread);
+        self::assertSame([['question' => 'Color?']], array_column($interrupts, 'value'));
+        self::assertSame(1, $calls);
+
+        // A Command resumes it: the tool runs again, now with the answer, and the agent finishes.
+        $result = $agent->invoke(new Command(resume: 'blue'), $thread);
+
+        self::assertSame(2, $calls);
+        $toolMessages = Support\AgentAssertions::ofType($result['messages'], ToolMessage::class);
+        self::assertSame(['The user said: blue'], array_map(static fn (ToolMessage $m): string => $m->content, $toolMessages));
     }
 }
