@@ -15,8 +15,6 @@ use LangGraph\State\StateGraph;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-use function LangChain\Tools\tool;
-
 /**
  * Port of `langgraph-supervisor/src/tests/supervisorSubgraph.test.ts`.
  *
@@ -119,7 +117,7 @@ final class SupervisorSubgraphTest extends TestCase
         // Every layer actually ran: the tool result of the innermost agent made it all the way up.
         $texts = array_map(static fn ($m) => (string) (is_string($m->content) ? $m->content : ''), $messages);
         self::assertContains('Successfully transferred to research_team', $texts);
-        self::assertContains('Successfully transferred back to top_level_supervisor', $texts);
+        self::assertContains('Successfully transferred back to supervisor', $texts);
         self::assertContains('The research team says the answer is 2.', $texts);
     }
 }
