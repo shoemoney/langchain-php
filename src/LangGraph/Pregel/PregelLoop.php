@@ -507,6 +507,7 @@ class PregelLoop
                 checkpointer: $this->checkpointer,
                 triggerToNodes: $this->triggerToNodes,
                 updatedChannels: $this->updatedChannels,
+                call: $this->callHandler(),
             ),
             // A task that already finished before a crash or an interrupt must be prepared again
             // so that the pending-writes pass below can re-attach its recorded writes. Dropping it
@@ -1531,15 +1532,35 @@ class PregelLoop
     /** Monotonic across every {@see self::drain()} call for this run. */
     private int $yieldedChunks = 0;
 
+    /** The scheduler answering `CONFIG_KEY_CALL` for every task this loop prepares. */
+    private ?CallScheduler $callScheduler = null;
+
     /**
-     * Schedule a task mid-superstep, from a node calling another node.
+     * The callback bound to `CONFIG_KEY_CALL` on each task, as `fn(task, func, name, args, options)`.
      *
-     * Port of `acceptPush`. A node that returns a `Send` (or writes one) does not
-     * wait for the target to run: the target is prepared and scheduled for
-     * later in the *same* superstep, which is how recursive fan-out works
-     * without the node itself blocking on the result.
+     * @return \Closure(PregelExecutableTask, callable, string, list<mixed>, array<string, mixed>): \LangChain\Utils\Promise
      */
-    public function acceptPush(PregelExecutableTask $task, int $writeIdx, mixed $call = null): ?PregelExecutableTask
+    public function callHandler(): \Closure
+    {
+        $this->callScheduler ??= new CallScheduler($this);
+
+        return $this->callScheduler->call(...);
+    }
+
+    /**
+     * Schedule a functional-API task call as a PUSH task of the current superstep.
+     *
+     * Port of `acceptPush`. A running task that calls a `task()` does not execute the function
+     * inline: the call becomes a task of its own, with a deterministic id derived from the
+     * caller's path and the call's position, so it is checkpointed, retried and cached like any
+     * other. The new task joins this superstep's task list; its recorded writes (from an earlier
+     * run) or cached result are attached before it is returned, and a task that already has
+     * either never runs again.
+     *
+     * Returns null when an `interruptAfter`/`interruptBefore` target stops the task from being
+     * scheduled.
+     */
+    public function acceptPush(PregelExecutableTask $task, int $writeIdx, ?Call $call = null): ?PregelExecutableTask
     {
         if ($this->interruptAfter !== []
             && Algorithm::shouldInterrupt($this->checkpoint, $this->interruptAfter, [$task])) {
@@ -1548,10 +1569,7 @@ class PregelLoop
             return null;
         }
 
-        $taskPath = new TaskPath(array_merge(
-            [Constants::PUSH, $task->path?->toArray() ?? []],
-            [$writeIdx, $task->id],
-        ));
+        $taskPath = new TaskPath([Constants::PUSH, $task->path?->toArray() ?? [], $writeIdx, $task->id, $call]);
 
         $pushed = Algorithm::prepareSingleTask(
             $taskPath,
@@ -1566,6 +1584,7 @@ class PregelLoop
                 channels: $this->channels,
                 processes: $this->nodes,
                 checkpointer: $this->checkpointer,
+                call: $this->callHandler(),
             ),
         );
 
@@ -1584,6 +1603,10 @@ class PregelLoop
         $this->tasks[$pushed->id] = $pushed;
         if ($this->skipDoneTasks) {
             $this->matchWrites([$pushed->id => $pushed]);
+        }
+
+        foreach ($this->matchCachedWrites() as $cached) {
+            $this->outputWrites($cached->id, $cached->writes, true);
         }
 
         return $pushed;

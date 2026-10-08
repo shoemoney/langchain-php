@@ -612,6 +612,11 @@ final class Algorithm
         $parentNamespace = (string) ($configurable['checkpoint_ns'] ?? '');
 
         if ($taskPath->isPush()) {
+            $call = $taskPath->segments[count($taskPath->segments) - 1] ?? null;
+            if ($call instanceof Call) {
+                return self::prepareCallTask($call, $taskPath, $checkpoint, $pendingWrites, $processes, $channels, $config, $forExecution, $extra);
+            }
+
             $index = (int) $taskPath->segments[1];
 
             $tasksChannel = $channels[Constants::TASKS] ?? null;
@@ -872,6 +877,134 @@ final class Algorithm
     }
 
     /**
+     * Build the PUSH task for a functional-API task call.
+     *
+     * Port of the `taskPath[0] === PUSH && isCall(...)` branch of `_prepareSingleTask`. The
+     * path is `[PUSH, parentPath, writeIdx, parentTaskId, Call]`; the id hashes the parent's
+     * path and the call's position in it, so the Nth call of a task has the same id on every
+     * run - which is how a resumed workflow finds the result a task already produced.
+     *
+     * The path the task *carries* ends in `true` rather than the `Call`: it marks "a task
+     * called this", so the loop leaves reporting any interrupt to the calling task, and it
+     * keeps the path serialisable.
+     *
+     * @param array<string, PregelNode>  $processes
+     * @param array<string, BaseChannel> $channels
+     * @param list<array{0: string, 1: string, 2: mixed}>|null $pendingWrites
+     */
+    private static function prepareCallTask(
+        Call $call,
+        TaskPath $taskPath,
+        Checkpoint $checkpoint,
+        ?array $pendingWrites,
+        array $processes,
+        array $channels,
+        RunnableConfig $config,
+        bool $forExecution,
+        NextTaskExtraFields $extra,
+    ): PregelExecutableTask {
+        $step = $extra->step;
+        $parentNamespace = (string) ($config->configurable['checkpoint_ns'] ?? '');
+
+        $triggers = [Constants::PUSH];
+        $checkpointNamespace = self::childNamespace($parentNamespace, $call->name);
+        $taskId = CheckpointFunctions::uuid5(
+            (string) json_encode([
+                $checkpointNamespace,
+                (string) $step,
+                $call->name,
+                Constants::PUSH,
+                $taskPath->segments[1] ?? null,
+                $taskPath->segments[2] ?? null,
+            ]),
+            $checkpoint->id
+        );
+        $taskCheckpointNamespace = $checkpointNamespace . Constants::CHECKPOINT_NAMESPACE_END . $taskId;
+
+        $outputPath = new TaskPath([...array_slice($taskPath->segments, 0, 3), true]);
+        $metadata = [
+            'langgraph_step' => $step,
+            'langgraph_node' => $call->name,
+            'langgraph_triggers' => $triggers,
+            'langgraph_path' => $outputPath->toArray(),
+            'langgraph_checkpoint_ns' => $taskCheckpointNamespace,
+            'checkpoint_ns' => $taskCheckpointNamespace,
+        ];
+
+        if (!$forExecution) {
+            return new PregelExecutableTask(
+                id: $taskId,
+                name: $call->name,
+                path: $outputPath,
+                triggers: $triggers,
+                metadata: $metadata,
+                interrupts: [],
+            );
+        }
+
+        $proc = Call::getRunnableForFunc($call->name, $call->func);
+
+        $cacheKey = null;
+        if ($call->cache !== null) {
+            $keyFunc = $call->cache['keyFunc'] ?? null;
+            $cacheKey = [
+                'ns' => [Constants::CACHE_NS_WRITES, $call->name],
+                'key' => hash('xxh128', $keyFunc !== null
+                    ? (string) $keyFunc([$call->input])
+                    : json_encode([$call->input], JSON_THROW_ON_ERROR)),
+                'ttl' => $call->cache['ttl'] ?? null,
+            ];
+        }
+
+        $task = new PregelExecutableTask(
+            id: $taskId,
+            name: $call->name,
+            input: $call->input,
+            proc: $proc,
+            writers: [],
+            path: $outputPath,
+            triggers: $triggers,
+            retryPolicy: $call->retry,
+            cacheKey: $cacheKey,
+            timeout: $call->timeout,
+            metadata: $metadata,
+        );
+        $task->config = self::buildTaskConfig(
+            task: $task,
+            config: $config,
+            taskId: $taskId,
+            nodeName: $call->name,
+            taskCheckpointNamespace: $taskCheckpointNamespace,
+            parentNamespace: $parentNamespace,
+            checkpoint: $checkpoint,
+            pendingWrites: $pendingWrites,
+            processes: $processes,
+            channels: $channels,
+            taskPath: $outputPath,
+            triggers: $triggers,
+            currentTaskInput: $call->input,
+            step: $step,
+            extra: $extra,
+            metadata: $metadata,
+            tags: [],
+        );
+        // A graph-wide resume value answers ONE interrupt. Upstream builds a task's scratchpad
+        // lazily from the shared pending writes, and the interrupt that takes the value deletes
+        // it from them - so a task called afterwards no longer sees it. Scratchpads here are
+        // built from a per-run index, so the call task inherits what its caller has left
+        // instead; without this every task in a workflow would be answered by the same resume.
+        $parentPad = $config->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
+        $ownPad = $task->config->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
+        if ($parentPad instanceof PregelScratchpad && $ownPad instanceof PregelScratchpad) {
+            $ownPad->nullResume = $parentPad->nullResume;
+        }
+
+        self::applyTimeout($task, $proc);
+
+        return $task;
+    }
+
+    /**
      * Put a task's node under its timeout, if it has one.
      *
      * Port of the `timeout: coerceTimeoutPolicy(...)` line of `_prepareSingleTask` plus the
@@ -988,10 +1121,17 @@ final class Algorithm
                 namespaceHash: hash('xxh128', $taskCheckpointNamespace),
                 index: $index,
             ),
-            Constants::CONFIG_KEY_PREVIOUS_STATE => $checkpoint->channelValue(Constants::PREVIOUS),
+            Constants::CONFIG_KEY_PREVIOUS_STATE => self::previousState($checkpoint),
             'checkpoint_id' => null,
             'checkpoint_ns' => $taskCheckpointNamespace,
         ]);
+
+        // The task's way of calling functional-API tasks (upstream binds `call` to the task in
+        // the runner). Bound per task, so a nested task's own calls are scheduled under IT.
+        if (is_callable($extra->call)) {
+            $scheduler = $extra->call;
+            $taskConfig->configurable[Constants::CONFIG_KEY_CALL] = static fn (mixed ...$args): mixed => $scheduler($task, ...$args);
+        }
 
         // Store injection (upstream `store: extra.store ?? config.store`): the loop publishes its
         // store on the config it runs under, and every task, subgraph included, receives it here.
@@ -1250,6 +1390,12 @@ final class Algorithm
             return ((int) (bool) $a) <=> ((int) (bool) $b);
         }
 
+        // A call task's path carries its parent's path as a segment. JavaScript's `<` on two
+        // arrays compares their string forms (`"__pregel_pull,graph"`), so do the same.
+        if (is_array($a) || is_array($b)) {
+            return strcmp(self::pathSegmentString($a), self::pathSegmentString($b));
+        }
+
         // Numeric when both are numbers, as JavaScript's `<` is. Upstream
         // compares the raw values with `aPath[i] < bPath[i]` (algo.ts:289), and
         // path segments are task indices — so upstream orders 9 before 10.
@@ -1266,6 +1412,30 @@ final class Algorithm
         // Mixed number/string is the pathological case; JavaScript coerces the
         // number to a string for `<`, which is what strcmp does here.
         return strcmp((string) $a, (string) $b);
+    }
+
+    /**
+     * The value the previous invocation saved to the `PREVIOUS` channel, or null before the first.
+     *
+     * `getPreviousState()` reads this from the task config. The checkpoint reports an absent
+     * channel as a {@see Missing} marker, which must not reach user code: JavaScript sees
+     * `undefined` there, and a first invocation has to look "empty" to a caller testing for it.
+     */
+    private static function previousState(Checkpoint $checkpoint): mixed
+    {
+        $value = $checkpoint->channelValue(Constants::PREVIOUS);
+
+        return $value instanceof Missing ? null : $value;
+    }
+
+    /** A path segment as JavaScript stringifies it: arrays join their elements with a comma. */
+    private static function pathSegmentString(mixed $segment): string
+    {
+        if (is_array($segment)) {
+            return implode(',', array_map(self::pathSegmentString(...), $segment));
+        }
+
+        return is_bool($segment) ? ($segment ? 'true' : 'false') : (string) $segment;
     }
 
     /** `parent|node`, or just `node` at the root. */
