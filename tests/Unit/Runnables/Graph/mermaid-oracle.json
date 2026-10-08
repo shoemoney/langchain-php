@@ -1,0 +1,1393 @@
+[
+ {
+  "name": "chain_plain",
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   },
+   {
+    "id": "c"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "first": "a",
+  "last": "c",
+  "nodeIds": [
+   "a",
+   "b",
+   "c"
+  ],
+  "nodeNames": [
+   "a",
+   "b",
+   "c"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta([a]):::first\n\tb(b)\n\tc([c]):::last\n\ta --> b;\n\tb --> c;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "first_last_runnables",
+  "nodes": [
+   {
+    "id": "__start__",
+    "kind": "schema"
+   },
+   {
+    "id": "model",
+    "kind": "runnable",
+    "rname": "ChatModel"
+   },
+   {
+    "id": "__end__",
+    "kind": "schema"
+   }
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model"
+   ],
+   [
+    "model",
+    "__end__"
+   ]
+  ],
+  "first": "__start__",
+  "last": "__end__",
+  "nodeIds": [
+   "__start__",
+   "model",
+   "__end__"
+  ],
+  "nodeNames": [
+   "__start__",
+   "model",
+   "__end__"
+  ],
+  "edgeList": [
+   [
+    "__start__",
+    "model"
+   ],
+   [
+    "model",
+    "__end__"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\t__start__([<p>__start__</p>]):::first\n\tmodel(model)\n\t__end__([<p>__end__</p>]):::last\n\t__start__ --> model;\n\tmodel --> __end__;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "uuid_ids_reid",
+  "nodes": [
+   {
+    "id": "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "schema",
+    "sname": "Input"
+   },
+   {
+    "id": "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "runnable",
+    "rname": "RunnablePassthrough"
+   },
+   {
+    "id": "6ba7b812-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "runnable",
+    "rname": "Parser"
+   },
+   {
+    "id": "6ba7b813-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "schema",
+    "sname": "Output"
+   }
+  ],
+  "edges": [
+   [
+    "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   ],
+   [
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b812-9dad-41d1-80b4-00c04fd430c8"
+   ],
+   [
+    "6ba7b812-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b813-9dad-41d1-80b4-00c04fd430c8"
+   ]
+  ],
+  "first": "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+  "last": "6ba7b813-9dad-41d1-80b4-00c04fd430c8",
+  "nodeIds": [
+   "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+   "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+   "6ba7b812-9dad-41d1-80b4-00c04fd430c8",
+   "6ba7b813-9dad-41d1-80b4-00c04fd430c8"
+  ],
+  "nodeNames": [
+   "Input",
+   "Passthrough",
+   "Parser",
+   "Output"
+  ],
+  "edgeList": [
+   [
+    "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   ],
+   [
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b812-9dad-41d1-80b4-00c04fd430c8"
+   ],
+   [
+    "6ba7b812-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b813-9dad-41d1-80b4-00c04fd430c8"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\tInput([Input]):::first\n\tPassthrough(Passthrough)\n\tParser(Parser)\n\tOutput([Output]):::last\n\tInput --> Passthrough;\n\tPassthrough --> Parser;\n\tParser --> Output;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "uuid_duplicate_names_keep_ids",
+  "nodes": [
+   {
+    "id": "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "runnable",
+    "rname": "Same"
+   },
+   {
+    "id": "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "runnable",
+    "rname": "Same"
+   }
+  ],
+  "edges": [
+   [
+    "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   ]
+  ],
+  "first": "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+  "last": "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+  "nodeIds": [
+   "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+   "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+  ],
+  "nodeNames": [
+   "Same",
+   "Same"
+  ],
+  "edgeList": [
+   [
+    "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\t6ba7b810-9dad-41d1-80b4-00c04fd430c8([Same]):::first\n\t6ba7b811-9dad-41d1-80b4-00c04fd430c8([Same]):::last\n\t6ba7b810-9dad-41d1-80b4-00c04fd430c8 --> 6ba7b811-9dad-41d1-80b4-00c04fd430c8;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "markdown_labels",
+  "nodes": [
+   {
+    "id": "__start__"
+   },
+   {
+    "id": "*bold*"
+   },
+   {
+    "id": "`code`"
+   },
+   {
+    "id": "_u_"
+   },
+   {
+    "id": "*half"
+   },
+   {
+    "id": "*"
+   }
+  ],
+  "edges": [
+   [
+    "__start__",
+    "*bold*"
+   ],
+   [
+    "*bold*",
+    "`code`"
+   ],
+   [
+    "`code`",
+    "_u_"
+   ],
+   [
+    "_u_",
+    "*half"
+   ],
+   [
+    "*half",
+    "*"
+   ]
+  ],
+  "first": "__start__",
+  "last": "*",
+  "nodeIds": [
+   "__start__",
+   "*bold*",
+   "`code`",
+   "_u_",
+   "*half",
+   "*"
+  ],
+  "nodeNames": [
+   "__start__",
+   "*bold*",
+   "`code`",
+   "_u_",
+   "*half",
+   "*"
+  ],
+  "edgeList": [
+   [
+    "__start__",
+    "*bold*"
+   ],
+   [
+    "*bold*",
+    "`code`"
+   ],
+   [
+    "`code`",
+    "_u_"
+   ],
+   [
+    "_u_",
+    "*half"
+   ],
+   [
+    "*half",
+    "*"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\t__start__([<p>__start__</p>]):::first\n\t_bold_(<p>*bold*</p>)\n\t_code_(<p>`code`</p>)\n\t_u_(<p>_u_</p>)\n\t_half(*half)\n\t_([<p>*</p>]):::last\n\t__start__ --> _bold_;\n\t_bold_ --> _code_;\n\t_code_ --> _u_;\n\t_u_ --> _half;\n\t_half --> _;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "metadata_values",
+  "nodes": [
+   {
+    "id": "a",
+    "metadata": {
+     "__interrupt": "before",
+     "n": 3,
+     "f": 1.5,
+     "b": true,
+     "z": null,
+     "l": [
+      1,
+      "x",
+      null
+     ],
+     "o": {
+      "k": 1
+     }
+    }
+   },
+   {
+    "id": "b",
+    "metadata": {}
+   },
+   {
+    "id": "c"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "first": "a",
+  "last": "c",
+  "nodeIds": [
+   "a",
+   "b",
+   "c"
+  ],
+  "nodeNames": [
+   "a",
+   "b",
+   "c"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta([a<hr/><small><em>__interrupt = before\nn = 3\nf = 1.5\nb = true\nz = null\nl = 1,x,\no = [object Object]</em></small>]):::first\n\tb(b)\n\tc([c]):::last\n\ta --> b;\n\tb --> c;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "dollar_patterns_in_label",
+  "nodes": [
+   {
+    "id": "a$&b"
+   },
+   {
+    "id": "c$'d"
+   },
+   {
+    "id": "e$`f"
+   },
+   {
+    "id": "g$$h"
+   }
+  ],
+  "edges": [
+   [
+    "a$&b",
+    "c$'d"
+   ],
+   [
+    "c$'d",
+    "e$`f"
+   ],
+   [
+    "e$`f",
+    "g$$h"
+   ]
+  ],
+  "first": "a$&b",
+  "last": "g$$h",
+  "nodeIds": [
+   "a$&b",
+   "c$'d",
+   "e$`f",
+   "g$$h"
+  ],
+  "nodeNames": [
+   "a$&b",
+   "c$'d",
+   "e$`f",
+   "g$$h"
+  ],
+  "edgeList": [
+   [
+    "a$&b",
+    "c$'d"
+   ],
+   [
+    "c$'d",
+    "e$`f"
+   ],
+   [
+    "e$`f",
+    "g$$h"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta__b([a{1}b]):::first\n\tc__d(c)d)\n\te__f(ee__f(f)\n\tg__h([g$h]):::last\n\ta__b --> c__d;\n\tc__d --> e__f;\n\te__f --> g__h;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "unicode_ids",
+  "nodes": [
+   {
+    "id": "café"
+   },
+   {
+    "id": "😀smile"
+   },
+   {
+    "id": "sp ace-and.dot"
+   }
+  ],
+  "edges": [
+   [
+    "café",
+    "😀smile"
+   ],
+   [
+    "😀smile",
+    "sp ace-and.dot"
+   ]
+  ],
+  "first": "café",
+  "last": "sp ace-and.dot",
+  "nodeIds": [
+   "café",
+   "😀smile",
+   "sp ace-and.dot"
+  ],
+  "nodeNames": [
+   "café",
+   "😀smile",
+   "sp ace-and.dot"
+  ],
+  "edgeList": [
+   [
+    "café",
+    "😀smile"
+   ],
+   [
+    "😀smile",
+    "sp ace-and.dot"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\tcaf_([café]):::first\n\t__smile(😀smile)\n\tsp_ace-and_dot([sp ace-and.dot]):::last\n\tcaf_ --> __smile;\n\t__smile --> sp_ace-and_dot;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "edge_labels",
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   },
+   {
+    "id": "c"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b",
+    "go"
+   ],
+   [
+    "a",
+    "c",
+    "maybe",
+    true
+   ],
+   [
+    "b",
+    "c",
+    null,
+    true
+   ],
+   [
+    "c",
+    "a",
+    "one two three four five six seven eight nine ten eleven twelve thirteen",
+    true
+   ],
+   [
+    "b",
+    "a",
+    "one two three four five six seven eight nine ten eleven twelve thirteen"
+   ]
+  ],
+  "first": null,
+  "last": null,
+  "nodeIds": [
+   "a",
+   "b",
+   "c"
+  ],
+  "nodeNames": [
+   "a",
+   "b",
+   "c"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "a",
+    "c"
+   ],
+   [
+    "b",
+    "c"
+   ],
+   [
+    "c",
+    "a"
+   ],
+   [
+    "b",
+    "a"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta(a)\n\tb(b)\n\tc(c)\n\ta -- &nbsp;go&nbsp; --> b;\n\ta -. &nbsp;maybe&nbsp; .-> c;\n\tb -.-> c;\n\tc -. &nbsp;one two three four five six seven eight nine&nbsp;<br>&nbsp;ten eleven twelve thirteen&nbsp; .-> a;\n\tb -- &nbsp;one two three four five six seven eight nine&nbsp;<br>&nbsp;ten eleven twelve thirteen&nbsp; --> a;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "edge_labels_wrap3",
+  "params": {
+   "wrapLabelNWords": 3
+  },
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b",
+    "one two three four five six seven"
+   ],
+   [
+    "b",
+    "a",
+    "one two three"
+   ],
+   [
+    "a",
+    "a",
+    "x y z w",
+    true
+   ]
+  ],
+  "first": null,
+  "last": null,
+  "nodeIds": [
+   "a",
+   "b"
+  ],
+  "nodeNames": [
+   "a",
+   "b"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "b",
+    "a"
+   ],
+   [
+    "a",
+    "a"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta(a)\n\tb(b)\n\ta -- &nbsp;one two three&nbsp;<br>&nbsp;four five six&nbsp;<br>&nbsp;seven&nbsp; --> b;\n\tb -- &nbsp;one two three&nbsp; --> a;\n\ta -. &nbsp;x y z&nbsp;<br>&nbsp;w&nbsp; .-> a;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "conditional_false_edge",
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b",
+    null,
+    false
+   ]
+  ],
+  "first": "a",
+  "last": "b",
+  "nodeIds": [
+   "a",
+   "b"
+  ],
+  "nodeNames": [
+   "a",
+   "b"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta([a]):::first\n\tb([b]):::last\n\ta --> b;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "subgraph_nested",
+  "nodes": [
+   {
+    "id": "__start__"
+   },
+   {
+    "id": "outer"
+   },
+   {
+    "id": "outer:one"
+   },
+   {
+    "id": "outer:two"
+   },
+   {
+    "id": "outer:deep:x"
+   },
+   {
+    "id": "outer:deep:y"
+   },
+   {
+    "id": "__end__"
+   }
+  ],
+  "edges": [
+   [
+    "__start__",
+    "outer:one"
+   ],
+   [
+    "outer:one",
+    "outer:two"
+   ],
+   [
+    "outer:two",
+    "outer:deep:x"
+   ],
+   [
+    "outer:deep:x",
+    "outer:deep:y"
+   ],
+   [
+    "outer:deep:y",
+    "__end__"
+   ]
+  ],
+  "first": null,
+  "last": null,
+  "nodeIds": [
+   "__start__",
+   "outer",
+   "outer:one",
+   "outer:two",
+   "outer:deep:x",
+   "outer:deep:y",
+   "__end__"
+  ],
+  "nodeNames": [
+   "__start__",
+   "outer",
+   "outer:one",
+   "outer:two",
+   "outer:deep:x",
+   "outer:deep:y",
+   "__end__"
+  ],
+  "edgeList": [
+   [
+    "__start__",
+    "outer:one"
+   ],
+   [
+    "outer:one",
+    "outer:two"
+   ],
+   [
+    "outer:two",
+    "outer:deep:x"
+   ],
+   [
+    "outer:deep:x",
+    "outer:deep:y"
+   ],
+   [
+    "outer:deep:y",
+    "__end__"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\t__start__(<p>__start__</p>)\n\touter(outer)\n\touter_one(one)\n\touter_two(two)\n\touter_deep_x(x)\n\touter_deep_y(y)\n\t__end__(<p>__end__</p>)\n\t__start__ --> outer_one;\n\touter_deep_y --> __end__;\n\tsubgraph outer\n\tsubgraph deep\n\touter_deep_x --> outer_deep_y;\n\tend\n\touter_one --> outer_two;\n\touter_two --> outer_deep_x;\n\tend\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "subgraph_two_toplevel",
+  "nodes": [
+   {
+    "id": "s"
+   },
+   {
+    "id": "p:a"
+   },
+   {
+    "id": "p:b"
+   },
+   {
+    "id": "q:a"
+   },
+   {
+    "id": "q:b"
+   }
+  ],
+  "edges": [
+   [
+    "s",
+    "p:a"
+   ],
+   [
+    "p:a",
+    "p:b"
+   ],
+   [
+    "p:b",
+    "q:a"
+   ],
+   [
+    "q:a",
+    "q:b"
+   ]
+  ],
+  "first": "s",
+  "last": "q:b",
+  "nodeIds": [
+   "s",
+   "p:a",
+   "p:b",
+   "q:a",
+   "q:b"
+  ],
+  "nodeNames": [
+   "s",
+   "p:a",
+   "p:b",
+   "q:a",
+   "q:b"
+  ],
+  "edgeList": [
+   [
+    "s",
+    "p:a"
+   ],
+   [
+    "p:a",
+    "p:b"
+   ],
+   [
+    "p:b",
+    "q:a"
+   ],
+   [
+    "q:a",
+    "q:b"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ts([s]):::first\n\tp_a(a)\n\tp_b(b)\n\tq_a(a)\n\tq_b([b]):::last\n\ts --> p_a;\n\tp_b --> q_a;\n\tsubgraph p\n\tp_a --> p_b;\n\tend\n\tsubgraph q\n\tq_a --> q_b;\n\tend\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "subgraph_selfloop",
+  "nodes": [
+   {
+    "id": "loop:a"
+   },
+   {
+    "id": "z"
+   }
+  ],
+  "edges": [
+   [
+    "loop:a",
+    "loop:a"
+   ],
+   [
+    "loop:a",
+    "z"
+   ]
+  ],
+  "first": null,
+  "last": "z",
+  "nodeIds": [
+   "loop:a",
+   "z"
+  ],
+  "nodeNames": [
+   "loop:a",
+   "z"
+  ],
+  "edgeList": [
+   [
+    "loop:a",
+    "loop:a"
+   ],
+   [
+    "loop:a",
+    "z"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\tloop_a(a)\n\tz([z]):::last\n\tloop_a --> z;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "subgraph_duplicate_error",
+  "nodes": [
+   {
+    "id": "p:a"
+   },
+   {
+    "id": "p:b"
+   },
+   {
+    "id": "q:a"
+   }
+  ],
+  "edges": [
+   [
+    "p:a",
+    "p:b"
+   ],
+   [
+    "q:a",
+    "p:b"
+   ],
+   [
+    "p:b",
+    "p:a"
+   ]
+  ],
+  "expectDirectDraw": true,
+  "directEdgesOrderTrick": true,
+  "first": "q:a",
+  "last": null,
+  "nodeIds": [
+   "p:a",
+   "p:b",
+   "q:a"
+  ],
+  "nodeNames": [
+   "p:a",
+   "p:b",
+   "q:a"
+  ],
+  "edgeList": [
+   [
+    "p:a",
+    "p:b"
+   ],
+   [
+    "q:a",
+    "p:b"
+   ],
+   [
+    "p:b",
+    "p:a"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\tp_a(a)\n\tp_b(b)\n\tq_a([a]):::first\n\tq_a --> p_b;\n\tsubgraph p\n\tp_a --> p_b;\n\tp_b --> p_a;\n\tend\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "no_styles",
+  "params": {
+   "withStyles": false
+  },
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b"
+   ]
+  ],
+  "first": "a",
+  "last": "b",
+  "nodeIds": [
+   "a",
+   "b"
+  ],
+  "nodeNames": [
+   "a",
+   "b"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ]
+  ],
+  "mermaid": "graph TD;\n\ta --> b;\n"
+ },
+ {
+  "name": "custom_style",
+  "params": {
+   "curveStyle": "basis",
+   "nodeColors": {
+    "default": "fill:#fff",
+    "first": "fill:#000",
+    "extra": "stroke:#f00"
+   }
+  },
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   },
+   {
+    "id": "c"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "first": "a",
+  "last": "c",
+  "nodeIds": [
+   "a",
+   "b",
+   "c"
+  ],
+  "nodeNames": [
+   "a",
+   "b",
+   "c"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'basis'}}}%%\ngraph TD;\n\ta([a]):::first\n\tb(b)\n\tc([c]):::last\n\ta --> b;\n\tb --> c;\n\tclassDef default fill:#fff;\n\tclassDef first fill:#000;\n\tclassDef extra stroke:#f00;\n"
+ },
+ {
+  "name": "no_node_colors_direct",
+  "direct": true,
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b"
+   ]
+  ],
+  "directConfig": {
+   "firstNode": "a",
+   "lastNode": "b"
+  },
+  "first": "a",
+  "last": "b",
+  "nodeIds": [
+   "a",
+   "b"
+  ],
+  "nodeNames": [
+   "a",
+   "b"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta([a]):::first\n\tb([b]):::last\n\ta --> b;\n"
+ },
+ {
+  "name": "multiple_sources_no_first_last",
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   },
+   {
+    "id": "c"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "c"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "first": null,
+  "last": "c",
+  "nodeIds": [
+   "a",
+   "b",
+   "c"
+  ],
+  "nodeNames": [
+   "a",
+   "b",
+   "c"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "c"
+   ],
+   [
+    "b",
+    "c"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta(a)\n\tb(b)\n\tc([c]):::last\n\ta --> c;\n\tb --> c;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "trim_first_last",
+  "ops": [
+   [
+    "trimFirstNode"
+   ],
+   [
+    "trimLastNode"
+   ]
+  ],
+  "nodes": [
+   {
+    "id": "__start__",
+    "kind": "schema"
+   },
+   {
+    "id": "x"
+   },
+   {
+    "id": "y"
+   },
+   {
+    "id": "__end__",
+    "kind": "schema"
+   }
+  ],
+  "edges": [
+   [
+    "__start__",
+    "x"
+   ],
+   [
+    "x",
+    "y"
+   ],
+   [
+    "y",
+    "__end__"
+   ]
+  ],
+  "first": "x",
+  "last": "y",
+  "nodeIds": [
+   "x",
+   "y"
+  ],
+  "nodeNames": [
+   "x",
+   "y"
+  ],
+  "edgeList": [
+   [
+    "x",
+    "y"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\tx([x]):::first\n\ty([y]):::last\n\tx --> y;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "trim_noop_when_branching",
+  "ops": [
+   [
+    "trimFirstNode"
+   ],
+   [
+    "trimLastNode"
+   ]
+  ],
+  "nodes": [
+   {
+    "id": "s"
+   },
+   {
+    "id": "x"
+   },
+   {
+    "id": "y"
+   }
+  ],
+  "edges": [
+   [
+    "s",
+    "x"
+   ],
+   [
+    "s",
+    "y"
+   ]
+  ],
+  "first": "s",
+  "last": null,
+  "nodeIds": [
+   "s",
+   "x",
+   "y"
+  ],
+  "nodeNames": [
+   "s",
+   "x",
+   "y"
+  ],
+  "edgeList": [
+   [
+    "s",
+    "x"
+   ],
+   [
+    "s",
+    "y"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ts([s]):::first\n\tx(x)\n\ty(y)\n\ts --> x;\n\ts --> y;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "extend_prefix",
+  "ops": [
+   [
+    "extend",
+    "sub",
+    {
+     "nodes": [
+      {
+       "id": "i"
+      },
+      {
+       "id": "j"
+      }
+     ],
+     "edges": [
+      [
+       "i",
+       "j"
+      ]
+     ]
+    }
+   ]
+  ],
+  "nodes": [
+   {
+    "id": "a"
+   },
+   {
+    "id": "b"
+   }
+  ],
+  "edges": [
+   [
+    "a",
+    "b"
+   ]
+  ],
+  "extendResult": [
+   {
+    "id": "sub:i"
+   },
+   {
+    "id": "sub:j"
+   }
+  ],
+  "first": null,
+  "last": null,
+  "nodeIds": [
+   "a",
+   "b",
+   "sub:i",
+   "sub:j"
+  ],
+  "nodeNames": [
+   "a",
+   "b",
+   "i",
+   "j"
+  ],
+  "edgeList": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    "sub:i",
+    "sub:j"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta(a)\n\tb(b)\n\tsub_i(i)\n\tsub_j(j)\n\ta --> b;\n\tsubgraph sub\n\tsub_i --> sub_j;\n\tend\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "extend_uuid_other_drops_prefix",
+  "ops": [
+   [
+    "extend",
+    "sub",
+    {
+     "nodes": [
+      {
+       "id": "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+       "kind": "runnable",
+       "rname": "R1"
+      },
+      {
+       "id": "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+       "kind": "runnable",
+       "rname": "R2"
+      }
+     ],
+     "edges": [
+      [
+       "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+       "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+      ]
+     ]
+    }
+   ]
+  ],
+  "nodes": [
+   {
+    "id": "a"
+   }
+  ],
+  "edges": [],
+  "extendResult": [
+   {
+    "id": "6ba7b810-9dad-41d1-80b4-00c04fd430c8"
+   },
+   {
+    "id": "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   }
+  ],
+  "first": null,
+  "last": null,
+  "nodeIds": [
+   "a",
+   "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+   "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+  ],
+  "nodeNames": [
+   "a",
+   "R1",
+   "R2"
+  ],
+  "edgeList": [
+   [
+    "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\ta(a)\n\tR1(R1)\n\tR2(R2)\n\tR1 --> R2;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ },
+ {
+  "name": "reid_op",
+  "ops": [
+   [
+    "reid"
+   ]
+  ],
+  "nodes": [
+   {
+    "id": "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "runnable",
+    "rname": "Solo"
+   },
+   {
+    "id": "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "runnable",
+    "rname": "Dup"
+   },
+   {
+    "id": "6ba7b812-9dad-41d1-80b4-00c04fd430c8",
+    "kind": "runnable",
+    "rname": "Dup"
+   },
+   {
+    "id": "plain"
+   }
+  ],
+  "edges": [
+   [
+    "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   ],
+   [
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+    "plain"
+   ],
+   [
+    "plain",
+    "6ba7b812-9dad-41d1-80b4-00c04fd430c8"
+   ]
+  ],
+  "first": "Solo",
+  "last": "6ba7b812-9dad-41d1-80b4-00c04fd430c8",
+  "nodeIds": [
+   "Solo",
+   "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+   "6ba7b812-9dad-41d1-80b4-00c04fd430c8",
+   "plain"
+  ],
+  "nodeNames": [
+   "Solo",
+   "Dup",
+   "Dup",
+   "plain"
+  ],
+  "edgeList": [
+   [
+    "Solo",
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8"
+   ],
+   [
+    "6ba7b811-9dad-41d1-80b4-00c04fd430c8",
+    "plain"
+   ],
+   [
+    "plain",
+    "6ba7b812-9dad-41d1-80b4-00c04fd430c8"
+   ]
+  ],
+  "mermaid": "%%{init: {'flowchart': {'curve': 'linear'}}}%%\ngraph TD;\n\tSolo([Solo]):::first\n\t6ba7b811-9dad-41d1-80b4-00c04fd430c8(Dup)\n\t6ba7b812-9dad-41d1-80b4-00c04fd430c8([Dup]):::last\n\tplain(plain)\n\tSolo --> 6ba7b811-9dad-41d1-80b4-00c04fd430c8;\n\t6ba7b811-9dad-41d1-80b4-00c04fd430c8 --> plain;\n\tplain --> 6ba7b812-9dad-41d1-80b4-00c04fd430c8;\n\tclassDef default fill:#f2f0ff,line-height:1.2;\n\tclassDef first fill-opacity:0;\n\tclassDef last fill:#bfb6fc;\n"
+ }
+]

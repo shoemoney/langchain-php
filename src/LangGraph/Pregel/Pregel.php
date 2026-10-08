@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
+use LangChain\Runnables\Graph\Graph as DrawableGraph;
+use LangChain\Runnables\Graph\Node as DrawableNode;
+use LangChain\Runnables\Graph\RunnableIOSchema;
 use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableInterface;
@@ -13,6 +16,7 @@ use LangGraph\Cache\BaseCache;
 use LangGraph\Channels\ChannelRegistry;
 use LangGraph\Checkpoint\CheckpointListOptions;
 use LangGraph\Errors\EmptyChannelError;
+use LangGraph\Graph\CompiledGraph;
 use LangGraph\Errors\EmptyInputError;
 use LangGraph\Errors\GraphValueError;
 use LangGraph\Errors\InvalidUpdateError;
@@ -598,6 +602,182 @@ class Pregel extends Runnable
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * A drawable representation of the computation graph.
+     *
+     * Port of `CompiledGraph.getGraph` (`graph/graph.ts`). Only a compiled builder-backed graph
+     * ({@see CompiledGraph}) knows its edges, so any other Pregel draws like a plain runnable.
+     * `$xray` expands subgraphs in place: `true` expands every level, an integer that many levels.
+     * Upstream passes it on the config; this port has no such config field, so it is an argument.
+     * Concurrency note: upstream's `getGraphAsync` is this same synchronous walk.
+     */
+    public function getGraph(?RunnableConfig $config = null, bool|int|null $xray = null): DrawableGraph
+    {
+        if (!$this instanceof CompiledGraph || $this->builder === null) {
+            return parent::getGraph($config);
+        }
+
+        $builder = $this->builder;
+        $graph = new DrawableGraph();
+        $startNodes = [Constants::START => $graph->addNode(new RunnableIOSchema(), Constants::START)];
+        $endNodes = [];
+        $subgraphs = [];
+        if ($xray) {
+            foreach ($this->getSubgraphs() as [$name, $subgraph]) {
+                if ($subgraph instanceof CompiledGraph) {
+                    $subgraphs[$name] = $subgraph;
+                }
+            }
+        }
+
+        /** @var list<array{src: string, dest: string, conditional: bool}> $discoveredEdges */
+        $discoveredEdges = [];
+
+        $addEdge = static function (string $start, string $end, ?string $label = null, bool $conditional = false) use ($graph, &$startNodes, &$endNodes, &$discoveredEdges): void {
+            if ($end === Constants::END && !isset($endNodes[Constants::END])) {
+                $endNodes[Constants::END] = $graph->addNode(new RunnableIOSchema(), Constants::END);
+            }
+            if (!isset($startNodes[$start])) {
+                return;
+            }
+            if (!isset($endNodes[$end])) {
+                throw new \RuntimeException('End node ' . $end . ' not found!');
+            }
+            $discoveredEdges[] = ['src' => $start, 'dest' => $end, 'conditional' => $conditional];
+            $graph->addEdge($startNodes[$start], $endNodes[$end], $label !== $end ? $label : null, $conditional);
+        };
+
+        foreach ($builder->nodes as $key => $spec) {
+            $key = (string) $key;
+            $displayKey = self::escapeMermaidKeywords($key);
+            $node = $spec->bound ?? new RunnableIOSchema($key);
+            $metadata = $spec->metadata;
+            $before = in_array($key, $this->interruptBefore, true);
+            $after = in_array($key, $this->interruptAfter, true);
+            if ($before && $after) {
+                $metadata['__interrupt'] = 'before,after';
+            } elseif ($before) {
+                $metadata['__interrupt'] = 'before';
+            } elseif ($after) {
+                $metadata['__interrupt'] = 'after';
+            }
+
+            if ($xray) {
+                $newXray = is_int($xray) ? $xray - 1 : $xray;
+                if (isset($subgraphs[$key])) {
+                    $drawableSubgraph = $subgraphs[$key]->getGraph($config, $newXray);
+                } else {
+                    $drawableSubgraph = $node instanceof RunnableInterface
+                        ? Runnable::graphOf($node, $config)
+                        : new DrawableGraph();
+                }
+                $drawableSubgraph->trimFirstNode();
+                $drawableSubgraph->trimLastNode();
+
+                if (count($drawableSubgraph->nodes) > 1) {
+                    [$entry, $exit] = $graph->extend($drawableSubgraph, $displayKey);
+                    if ($entry === null) {
+                        throw new \RuntimeException('Could not extend subgraph "' . $key . '" due to missing entrypoint.');
+                    }
+                    if ($exit !== null) {
+                        $startNodes[$displayKey] = $exit;
+                    }
+                    $endNodes[$displayKey] = $entry;
+                } else {
+                    $newNode = $graph->addNode($node, $displayKey, $metadata);
+                    $startNodes[$displayKey] = $newNode;
+                    $endNodes[$displayKey] = $newNode;
+                }
+            } else {
+                $newNode = $graph->addNode($node, $displayKey, $metadata);
+                $startNodes[$displayKey] = $newNode;
+                $endNodes[$displayKey] = $newNode;
+            }
+        }
+
+        // Upstream's comparator never returns a positive number, which V8's TimSort turns into a
+        // stable ascending sort on the start node.
+        $sortedEdges = $builder->allEdges();
+        usort($sortedEdges, static fn (array $a, array $b): int => strcmp($a[0], $b[0]));
+        foreach ($sortedEdges as [$start, $end]) {
+            $addEdge(self::escapeMermaidKeywords($start), self::escapeMermaidKeywords($end));
+        }
+
+        foreach ($builder->branches as $start => $branches) {
+            $start = (string) $start;
+            $defaultEnds = [];
+            foreach (array_keys($builder->nodes) as $k) {
+                if ((string) $k !== $start) {
+                    $defaultEnds[self::escapeMermaidKeywords((string) $k)] = self::escapeMermaidKeywords((string) $k);
+                }
+            }
+            $defaultEnds[Constants::END] = Constants::END;
+
+            foreach ($branches as $branch) {
+                foreach ($branch->ends ?? $defaultEnds as $label => $end) {
+                    $addEdge(
+                        self::escapeMermaidKeywords($start),
+                        self::escapeMermaidKeywords((string) $end),
+                        (string) $label,
+                        true,
+                    );
+                }
+            }
+        }
+
+        foreach ($builder->nodes as $key => $spec) {
+            foreach ($spec->ends as $end) {
+                $addEdge(self::escapeMermaidKeywords((string) $key), self::escapeMermaidKeywords($end), null, true);
+            }
+        }
+
+        $this->addImplicitTerminalEndEdges($builder->nodes, $discoveredEdges, $addEdge);
+
+        return $graph;
+    }
+
+    private static function escapeMermaidKeywords(string $key): string
+    {
+        return $key === 'subgraph' ? '"' . $key . '"' : $key;
+    }
+
+    /**
+     * Add implicit edges to END for terminal nodes (targets with no outgoing edges).
+     *
+     * Only nodes reached by a non-conditional edge are considered, so conditional-branch targets are
+     * not treated as implicit sinks.
+     *
+     * @param array<string, PregelNode>                                   $nodes
+     * @param list<array{src: string, dest: string, conditional: bool}>   $discovered
+     */
+    private function addImplicitTerminalEndEdges(array $nodes, array $discovered, \Closure $addEdge): void
+    {
+        $sources = array_flip(array_column($discovered, 'src'));
+        $destinations = [];
+        foreach ($discovered as $edge) {
+            if (!$edge['conditional'] && $edge['dest'] !== Constants::END) {
+                $destinations[$edge['dest']] = true;
+            }
+        }
+        $destinations = array_map(strval(...), array_keys($destinations));
+        sort($destinations, SORT_STRING);
+
+        foreach ($destinations as $displayDest) {
+            if (isset($sources[$displayDest])) {
+                continue;
+            }
+            foreach ($nodes as $k => $spec) {
+                if (self::escapeMermaidKeywords((string) $k) === $displayDest) {
+                    if ($spec->isErrorHandler) {
+                        continue 2;
+                    }
+                    break;
+                }
+            }
+            $addEdge($displayDest, Constants::END);
         }
     }
 
