@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangGraph\Pregel;
 
 use LangChain\Runnables\Graph\Graph as DrawableGraph;
-use LangChain\Runnables\Graph\Node as DrawableNode;
 use LangChain\Runnables\Graph\RunnableIOSchema;
 use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableConfig;
@@ -612,7 +611,7 @@ class Pregel extends Runnable
      * ({@see CompiledGraph}) knows its edges, so any other Pregel draws like a plain runnable.
      * `$xray` expands subgraphs in place: `true` expands every level, an integer that many levels.
      * Upstream passes it on the config; this port has no such config field, so it is an argument.
-     * Concurrency note: upstream's `getGraphAsync` is this same synchronous walk.
+     * Upstream's `getGraphAsync` is this same walk, so it has no separate port.
      */
     public function getGraph(?RunnableConfig $config = null, bool|int|null $xray = null): DrawableGraph
     {
