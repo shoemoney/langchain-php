@@ -59,9 +59,14 @@ class Topic extends BaseChannel
             return $empty;
         }
 
-        // `unique: true` checkpoints are the two-element [seen, values] shape.
+        // Only `unique: true` checkpoints are the two-element [seen, values]
+        // shape; a non-unique list of two array values (e.g. two Sends) is flat.
+        // Upstream's isUniqueTopicCheckpoint also reads [seen, values] for non-unique topics to
+        // support legacy pre-flat JS checkpoints; this port drops that path on purpose because it
+        // has no legacy pre-flat checkpoints.
         if (
-            is_array($checkpoint)
+            $this->unique
+            && is_array($checkpoint)
             && count($checkpoint) === 2
             && is_array($checkpoint[0])
             && array_key_exists(1, $checkpoint)
