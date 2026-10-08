@@ -31,9 +31,9 @@ use function LangGraph\Pregel\interrupt;
  *    stream and checkpoint writes are attributed to the failed node, not `__error_handler__<node>`;
  *  - the two async-handler cases collapse into the synchronous ones (PHP has no async functions);
  *    the second is kept as "the handler also receives the config and the NodeError in it";
- *  - NON-EXACT (cache): a handled failure is cached under the failed node's cache key, because the
- *    handler runs inside that node's task and `PregelLoop` caches every non-error task. Upstream does
- *    not cache a failed task. `testAHandledFailureIsCachedUnderTheFailedNodesKey` pins this.
+ *  - a handled failure is not cached under the failed node's key, matching upstream: the inline
+ *    handler's writes carry a reserved marker that `PregelLoop::cacheTaskWrites()` skips
+ *    (`testAHandledFailureIsNotCachedUnderTheFailedNodesKey`).
  */
 #[CoversClass(StateGraph::class)]
 final class NodeErrorHandlerTest extends TestCase
@@ -407,11 +407,8 @@ final class NodeErrorHandlerTest extends TestCase
         self::assertSame('handled', $graph->invoke(['foo' => ''])['foo']);
     }
 
-    /**
-     * NON-EXACT: upstream would return 'handled' then 'ok' (two calls); this engine replays the
-     * handled result from the cache, so the node runs once and the second invoke is stale.
-     */
-    public function testAHandledFailureIsCachedUnderTheFailedNodesKey(): void
+    /** Upstream returns 'handled' then 'ok': a handled failure is never cached. */
+    public function testAHandledFailureIsNotCachedUnderTheFailedNodesKey(): void
     {
         $calls = 0;
         $graph = (new StateGraph(self::foo()))
@@ -428,7 +425,28 @@ final class NodeErrorHandlerTest extends TestCase
             ->compile(['cache' => new InMemoryCache()]);
 
         self::assertSame('handled', $graph->invoke(['foo' => 'x'])['foo']);
-        self::assertSame('handled', $graph->invoke(['foo' => 'x'])['foo'], 'upstream would return "ok" here');
-        self::assertSame(1, $calls, 'upstream would have called the node twice');
+        self::assertSame('ok', $graph->invoke(['foo' => 'x'])['foo']);
+        self::assertSame(2, $calls);
+        // A successful run is cached as usual.
+        self::assertSame('ok', $graph->invoke(['foo' => 'x'])['foo']);
+        self::assertSame(2, $calls);
+    }
+
+    public function testAHandledFailureStillAppliesAndCheckpointsItsWrites(): void
+    {
+        $saver = new MemorySaver();
+        $graph = (new StateGraph(self::foo()))
+            ->setNodeDefaults(['cachePolicy' => true, 'errorHandler' => static fn (): array => ['foo' => 'handled']])
+            ->addNode('a', static function (): array {
+                throw new \RuntimeException('boom');
+            })
+            ->addNode('b', static fn (array $state): array => ['foo' => $state['foo'] . '_b'])
+            ->addEdge(Constants::START, 'a')
+            ->addEdge('a', 'b')
+            ->compile(['cache' => new InMemoryCache(), 'checkpointer' => $saver]);
+
+        $config = new RunnableConfig(configurable: ['thread_id' => 't1']);
+        self::assertSame('handled', $graph->invoke(['foo' => 'x'], $config)['foo']);
+        self::assertSame('handled', $graph->getState($config)->values['foo']);
     }
 }
