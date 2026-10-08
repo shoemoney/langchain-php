@@ -9,8 +9,7 @@ use LangChain\Utils\Http\HttpClient;
 /**
  * Port of `client/index.ts`: the LangGraph Platform client.
  *
- * Carries `assistants`, `threads`, `crons` and `store`. The `runs` client (and the internal `~ui`
- * client) belong to WP-23b, so `Client` has no `runs` property yet; adding it is one line there.
+ * Carries `assistants`, `threads`, `runs`, `crons` and `store`. The internal `~ui` client is not ported.
  *
  * Every sub-client shares the one transport, so passing a fake `HttpClient` here is all a test needs.
  * The config array is documented on {@see BaseClient}.
@@ -20,6 +19,8 @@ class Client
     public readonly AssistantsClient $assistants;
 
     public readonly ThreadsClient $threads;
+
+    public readonly RunsClient $runs;
 
     public readonly CronsClient $crons;
 
@@ -51,6 +52,7 @@ class Client
 
         $this->assistants = new AssistantsClient($config, $http);
         $this->threads = new ThreadsClient($config, $http);
+        $this->runs = new RunsClient($config, $http);
         $this->crons = new CronsClient($config, $http);
         $this->store = new StoreClient($config, $http);
     }
