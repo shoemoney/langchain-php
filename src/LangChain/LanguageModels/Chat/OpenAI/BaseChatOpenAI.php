@@ -503,7 +503,7 @@ abstract class BaseChatOpenAI extends BaseChatModel
                     $this->url(),
                     $this->headers(),
                     $body,
-                    [],
+                    $this->query(),
                     $this->timeout,
                 );
             } catch (OpenAIException $e) {
@@ -601,7 +601,7 @@ abstract class BaseChatOpenAI extends BaseChatModel
             $delivered = false;
 
             try {
-                $raw = $this->http()->postStream($this->url(), $this->headers(), $body, [], $this->timeout);
+                $raw = $this->http()->postStream($this->url(), $this->headers(), $body, $this->query(), $this->timeout);
 
                 // The drain has to live inside the `try`, not just the call that
                 // creates the generator. `postStream()` is a generator function:
@@ -727,6 +727,28 @@ abstract class BaseChatOpenAI extends BaseChatModel
     protected function url(): string
     {
         return $this->baseUrl !== null ? $this->baseUrl : $this->defaultUrl();
+    }
+
+    /**
+     * Query-string parameters sent on every request (Azure's `api-version`).
+     *
+     * @return array<string, mixed>
+     */
+    protected function query(): array
+    {
+        return [];
+    }
+
+    /**
+     * The capability profile for this model (`[]` when unknown).
+     *
+     * Port of `get profile()` on `BaseChatOpenAI`: `PROFILES[this.model] ?? {}`.
+     *
+     * @return array<string, int|bool>
+     */
+    public function profile(): array
+    {
+        return Profiles::for($this->model);
     }
 
     /**
