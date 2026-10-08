@@ -564,9 +564,14 @@ abstract class Runnable implements RunnableInterface
     {
         $runLog = null;
         $hasEncounteredStartEvent = false;
-        $rootTags = $config->tags;
-        $rootMetadata = $config->metadata;
-        $rootName = $config->runName ?? $this->getName();
+        // A binding is transparent (upstream's `RunnableBinding` forwards `streamEvents` to the bound
+        // runnable with its own config), so the root's name, tags and metadata are those of the runnable
+        // the binding resolves to, under the merged config.
+        [$target, $rootConfig] = self::unwrapBindings($this, $config);
+        $rootConfig ??= $config;
+        $rootTags = $rootConfig->tags;
+        $rootMetadata = $rootConfig->metadata;
+        $rootName = $rootConfig->runName ?? $target->getName();
         unset($streamOptions['autoClose']);
 
         $logStreamCallbackHandler = new LogStreamCallbackHandler(array_merge($streamOptions, [
