@@ -120,6 +120,9 @@ class PregelLoop
 
         $skipDoneTasks = $config->configurable === [] || !array_key_exists('checkpoint_id', $config->configurable);
 
+        // The checkpoint id the CALLER named, read before the namespace reset below can drop it.
+        $requestedCheckpointId = $config->configurable['checkpoint_id'] ?? null;
+
         $scratchpad = $config->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
         if ($scratchpad instanceof PregelScratchpad && $scratchpad->subgraphCounter > 0) {
             $config = clone $config;
@@ -166,9 +169,6 @@ class PregelLoop
             : ($config->configurable[Constants::CONFIG_KEY_CHECKPOINTER]
                 ?? $params['checkpointer']
                 ?? null);
-        // The checkpoint id the CALLER named, before any namespace reset below could drop it.
-        $requestedCheckpointId = $config->configurable['checkpoint_id'] ?? null;
-
         $saved = null;
         if ($checkpointer !== null) {
             $replayState = $config->configurable[Constants::CONFIG_KEY_REPLAY_STATE] ?? null;
