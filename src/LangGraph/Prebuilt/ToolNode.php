@@ -126,7 +126,7 @@ class ToolNode extends RunnableCallable
                 throw $e;
             }
 
-            if (Guard::isGraphBubbleUp($e)) {
+            if (Guard::isGraphInterrupt($e)) {
                 // An interrupt is a breakpoint that brings a human into the loop; it is not recoverable
                 // by the agent and must not be fed back to the model as an error message.
                 throw $e;

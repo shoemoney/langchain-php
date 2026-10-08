@@ -222,6 +222,25 @@ final class ToolNodeCommandsTest extends TestCase
         (new ToolNode([$toolWithInterrupt]))->invoke(['messages' => [self::ai(self::call('tool_with_interrupt', [], 'testid'))]]);
     }
 
+    public function testAParentCommandThrownInsideAToolBecomesAnErrorToolMessage(): void
+    {
+        // Upstream rethrows only isGraphInterrupt (GraphInterrupt/NodeInterrupt), not every GraphBubbleUp.
+        $subgraphCaller = tool(
+            static function (): never {
+                throw new ParentCommand(new Command(graph: Command::PARENT, goto: 'elsewhere'));
+            },
+            ['name' => 'call_subgraph', 'description' => 'x', 'schema' => Schema::object([])],
+        );
+
+        $result = (new ToolNode([$subgraphCaller]))->invoke([self::ai(self::call('call_subgraph', [], 'p1'))]);
+
+        self::assertInstanceOf(ToolMessage::class, $result[0]);
+        self::assertSame('p1', $result[0]->toolCallId);
+        self::assertSame('error', $result[0]->additional_kwargs['status']);
+        self::assertStringStartsWith('Error: ', (string) $result[0]->content);
+        self::assertStringEndsWith('Please fix your mistakes.', (string) $result[0]->content);
+    }
+
     public function testAnInterruptIsRethrownEvenWhenHandleToolErrorsIsACallable(): void
     {
         $interrupting = tool(
