@@ -263,4 +263,61 @@ final class ReactAgentToolNodeTest extends TestCase
         self::assertSame(['hi', 'plain answer'], ReactAgentFixtures::texts($result['messages']));
         self::assertCount(1, $llm->generateCalls);
     }
+
+    /** @return array<string, array{0: string, 1: bool, 2: int}> */
+    public static function fanOutCases(): array
+    {
+        return [
+            'v1 without a post-model hook' => ['v1', false, 1],
+            'v2 without a post-model hook' => ['v2', false, 2],
+            'v1 with a post-model hook' => ['v1', true, 1],
+            'v2 with a post-model hook' => ['v2', true, 2],
+        ];
+    }
+
+    #[DataProvider('fanOutCases')]
+    public function testVersionDecidesWhetherToolCallsShareOneToolsTask(string $version, bool $withPostModelHook, int $expectedToolsTasks): void
+    {
+        $llm = ReactAgentFixtures::fake([
+            new AIMessage(['content' => '', 'tool_calls' => [
+                ReactAgentFixtures::toolCall('search_api', 'a', ['query' => 'foo']),
+                ReactAgentFixtures::toolCall('search_api', 'b', ['query' => 'bar']),
+            ]]),
+            new AIMessage('done'),
+        ]);
+        $agent = ReactAgent::create([
+            'llm' => $llm,
+            'tools' => [ReactAgentFixtures::searchApi()],
+            'version' => $version,
+        ] + ($withPostModelHook ? ['postModelHook' => static fn (): array => []] : []));
+
+        $toolsTasks = 0;
+        $last = null;
+        foreach ($agent->stream(['messages' => 'go']) as [$mode, $chunk]) {
+            if ($mode === 'updates' && isset($chunk['tools'])) {
+                $toolsTasks++;
+            }
+            if ($mode === 'values') {
+                $last = $chunk;
+            }
+        }
+
+        self::assertSame($expectedToolsTasks, $toolsTasks);
+        self::assertSame(['go', '', 'result for foo', 'result for bar', 'done'], ReactAgentFixtures::texts($last['messages']));
+    }
+
+    public function testTheToolBindingIsDoneOnceAndReusedAcrossModelCalls(): void
+    {
+        $llm = ReactAgentFixtures::spy([
+            new AIMessage(['content' => '', 'tool_calls' => [ReactAgentFixtures::toolCall('search_api', 'a', ['query' => 'foo'])]]),
+            new AIMessage('done'),
+        ]);
+        $agent = ReactAgent::create(['llm' => $llm, 'tools' => [ReactAgentFixtures::searchApi()]]);
+
+        $agent->invoke(['messages' => 'one']);
+        $agent->invoke(['messages' => 'two']);
+
+        self::assertCount(1, $llm->bindToolsCalls, 'four model calls, one bind');
+        self::assertCount(4, $llm->generateCalls);
+    }
 }
