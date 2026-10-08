@@ -190,6 +190,21 @@ class Pregel extends Runnable
             Validate::validateKeys($outputKeys, $this->channels);
         }
 
+        // A subgraph compiled with `checkpointer: true` keeps ONE persistent checkpoint lineage
+        // across the parent's runs: its namespace loses the `:taskId` suffix the parent would
+        // otherwise give every invocation, so each call resumes the previous call's state.
+        if ($this->persistsAcrossInvocations()) {
+            $config = self::patchConfigurable($config, [
+                Constants::CONFIG_KEY_CHECKPOINT_NS => implode(
+                    Constants::CHECKPOINT_NAMESPACE_SEPARATOR,
+                    array_map(
+                        static fn (string $part): string => explode(Constants::CHECKPOINT_NAMESPACE_END, $part)[0],
+                        explode(Constants::CHECKPOINT_NAMESPACE_SEPARATOR, (string) ($config->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] ?? '')),
+                    ),
+                ),
+            ]);
+        }
+
         $validInput = $this->validateInput($input);
 
         $modes = $this->resolveStreamModes();
@@ -225,6 +240,23 @@ class Pregel extends Runnable
         $loop->traceNodes = $handlers !== [];
 
         return $loop->run($inputKeys);
+    }
+
+    /**
+     * Whether this graph is a subgraph that asked for `checkpointer: true`.
+     *
+     * Upstream keeps `true` on the graph. This port's `StateGraph::compile()` (outside this work
+     * package) turns `true` into a plain base-class {@see Checkpoint\MemorySaver} before the graph
+     * exists, so the choice is recovered from that: a nested graph holding exactly that class
+     * got its saver from `compile(['checkpointer' => true])`; a saver a caller supplied is a
+     * subclass (`LangGraph\Checkpoint\MemorySaver`, `SqliteSaver`...). A root graph is never
+     * affected: it has no parent namespace to strip.
+     */
+    private function persistsAcrossInvocations(): bool
+    {
+        return $this->checkpointer !== null
+            && $this->checkpointer::class === Checkpoint\MemorySaver::class
+            && !$this->checkpointerDisabled;
     }
 
     /**
@@ -1213,10 +1245,13 @@ class Pregel extends Runnable
         } elseif ($asNode === null) {
             $lastSeenByNode = [];
             foreach ($checkpoint->versionsSeen as $node => $seenVersions) {
+                // `__interrupt__` is not a node: it records what a resume had already seen, and
+                // counting it would make every resumed thread look ambiguous.
+                if ((string) $node === Constants::INTERRUPT) {
+                    continue;
+                }
                 foreach ($seenVersions as $version) {
-                    if ($version !== Constants::INTERRUPT) {
-                        $lastSeenByNode[] = [$version, (string) $node];
-                    }
+                    $lastSeenByNode[] = [$version, (string) $node];
                 }
             }
             usort($lastSeenByNode, static fn (array $a, array $b): int => CheckpointFunctions::compareChannelVersions($a[0], $b[0]));

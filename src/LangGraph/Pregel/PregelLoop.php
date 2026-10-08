@@ -166,9 +166,29 @@ class PregelLoop
             : ($config->configurable[Constants::CONFIG_KEY_CHECKPOINTER]
                 ?? $params['checkpointer']
                 ?? null);
+        // The checkpoint id the CALLER named, before any namespace reset below could drop it.
+        $requestedCheckpointId = $config->configurable['checkpoint_id'] ?? null;
+
         $saved = null;
         if ($checkpointer !== null) {
-            $saved = $checkpointer->getTuple($checkpointConfig->configurable);
+            $replayState = $config->configurable[Constants::CONFIG_KEY_REPLAY_STATE] ?? null;
+            if (!empty($checkpointConfig->configurable['checkpoint_id'])) {
+                $saved = $checkpointer->getTuple($checkpointConfig->configurable);
+            } elseif ($replayState instanceof ReplayState) {
+                // A subgraph visited while the parent replays an old checkpoint loads the
+                // checkpoint it had BEFORE that point on its first visit (see ReplayState).
+                $saved = $replayState->getCheckpoint(
+                    (string) ($config->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] ?? ''),
+                    $checkpointer,
+                    $checkpointConfig,
+                );
+                // The loop works on its own copy of the config from here on, so the caller's
+                // is not edited.
+                $config = clone $config;
+                unset($config->configurable[Constants::CONFIG_KEY_RESUMING]);
+            } else {
+                $saved = $checkpointer->getTuple($checkpointConfig->configurable);
+            }
         }
 
         $hasPersistedParent = $saved !== null;
@@ -182,7 +202,16 @@ class PregelLoop
             );
         }
 
-        $prevCheckpointConfig = $saved->parentConfig;
+        // The checkpoint the loop writes next is a child of the one it loaded, so its config
+        // carries the loaded checkpoint's id (and any lineage the saver recorded) on top of the
+        // caller's. Without this, a resumed run's first save has no parent and the thread's
+        // `parentConfig` chain breaks at every resume.
+        $checkpointConfig = clone $config;
+        $checkpointConfig->configurable = array_merge(
+            ['checkpoint_ns' => ''],
+            $config->configurable,
+            $saved->config['configurable'] ?? [],
+        );
         $checkpoint = $saved->checkpoint->copy();
         $checkpointMetadata = $saved->metadata;
         $checkpointPendingWrites = $saved->pendingWrites;
@@ -202,6 +231,20 @@ class PregelLoop
                 $checkpointPendingWrites,
                 static fn (array $w): bool => $w[1] !== Constants::RESUME
             ));
+        }
+
+        // Resuming at the head: the caller named the thread's newest checkpoint explicitly. That is
+        // a resume, not a replay, unless the head is a state edit or a fork.
+        $resumeAtHead = false;
+        $threadId = $checkpointConfig->configurable['thread_id'] ?? null;
+        if ($checkpointer !== null && $requestedCheckpointId && is_string($threadId)) {
+            $latest = $checkpointer->getTuple([
+                'thread_id' => $threadId,
+                'checkpoint_ns' => (string) ($checkpointConfig->configurable['checkpoint_ns'] ?? ''),
+            ]);
+            $resumeAtHead = ($latest?->config['configurable']['checkpoint_id'] ?? null) === $requestedCheckpointId
+                && ($checkpointMetadata['source'] ?? null) !== 'update'
+                && ($checkpointMetadata['source'] ?? null) !== 'fork';
         }
 
         $channels = ChannelRegistry::emptyChannels($params['channelSpecs'], $checkpoint->channelValues);
@@ -238,6 +281,7 @@ class PregelLoop
             checkpointNamespace: $checkpointNamespace,
             skipDoneTasks: $skipDoneTasks,
             isNested: $isNested,
+            resumeAtHead: $resumeAtHead,
             interruptAfter: $params['interruptAfter'] ?? [],
             interruptBefore: $params['interruptBefore'] ?? [],
             debug: (bool) ($params['debug'] ?? false),
@@ -247,6 +291,10 @@ class PregelLoop
             cache: $params['cache'] ?? null,
         );
         $loop->hasPersistedParent = $hasPersistedParent;
+        $parentConfig = $saved->parentConfig;
+        $loop->prevCheckpointConfig = $parentConfig === null
+            ? null
+            : new RunnableConfig(configurable: $parentConfig['configurable'] ?? $parentConfig);
         $loop->durability = $params['durability'] ?? 'async';
 
         return $loop;
@@ -694,7 +742,24 @@ class PregelLoop
         }
 
         if (!$this->isNested) {
+            // Hand subgraphs the replay point only while time travelling (see ReplayState), not
+            // when resuming from the head with an explicit `checkpoint_id`.
+            $replayState = null;
+            if ($isTimeTraveling) {
+                $replayCheckpointId = $this->checkpoint->id;
+                if (in_array($this->checkpointMetadata['source'] ?? null, ['update', 'fork'], true)
+                    && $this->prevCheckpointConfig !== null) {
+                    $replayCheckpointId = $this->prevCheckpointConfig->configurable['checkpoint_id'] ?? $replayCheckpointId;
+                }
+                $replayState = new ReplayState($replayCheckpointId);
+            }
+
             $this->config->configurable[Constants::CONFIG_KEY_RESUMING] = $this->isResuming();
+            if ($replayState !== null) {
+                $this->config->configurable[Constants::CONFIG_KEY_REPLAY_STATE] = $replayState;
+            } else {
+                unset($this->config->configurable[Constants::CONFIG_KEY_REPLAY_STATE]);
+            }
         }
     }
 
@@ -1219,7 +1284,16 @@ class PregelLoop
             $config->configurable['thread_id'] ??= $this->config->configurable['thread_id'] ?? null;
             $config->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] = (string) ($this->config->configurable['checkpoint_ns'] ?? '');
 
-            if (($this->checkpointConfig->configurable['checkpoint_id'] ?? null) !== null) {
+            if ($exiting && ($this->checkpointConfig->configurable['checkpoint_id'] ?? null) === $newCheckpoint->id) {
+                // Re-saving the checkpoint the loop just wrote: its parent is still the one
+                // that save used, not itself. (`prevCheckpointConfig` already names that parent.)
+                $parentId = $this->prevCheckpointConfig?->configurable['checkpoint_id'] ?? null;
+                if ($parentId === null) {
+                    unset($config->configurable['checkpoint_id']);
+                } else {
+                    $config->configurable['checkpoint_id'] = $parentId;
+                }
+            } elseif (($this->checkpointConfig->configurable['checkpoint_id'] ?? null) !== null) {
                 $this->prevCheckpointConfig = $this->checkpointConfig;
             } else {
                 $this->prevCheckpointConfig = null;
