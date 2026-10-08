@@ -6,6 +6,7 @@ namespace LangGraph\Pregel;
 
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableInterface;
+use LangGraph\Graph\Branch;
 
 /**
  * The writer a conditional edge contributes to its source node.
@@ -33,15 +34,19 @@ class RunnableBranchWriter implements RunnableInterface
 {
     public string $lcGraphName = 'RunnableBranchWriter';
 
+    /** Path evaluation, `pathMap` lookup and destination validation live in {@see Branch}, not here. */
+    private readonly Branch $branch;
+
     /**
-     * @param callable|RunnableInterface $path    Maps node output to destinations.
-     * @param bool                       $isStart  Whether the source is `__start__`.
+     * @param callable|RunnableInterface|Branch $path    Maps node output to destinations.
+     * @param bool                              $isStart  Whether the source is `__start__`.
      */
     public function __construct(
         public readonly mixed $path,
         public readonly bool $isStart = false,
         public readonly ?string $start = null,
     ) {
+        $this->branch = $path instanceof Branch ? $path : new Branch($path);
     }
 
     public function getName(): string
@@ -59,14 +64,8 @@ class RunnableBranchWriter implements RunnableInterface
      */
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
-        $result = $this->evaluate($input, $config);
-
-        if ($result === null || $result === [] || $result === false || $result === '') {
-            return $input;
-        }
-
         $writes = [];
-        foreach ((array) $result as $dest) {
+        foreach ($this->branch->destinations($input, $config) as $dest) {
             if ($dest === Constants::END) {
                 continue;
             }
@@ -135,16 +134,5 @@ class RunnableBranchWriter implements RunnableInterface
         foreach ($input as $item) {
             yield $this->invoke($item, $config);
         }
-    }
-
-    private function evaluate(mixed $input, ?RunnableConfig $config): mixed
-    {
-        if ($this->path instanceof RunnableInterface) {
-            return $this->path->invoke($input, $config);
-        }
-
-        \assert(is_callable($this->path));
-
-        return ($this->path)($input, $config);
     }
 }
