@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\Prebuilt;
 
 use LangChain\Messages\AIMessage;
-use LangChain\Messages\BaseMessage;
 use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Runnables\RunnableConfig;

@@ -7,7 +7,6 @@ namespace LangChain\Tests\Unit\LanguageModels\Chat\OpenAI\Converters;
 use LangChain\LanguageModels\Chat\OpenAI\Converters\ResponsesInput;
 use LangChain\LanguageModels\Chat\OpenAI\Converters\ResponsesTools;
 use LangChain\Messages\AIMessage;
-use LangChain\Messages\BaseMessage;
 use LangChain\Messages\HumanMessage;
 use LangChain\Messages\SystemMessage;
 use LangChain\Messages\ToolMessage;

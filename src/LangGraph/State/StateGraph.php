@@ -9,7 +9,6 @@ use LangGraph\Graph\Branch;
 use LangGraph\Graph\Graph;
 use LangChain\Runnables\RunnableLambda;
 use LangGraph\Channels\EphemeralValue;
-use LangGraph\Channels\Missing;
 use LangGraph\Errors\InvalidUpdateError;
 use LangGraph\Pregel\ChannelWrite;
 use LangGraph\Pregel\Command;
