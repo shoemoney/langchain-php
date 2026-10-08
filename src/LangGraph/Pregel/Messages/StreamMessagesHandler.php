@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel\Messages;
 
-use LangChain\LanguageModels\Outputs\ChatGeneration;
-use LangChain\LanguageModels\Outputs\ChatGenerationChunk;
-use LangChain\LanguageModels\Outputs\LLMResult;
 use LangChain\Messages\AIMessageChunk;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\ToolMessage;
@@ -208,7 +205,7 @@ class StreamMessagesHandler extends BaseCallbackHandler
             return;
         }
 
-        if ($chunk instanceof ChatGenerationChunk) {
+        if ($chunk instanceof \LangChain\LanguageModels\Outputs\ChatGenerationChunk) {
             $this->emit($meta, $chunk->message, $runId);
         } else {
             $this->emit($meta, new AIMessageChunk(['content' => $token]), $runId);
@@ -220,7 +217,7 @@ class StreamMessagesHandler extends BaseCallbackHandler
      * @param array<string, mixed> $extraParams
      */
     public function handleLLMEnd(
-        LLMResult $output,
+        \LangChain\LanguageModels\Outputs\LLMResult $output,
         string $runId,
         ?string $parentRunId = null,
         array $tags = [],
@@ -237,7 +234,7 @@ class StreamMessagesHandler extends BaseCallbackHandler
         // message is emitted here instead.
         if (!isset($this->emittedChatModelRunIds[$runId])) {
             $generation = $output->generations[0][0] ?? null;
-            if ($generation instanceof ChatGeneration) {
+            if ($generation instanceof \LangChain\LanguageModels\Outputs\ChatGeneration) {
                 $this->emit($meta, $generation->message, $runId, true);
             }
         }

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel\Messages;
 
-use LangChain\LanguageModels\Outputs\ChatGeneration;
-use LangChain\LanguageModels\Outputs\LLMResult;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Tracers\BaseCallbackHandler;
@@ -253,7 +251,7 @@ class StreamProtocolMessagesHandler extends BaseCallbackHandler
      * @param array<string, mixed> $extraParams
      */
     public function handleLLMEnd(
-        LLMResult $output,
+        \LangChain\LanguageModels\Outputs\LLMResult $output,
         string $runId,
         ?string $parentRunId = null,
         array $tags = [],
@@ -265,7 +263,7 @@ class StreamProtocolMessagesHandler extends BaseCallbackHandler
         }
 
         $generation = $output->generations[0][0] ?? null;
-        $message = $generation instanceof ChatGeneration ? $generation->message : null;
+        $message = $generation instanceof \LangChain\LanguageModels\Outputs\ChatGeneration ? $generation->message : null;
 
         if ($message !== null) {
             if (isset($this->streamedRunIds[$runId])) {
