@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace LangGraph\Sdk;
 
 /**
- * Port of `client/threads/index.ts`, minus the streaming surface (`joinStream`, `stream`), which is
- * WP-23b alongside the runs client and the stream utilities.
+ * Port of `client/threads/index.ts`, minus `stream()`: it returns a `ThreadStream` over the v2
+ * thread-centric protocol (transport adapters, media, subscriptions), which is not part of this port.
+ * `joinStream()` is here.
  *
  * `ttl` anywhere below is either minutes (an int, sent as `{ttl, strategy: "delete"}`) or an
  * explicit `{ttl: int, strategy?: "delete"}` map.
@@ -17,6 +18,8 @@ namespace LangGraph\Sdk;
  */
 class ThreadsClient extends BaseClient
 {
+    use StreamsWithRetry;
+
     /**
      * Get a thread by ID. `include` asks the server for extra fields.
      *
@@ -274,6 +277,26 @@ class ThreadsClient extends BaseClient
             ] + self::wireFields($options, ['before' => 'before', 'metadata' => 'metadata', 'checkpoint' => 'checkpoint']),
             'dedupe' => true,
         ] + self::signalOf($options));
+    }
+
+    /**
+     * Join the live stream of a thread's runs. `lastEventId` resumes after that event.
+     *
+     * @param array{lastEventId?: string, streamMode?: string|list<string>, signal?: mixed} $options
+     *
+     * @return \Generator<int, array{id: string|null, event: string, data: mixed}>
+     */
+    public function joinStream(string $threadId, array $options = []): \Generator
+    {
+        $lastEventId = $options['lastEventId'] ?? '';
+
+        return $this->streamWithRetry([
+            'endpoint' => "/threads/{$threadId}/stream",
+            'method' => 'GET',
+            'signal' => $options['signal'] ?? null,
+            'headers' => $lastEventId !== '' ? ['Last-Event-ID' => $lastEventId] : null,
+            'params' => isset($options['streamMode']) ? ['stream_mode' => $options['streamMode']] : null,
+        ]);
     }
 
     /**
