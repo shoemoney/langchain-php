@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\Func;
 
-use LangChain\Runnables\RunnableConfig;
 use LangGraph\Checkpoint\MemorySaver;
 use LangGraph\Func\EntrypointFinal;
 use LangGraph\Func\Func;
