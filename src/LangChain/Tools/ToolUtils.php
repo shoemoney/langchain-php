@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace LangChain\Tools;
 
+use LangChain\Runnables\Runnable;
+use LangChain\Utils\Testing\StructuredToolSpec;
+
 /**
  * The two small predicates the tool layer needs on its inputs.
  *
  * Port of `_isToolCall` / `_configHasToolCallId` from
- * `@langchain/core/tools/utils`.
+ * `@langchain/core/tools/utils`, plus the `isStructuredTool` /
+ * `isStructuredToolParams` / `isRunnableToolLike` / `isLangChainTool` predicates
+ * from `@langchain/core/tools/types` that `utils/function_calling` re-exports.
  *
  * Both answer "is this the tool-call envelope rather than bare arguments?", which
  * is the single most consequential branch in {@see StructuredTool::call()}: a
@@ -61,5 +66,65 @@ final class ToolUtils
         }
 
         return isset($toolCall['id']) && is_string($toolCall['id']);
+    }
+
+    /**
+     * Whether `$tool` is a full tool object (upstream: carries an `lc_namespace`).
+     */
+    public static function isStructuredTool(mixed $tool): bool
+    {
+        return $tool instanceof StructuredTool;
+    }
+
+    /**
+     * Whether `$tool` is a Runnable that was turned into a tool.
+     *
+     * Upstream keys on the constructor's `lc_name()` being `"RunnableToolLike"`;
+     * the same discriminator is used here, since a class-name check would break
+     * for a subclass.
+     */
+    public static function isRunnableToolLike(mixed $tool): bool
+    {
+        return $tool instanceof Runnable
+            && method_exists($tool, 'lcName')
+            && $tool::lcName() === 'RunnableToolLike';
+    }
+
+    /**
+     * Whether `$tool` has the minimum a model needs to call it: a name and a schema.
+     *
+     * The schema must be a {@see Schema} or a JSON Schema whose `type` is one of
+     * the JSON primitives. A bare `["name" => ..., "schema" => ...]` with a
+     * schema of any other shape is not a tool, it is data that happens to have
+     * those keys.
+     */
+    public static function isStructuredToolParams(mixed $tool): bool
+    {
+        if ($tool instanceof StructuredToolSpec) {
+            return true;
+        }
+        if (!is_array($tool) || !array_key_exists('name', $tool) || !array_key_exists('schema', $tool)) {
+            return false;
+        }
+
+        $schema = $tool['schema'];
+        if ($schema instanceof Schema) {
+            return true;
+        }
+
+        return is_array($schema)
+            && isset($schema['type'])
+            && is_string($schema['type'])
+            && in_array($schema['type'], ['null', 'boolean', 'object', 'array', 'number', 'string'], true);
+    }
+
+    /**
+     * Whether `$tool` is a StructuredTool, a RunnableToolLike or a StructuredToolParams.
+     */
+    public static function isLangChainTool(mixed $tool): bool
+    {
+        return self::isRunnableToolLike($tool)
+            || self::isStructuredToolParams($tool)
+            || self::isStructuredTool($tool);
     }
 }
