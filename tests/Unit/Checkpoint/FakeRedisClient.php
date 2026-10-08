@@ -60,6 +60,8 @@ final class FakeRedisClient implements RedisClientInterface
 
     private float $now = 1_000_000.0;
 
+    private bool $indexingDisabled = false;
+
     public function jsonGet(string $key): ?string
     {
         $this->record(__FUNCTION__, func_get_args());
@@ -171,6 +173,9 @@ final class FakeRedisClient implements RedisClientInterface
     public function ftCreate(string $index, array $schema, string $prefix): void
     {
         $this->record(__FUNCTION__, func_get_args());
+        if ($this->indexingDisabled) {
+            return;
+        }
         if (isset($this->indexes[$index])) {
             throw new RedisClientException('Index already exists');
         }
@@ -259,6 +264,15 @@ final class FakeRedisClient implements RedisClientInterface
         }
 
         return (int) ceil($this->expiresAt[$key] - $this->now);
+    }
+
+    /**
+     * Make `FT.CREATE` a silent no-op, so a dropped index stays dropped and the savers' key-scan
+     * fallback is reachable (they re-create their indexes before every `list()`).
+     */
+    public function disableIndexing(): void
+    {
+        $this->indexingDisabled = true;
     }
 
     /** Remove an index, as `FT.DROPINDEX` would. */

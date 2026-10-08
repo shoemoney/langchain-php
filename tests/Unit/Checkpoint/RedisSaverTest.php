@@ -6,6 +6,8 @@ namespace LangChain\Tests\Unit\Checkpoint;
 
 use LangGraph\Checkpoint\BaseCheckpointSaver;
 use LangGraph\Checkpoint\Checkpoint;
+use LangGraph\Checkpoint\CheckpointId;
+use LangGraph\Checkpoint\CheckpointListOptions;
 use LangGraph\Checkpoint\Redis\RedisSaver;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -174,6 +176,36 @@ final class RedisSaverTest extends TestCase
         ] as $key) {
             self::assertContains($key, $client->deletedKeys());
         }
+    }
+
+    /**
+     * The saver re-creates its indexes before every `list()`, so the missing-index path is only
+     * reachable when creation does nothing. Search then fails with the server's own wording
+     * (`No such index checkpoints`, capitalised, which is why the match is case-insensitive) and
+     * the saver scans keys instead.
+     */
+    public function testListFallsBackToAKeyScanWhenTheSearchIndexIsMissing(): void
+    {
+        $client = new FakeRedisClient();
+        $client->disableIndexing();
+        $saver = new RedisSaver($client);
+        $config = ['configurable' => ['thread_id' => 'no-index-thread', 'checkpoint_ns' => '']];
+        $ids = [];
+        foreach ([0, 1, 2] as $seq) {
+            $ids[] = $id = CheckpointId::uuid6($seq);
+            $saver->put($config, new Checkpoint(v: 4, id: $id, ts: gmdate('c')), ['source' => 'loop', 'step' => $seq, 'parents' => []]);
+        }
+
+        $listed = $saver->list($config);
+
+        self::assertSame([$ids[2], $ids[1], $ids[0]], array_map(static fn ($t): string => $t->checkpoint->id, $listed));
+        self::assertNotSame([], $client->callsTo('ftSearch'), 'the search was attempted first');
+
+        $filtered = $saver->list($config, new CheckpointListOptions(filter: ['step' => 1], limit: 5));
+        self::assertSame([$ids[1]], array_map(static fn ($t): string => $t->checkpoint->id, $filtered));
+
+        $before = $saver->list($config, new CheckpointListOptions(before: ['thread_id' => 'no-index-thread', 'checkpoint_id' => $ids[2]]));
+        self::assertSame([$ids[1], $ids[0]], array_map(static fn ($t): string => $t->checkpoint->id, $before));
     }
 
     /** `fromUrl` needs ext-redis and a server; the failure mode without either is a clear exception. */
