@@ -18,6 +18,7 @@ use LangGraph\Errors\InvalidUpdateError;
 use LangGraph\Errors\NodeError;
 use LangGraph\Graph\Branch;
 use LangGraph\Graph\Graph;
+use LangGraph\Pregel\ChannelRead;
 use LangGraph\Pregel\ChannelWrite;
 use LangGraph\Pregel\Command;
 use LangGraph\Pregel\CompiledStateGraph;
@@ -756,6 +757,7 @@ class StateGraph extends Graph
         $this->compiled = true;
 
         $stateKeys = array_map(strval(...), array_keys($this->channels));
+        $streamChannels = count($stateKeys) === 1 && $stateKeys[0] === self::ROOT ? [self::ROOT] : $stateKeys;
         $outputKeys = array_map(strval(...), array_keys($this->outputDefinition));
         $inputKeys = array_map(strval(...), array_keys($this->inputDefinition));
 
@@ -916,7 +918,7 @@ class StateGraph extends Graph
         foreach ($this->branches as $rawStart => $branches) {
             $start = (string) $rawStart;
             foreach ($branches as $name => $branch) {
-                $writer = $this->makeBranchWriter($branch, $start === Constants::START, $start);
+                $writer = $this->makeConditionalEdgeWriter($branch, $start, $streamChannels);
                 if ($start === Constants::START) {
                     $startNode->writers[] = $writer;
                 } else {
@@ -937,9 +939,6 @@ class StateGraph extends Graph
         $outputChannels = count($outputKeys) === 1 && $outputKeys[0] === self::ROOT
             ? self::ROOT
             : $outputKeys;
-
-        $streamKeys = array_map(strval(...), array_keys($this->channels));
-        $streamChannels = count($streamKeys) === 1 && $streamKeys[0] === self::ROOT ? [self::ROOT] : $streamKeys;
 
         return new CompiledStateGraph(
             nodes: $compiledNodes,
@@ -1266,6 +1265,38 @@ class StateGraph extends Graph
             path: $path,
             isStart: $isStart,
             start: $start,
+        );
+    }
+
+    /**
+     * The writer for a declared conditional edge.
+     *
+     * Port of `CompiledStateGraph.attachBranch`. The path is handed the graph's **state**, read fresh
+     * from the channels, not the source node's return value: a router like `fn($state) => $state['route']`
+     * must see every key, including ones the node did not just write. The destinations become writes to
+     * the `branch:to:<node>` channels (or `Send` packets); `END` is dropped, because reaching the end is
+     * already an edge to `__end__`.
+     *
+     * @param list<string> $readChannels
+     */
+    private function makeConditionalEdgeWriter(Branch $branch, string $start, array $readChannels): RunnableInterface
+    {
+        $read = count($readChannels) === 1 && $readChannels[0] === self::ROOT ? self::ROOT : $readChannels;
+
+        return $branch->run(
+            static function (array $destinations) use ($start): ?ChannelWrite {
+                $writes = [];
+                foreach ($destinations as $destination) {
+                    if ($destination instanceof Send) {
+                        $writes[] = $destination;
+                    } elseif ($destination !== Constants::END) {
+                        $writes[] = ['channel' => self::branchTo($destination), 'value' => $start];
+                    }
+                }
+
+                return $writes === [] ? null : new ChannelWrite($writes, [Constants::TAG_HIDDEN]);
+            },
+            static fn (RunnableConfig $config): mixed => ChannelRead::doRead($config, $read, true),
         );
     }
 }
