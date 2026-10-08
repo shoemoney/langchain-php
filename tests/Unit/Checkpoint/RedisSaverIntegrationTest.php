@@ -32,7 +32,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
  * `test_sync_redis_checkpointer` (including the three pending-writes flows, blob
  * reconstruction, blob deletion and the three blob-TTL cases) and `test_search`.
  * Not converted: the `RediSearch Index Creation` block, which asserts on `FT.INFO` output
- * and so tests the server, not the saver. `ShallowRedisSaverIntegrationTest` covers the rest.
+ * and so tests the server, not the saver. `RedisShallowSaverIntegrationTest` covers the rest.
  */
 #[CoversClass(RedisSaver::class)]
 #[CoversClass(TtlConfig::class)]

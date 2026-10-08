@@ -24,7 +24,7 @@ use PHPUnit\Framework\TestCase;
  * both.
  */
 #[CoversClass(ShallowRedisSaver::class)]
-final class ShallowRedisSaverIntegrationTest extends TestCase
+final class RedisShallowSaverIntegrationTest extends TestCase
 {
     private RedisClientInterface $client;
 

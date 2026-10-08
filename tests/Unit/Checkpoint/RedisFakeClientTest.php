@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  * `RedisSaverIntegrationTest` is the standing check on the rest.
  */
 #[CoversNothing]
-final class FakeRedisClientTest extends TestCase
+final class RedisFakeClientTest extends TestCase
 {
     public function testJsonSetNxDeclinesToOverwriteAndReportsIt(): void
     {
