@@ -871,8 +871,8 @@ class PregelLoop
      * Remember a finished task's writes under its cache key.
      *
      * Port of the tail of `putWrites`. Only a task that declared a cache policy
-     * has a key, and only a successful one is cached: a task that errored or
-     * interrupted must run again.
+     * has a key, and only a successful one is cached: a task that errored,
+     * interrupted or was rescued by an error handler must run again.
      *
      * @param list<array{0: string, 1: mixed}> $writes
      */
@@ -889,6 +889,14 @@ class PregelLoop
 
         if ($writes[0][0] === Constants::ERROR || $writes[0][0] === Constants::INTERRUPT) {
             return;
+        }
+
+        // Upstream runs an error handler as its own task, so a handled failure is never cached under the
+        // failed node's key; the inline handler's writes carry a marker instead.
+        foreach ($writes as $write) {
+            if ($write[0] === Constants::HANDLED) {
+                return;
+            }
         }
 
         $this->cache->set([[

@@ -50,6 +50,15 @@ final class Constants
      */
     public const ERROR_SOURCE_NODE = '__error_source_node__';
 
+    /**
+     * Reserved write key marking a task whose writes came from a node error handler.
+     *
+     * Upstream runs a handler as its own task, so a handled failure is never cached under the failed
+     * node's key. This engine runs the handler inline, so the node's write-back appends this marker for
+     * {@see \LangGraph\Pregel\PregelLoop} to see. It never reaches a channel.
+     */
+    public const HANDLED = '__handled__';
+
     /** Reserved cache namespace for node writes. */
     public const CACHE_NS_WRITES = '__pregel_ns_writes';
 
@@ -165,6 +174,7 @@ final class Constants
             self::RESUME,
             self::ERROR,
             self::ERROR_SOURCE_NODE,
+            self::HANDLED,
             self::NO_WRITES,
             self::CONFIG_KEY_SEND,
             self::CONFIG_KEY_READ,

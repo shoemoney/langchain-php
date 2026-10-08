@@ -90,12 +90,10 @@ use LangGraph\Utils\RunnableCallable;
  * do not fire; only the state write-back and the `Command` goto do. The `updates` stream and the
  * checkpoint writes are still attributed to the failed node, not `__error_handler__<node>`.
  *
- * **Divergence (cache):** because the handler runs inside the failed node's own task, that task
- * finishes "successfully" with the handler's writes, and a node that has a cache policy stores them
- * under its own cache key. Upstream never caches a failed task, so a transient failure there is
- * re-run on the next call; here the handled result is replayed from the cache for the whole TTL.
- * Fixing it needs a change in `PregelLoop::cacheTaskWrites()`, which is out of this package's reach.
- * Pinned by `NodeErrorHandlerTest::testAHandledFailureIsCachedUnderTheFailedNodesKey`.
+ * **Cache:** a handled failure is never cached, as upstream (which never caches a failed task). The handler
+ * runs inside the failed node's own task, so the write-back appends the reserved
+ * {@see Constants::HANDLED} write, which `PregelLoop::cacheTaskWrites()` sees and skips; the marker never
+ * reaches a channel. The handler's state writes are still applied and checkpointed.
  */
 class StateGraph extends Graph
 {
@@ -1150,7 +1148,11 @@ class StateGraph extends Graph
      */
     private function getUpdates(mixed $input, string $nodeKey, array $outputKeys): ?array
     {
+        $handled = $input instanceof HandledOutcome;
         $updates = $this->collectUpdates($input, $nodeKey, $outputKeys);
+        if ($handled) {
+            $updates = [...($updates ?? []), [Constants::HANDLED, true]];
+        }
         if ($updates === null) {
             return null;
         }
