@@ -759,8 +759,10 @@ class StateGraph extends Graph
         // does not: `PregelLoopTest::testGraphWithNoReachableNodeReturnsEmptyState` pins that a graph
         // whose only node has no edge compiles and returns its input. Call `validate()` explicitly to
         // get the reachability check; compile still rejects an interrupt naming an unknown node.
+        // `['*']` is this port's spelling of upstream's `"*"` (interrupt everywhere, see
+        // Pregel's normalisation), which upstream never validates because it is not an array.
         foreach ([...(is_array($interruptBefore) ? $interruptBefore : []), ...(is_array($interruptAfter) ? $interruptAfter : [])] as $node) {
-            if (!isset($this->nodes[$node])) {
+            if ($node !== '*' && !isset($this->nodes[$node])) {
                 throw new \InvalidArgumentException('Interrupt node `' . $node . '` is not present');
             }
         }
