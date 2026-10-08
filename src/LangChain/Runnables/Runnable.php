@@ -73,7 +73,7 @@ abstract class Runnable implements RunnableInterface
             function (RunnableConfig $child) use ($input): \Generator {
                 yield [self::CHANNEL_DEFAULT, $this->invoke($input, $child)];
             },
-            $this->defersInputs(),
+            $this->usesTransformStreaming(),
         );
     }
 
@@ -713,10 +713,12 @@ abstract class Runnable implements RunnableInterface
     }
 
     /**
-     * Upstream runs lambdas and passthroughs through `_transformStreamWithConfig`, which cannot know
-     * the input when the run starts (it may itself be a stream); everything else starts with the input.
+     * Upstream runs lambdas and passthroughs (and sequences, maps, ...) through
+     * `_transformStreamWithConfig`, which cannot know the input when the run starts (it may itself be a
+     * stream) and whose output stream is tapped; everything else goes through `_callWithConfig`, which
+     * starts with the input and is not tapped.
      */
-    private function defersInputs(): bool
+    private function usesTransformStreaming(): bool
     {
         return $this instanceof RunnableLambda || $this instanceof RunnablePassthrough;
     }
@@ -800,7 +802,7 @@ abstract class Runnable implements RunnableInterface
             $input,
             $config,
             static fn (RunnableConfig $child): \Generator => self::untracedStream($target, $input, $child),
-            false,
+            true,
         );
     }
 
@@ -882,7 +884,7 @@ abstract class Runnable implements RunnableInterface
         mixed $input,
         ?RunnableConfig $config,
         \Closure $source,
-        bool $deferInputs,
+        bool $transformStyle,
         ?string $runType = null,
     ): \Generator {
         $config ??= new RunnableConfig();
@@ -903,26 +905,31 @@ abstract class Runnable implements RunnableInterface
         $inputs = self::coerceToDict($input);
         $runManager = $manager->handleChainStart(
             new Serialized(['langchain_core', 'runnables', $runnable->getName()]),
-            $deferInputs ? ['input' => ''] : $inputs,
+            $transformStyle ? ['input' => ''] : $inputs,
             $runId,
             $runType ?? self::runTypeOf($runnable),
             [],
             [],
             $config->runName ?? $runnable->getName(),
-            $deferInputs ? ['lc_defers_inputs' => true] : [],
+            $transformStyle ? ['lc_defers_inputs' => true] : [],
         );
 
         $stream = $source($child);
-        foreach ($runManager->handlers as $handler) {
-            if ($handler instanceof EventStreamCallbackHandler) {
-                $stream = $handler->tapOutputIterable($runId, $stream);
-                break;
+        // Only a run driven through `_transformStreamWithConfig` is tapped. One driven through
+        // `_callWithConfig` (a prompt, a parser) streams nothing: its single chunk exists only after the
+        // run has already ended.
+        if ($transformStyle) {
+            foreach ($runManager->handlers as $handler) {
+                if ($handler instanceof EventStreamCallbackHandler) {
+                    $stream = $handler->tapOutputIterable($runId, $stream);
+                    break;
+                }
             }
-        }
-        foreach ($runManager->handlers as $handler) {
-            if ($handler instanceof LogStreamCallbackHandler) {
-                $stream = $handler->tapOutputIterable($runId, $stream);
-                break;
+            foreach ($runManager->handlers as $handler) {
+                if ($handler instanceof LogStreamCallbackHandler) {
+                    $stream = $handler->tapOutputIterable($runId, $stream);
+                    break;
+                }
             }
         }
 

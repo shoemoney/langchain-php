@@ -23,6 +23,14 @@ use LangChain\Schema\PromptValue;
  *  - `stream()` — one input, a generator of `[channel, chunk]` pairs;
  *  - `batch()` — many inputs, many outputs.
  *
+ * `streamEvents()` and `streamLog()` are declared on {@see Runnable}, not here: three implementers
+ * (`RunnablePick`, `ChannelWrite`, `RunnableBranchWriter`) implement this interface directly, and a new
+ * interface method would take the whole suite down at class-load time. Once they extend `Runnable` (or
+ * gain the two methods) the declarations below can become real:
+ *
+ * @method \Generator streamEvents(mixed $input, ?RunnableConfig $config = null, string $version = 'v2', array $streamOptions = [], ?string $encoding = null) Events emitted by the steps of the run.
+ * @method \Generator streamLog(mixed $input, ?RunnableConfig $config = null, array $streamOptions = []) JSON Patch ops describing the run state.
+ *
  * The default implementations are meaningful rather than abstract, because
  * most runnables only need to override one: `stream` yields a single
  * `default`-channel chunk carrying the `invoke` result, and `batch` maps inputs
@@ -32,6 +40,14 @@ use LangChain\Schema\PromptValue;
  */
 interface RunnableInterface
 {
+    /**
+     * The default output channel name of a `stream()` pair.
+     *
+     * Declared here as well as on {@see Runnable} because implementers that do not extend `Runnable`
+     * (`RunnablePick`, `ChannelWrite`) yield `[self::CHANNEL_DEFAULT, ...]` pairs too.
+     */
+    public const CHANNEL_DEFAULT = 'default';
+
     /**
      * The name of the run in traces.
      */

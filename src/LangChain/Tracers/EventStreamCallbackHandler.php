@@ -293,9 +293,34 @@ class EventStreamCallbackHandler extends BaseTracer
         parent::handleLLMEnd($output, $runId, $parentRunId, $tags, $extraParams);
     }
 
+    /**
+     * Upstream's `assignName`: the explicit run name, else the serialized component's `name`, else the
+     * last segment of its id. The serialized `name` is what names a tool run after the tool.
+     */
+    private function assignName(Run $run): string
+    {
+        $explicit = $run->extra['__name'] ?? null;
+        if (\is_string($explicit) && $explicit !== '') {
+            return $explicit;
+        }
+
+        $serialized = $run->serialized;
+        $name = $serialized['name'] ?? $serialized['kwargs']['name'] ?? null;
+        if (\is_string($name) && $name !== '') {
+            return $name;
+        }
+
+        $id = $serialized['id'] ?? null;
+        if (\is_array($id) && $id !== []) {
+            return (string) end($id);
+        }
+
+        return 'Unnamed';
+    }
+
     protected function onLLMStart(Run $run): void
     {
-        $runName = $run->name();
+        $runName = $this->assignName($run);
         $runType = isset($run->inputs['messages']) ? 'chat_model' : 'llm';
         $runInfo = [
             'tags' => $run->tags,
@@ -385,7 +410,7 @@ class EventStreamCallbackHandler extends BaseTracer
 
     protected function onChainStart(Run $run): void
     {
-        $runName = $run->name();
+        $runName = $this->assignName($run);
         $runType = $run->runType;
         $runInfo = [
             'tags' => $run->tags,
@@ -437,7 +462,7 @@ class EventStreamCallbackHandler extends BaseTracer
 
     protected function onToolStart(Run $run): void
     {
-        $runName = $run->name();
+        $runName = $this->assignName($run);
         $runInfo = [
             'tags' => $run->tags,
             'metadata' => $run->extra['metadata'] ?? [],
@@ -489,7 +514,7 @@ class EventStreamCallbackHandler extends BaseTracer
 
     protected function onRetrieverStart(Run $run): void
     {
-        $runName = $run->name();
+        $runName = $this->assignName($run);
         $inputs = ['query' => $run->inputs['query'] ?? null];
         $runInfo = [
             'tags' => $run->tags,
