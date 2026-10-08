@@ -77,7 +77,7 @@ class AsyncCaller
      * Run `$callable` with retries.
      *
      * Attempt count is `maxRetries + 1`, matching p-retry. Any failure is retried unless it is on the
-     * no-retry list (cancel/timeout/abort, 4xx caller errors) or is a connection failure with no
+     * no-retry list (cancel/timeout/abort, 4xx caller errors, PHP `LogicException`/`Error`) or is a connection failure with no
      * retries left, which becomes a {@see ConnectionError}.
      */
     public function call(callable $callable, mixed ...$args): mixed
@@ -149,6 +149,12 @@ class AsyncCaller
      */
     private function onFailedAttempt(\Throwable $error, int $retriesLeft): void
     {
+        // A programming or configuration error (a missing transport, a TypeError) fails identically on
+        // every attempt, and JS has no equivalent: there, such a throw is rare and retried anyway.
+        if ($error instanceof \LogicException || $error instanceof \Error) {
+            throw $error;
+        }
+
         $message = $error->getMessage();
 
         if (
