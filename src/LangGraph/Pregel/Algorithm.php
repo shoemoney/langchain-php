@@ -515,6 +515,9 @@ final class Algorithm
      * @param array<string, PregelNode>   $processes
      * @param array<string, BaseChannel>  $channels
      * @param list<array{0: string, 1: string, 2: mixed}>|null $pendingWrites
+     * @param bool $includeCompleted Also return tasks that already have a successful pending
+     *        write. `getState` / `updateState` need them (upstream does not filter them out of
+     *        `_prepareNextTasks`; the loop's own scheduling does, so it keeps the default).
      * @return array<string, PregelExecutableTask>
      */
     public static function prepareNextTasks(
@@ -525,6 +528,7 @@ final class Algorithm
         RunnableConfig $config,
         bool $forExecution,
         NextTaskExtraFields $extra,
+        bool $includeCompleted = false,
     ): array {
         $tasks = [];
         $indexedExtra = $extra;
@@ -544,6 +548,7 @@ final class Algorithm
                     $config,
                     $forExecution,
                     $indexedExtra,
+                    $includeCompleted,
                 );
                 if ($task !== null) {
                     $tasks[$task->id] = $task;
@@ -562,6 +567,7 @@ final class Algorithm
                 $config,
                 $forExecution,
                 $indexedExtra,
+                $includeCompleted,
             );
             if ($task !== null) {
                 $tasks[$task->id] = $task;
@@ -599,6 +605,7 @@ final class Algorithm
         RunnableConfig $config,
         bool $forExecution,
         NextTaskExtraFields $extra,
+        bool $includeCompleted = false,
     ): ?PregelExecutableTask {
         $step = $extra->step;
         $configurable = $config->configurable;
@@ -715,6 +722,7 @@ final class Algorithm
                     metadata: $metadata,
                     tags: $proc->tags,
             );
+            self::applyTimeout($task, $node);
 
             return $task;
         }
@@ -788,7 +796,7 @@ final class Algorithm
             // A task that already produced a non-error write this step is done;
             // re-preparing it would schedule the work twice. Checked AFTER the
             // trigger is resolved, because the id depends on it.
-            if ($pendingWrites !== null && $pendingWrites !== []) {
+            if (!$includeCompleted && $pendingWrites !== null && $pendingWrites !== []) {
                 if ($extra->indexFor($pendingWrites)->hasCompletedWrite($taskId)) {
                     return null;
                 }
@@ -855,11 +863,28 @@ final class Algorithm
                     metadata: $metadata,
                     tags: $proc->tags,
             );
+            self::applyTimeout($task, $node);
 
             return $task;
         }
 
         return null;
+    }
+
+    /**
+     * Put a task's node under its timeout, if it has one.
+     *
+     * Port of the `timeout: coerceTimeoutPolicy(...)` line of `_prepareSingleTask` plus the
+     * enforcement in `_runWithRetry`. The runner is not edited: wrapping `proc` means a retry
+     * re-enters the wrapper, so each attempt gets a fresh clock exactly as upstream resets it.
+     */
+    private static function applyTimeout(PregelExecutableTask $task, \LangChain\Runnables\RunnableInterface $node): void
+    {
+        $policy = Timeout::coerceTimeoutPolicy($task->timeout);
+        $task->timeout = $policy;
+        if ($policy !== null) {
+            $task->proc = Timeout::wrapProc($task, $node, $policy);
+        }
     }
 
     /**
