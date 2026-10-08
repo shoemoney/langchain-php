@@ -185,17 +185,13 @@ final class PhpRedisClient implements RedisClientInterface
     private function guard(callable $call): mixed
     {
         try {
-            $result = $call();
+            return $call();
         } catch (\RedisException $e) {
+            // phpredis keeps the last error string after throwing; clear it so it cannot be
+            // mistaken for the outcome of a later, successful command.
+            $this->redis->clearLastError();
+
             throw new RedisClientException($e->getMessage(), 0, $e);
         }
-
-        $error = $this->redis->getLastError();
-        if ($error !== null) {
-            $this->redis->clearLastError();
-            throw new RedisClientException($error);
-        }
-
-        return $result;
     }
 }
