@@ -275,7 +275,7 @@ class StateGraph
      * because a `Command` carries its update *and* its routing, and the update
      * must land before anything downstream is scheduled to read it.
      *
-     * @param array{checkpointer?: \LangGraph\Pregel\Checkpoint\BaseCheckpointSaver|bool, interruptBefore?: list<string>, interruptAfter?: list<string>, name?: string, description?: string, streamMode?: list<string>, retryPolicy?: \LangGraph\Pregel\Retry\RetryPolicy} $options
+     * @param array{checkpointer?: \LangGraph\Pregel\Checkpoint\BaseCheckpointSaver|bool, interruptBefore?: list<string>, interruptAfter?: list<string>, name?: string, description?: string, streamMode?: list<string>, retryPolicy?: \LangGraph\Pregel\Retry\RetryPolicy, store?: \LangGraph\Store\BaseStore|null, cache?: \LangGraph\Cache\BaseCache|null} $options
      */
     public function compile(array $options = []): CompiledStateGraph
     {
@@ -431,6 +431,8 @@ class StateGraph
             triggerToNodes: $triggerToNodes,
             builder: $this,
             checkpointerDisabled: $checkpointerDisabled,
+            store: $options['store'] ?? null,
+            cache: $options['cache'] ?? null,
         );
     }
 

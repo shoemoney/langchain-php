@@ -25,7 +25,10 @@ final class ToolRuntime
      * @param array<string, mixed>|null $toolCall The full tool call.
      * @param array<string, mixed> $configurable
      * @param mixed                $context   Runtime context from the agent.
-     * @param object|null          $store     Persistent key-value storage.
+     * @param object|null          $store     Persistent key-value storage. Inside a LangGraph run this is the
+     *                                        graph's `LangGraph\Store\BaseStore`. It is typed `object` because
+     *                                        `@langchain/core` does not depend on the graph package, and its own
+     *                                        `BaseStore` (`stores.ts`) is a different, key-value, interface.
      * @param callable|null        $writer    Stream writer for progressive output.
      */
     public function __construct(
@@ -58,9 +61,13 @@ final class ToolRuntime
             toolCall: $config->toolCall,
             configurable: $config->configurable,
             context: $config->context,
-            // `store` and `writer` are left at their constructor defaults: the
-            // config carries no field for either. They exist for the LangGraph
-            // integration, which injects them when it builds the runtime.
+            // The graph engine publishes its store under `__pregel_store` (`Constants::CONFIG_KEY_STORE`)
+            // on the task config; a tool run outside a graph has none. The key is spelled out because
+            // this package must not import the graph package. `writer` stays at its default: nothing
+            // injects one yet.
+            store: is_object($config->configurable['__pregel_store'] ?? null)
+                ? $config->configurable['__pregel_store']
+                : null,
         );
     }
 }

@@ -7,10 +7,12 @@ namespace LangGraph\Pregel;
 use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableConfig;
 use LangGraph\Channels\BaseChannel;
+use LangGraph\Cache\BaseCache;
 use LangGraph\Channels\ChannelRegistry;
 use LangGraph\Errors\EmptyInputError;
 use LangGraph\Pregel\Checkpoint\BaseCheckpointSaver;
 use LangGraph\Pregel\Retry\RetryPolicy;
+use LangGraph\Store\BaseStore;
 
 /**
  * The durable-execution engine: a graph of nodes and channels, run to
@@ -80,6 +82,8 @@ class Pregel extends Runnable
         public ?int $stepTimeout = null,
         public ?string $description = null,
         public bool $checkpointerDisabled = false,
+        public ?BaseStore $store = null,
+        public ?BaseCache $cache = null,
     ) {
         if (isset($channels[self::TASKS_CHANNEL])
             && $channels[self::TASKS_CHANNEL]->lcGraphName !== 'Topic') {
@@ -163,6 +167,8 @@ class Pregel extends Runnable
             'interruptBefore' => $this->interruptBefore,
             'debug' => $this->debug,
             'triggerToNodes' => $this->triggerToNodes,
+            'store' => $config->configurable[Constants::CONFIG_KEY_STORE] ?? $this->store,
+            'cache' => $config->configurable[Constants::CONFIG_KEY_CACHE] ?? $this->cache,
         ]);
 
         $loop->streamModes = $modes;
@@ -314,6 +320,7 @@ class Pregel extends Runnable
             'outputKeys' => $this->outputChannels,
             'streamKeys' => $this->streamChannels,
             'triggerToNodes' => $this->triggerToNodes,
+            'store' => $this->store,
         ]);
 
         $tasks = Algorithm::prepareNextTasks(
