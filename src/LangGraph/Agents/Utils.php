@@ -519,15 +519,15 @@ final class Utils
 
                 // Exact values thrown downstream, so unchanged propagation is not misclassified as a
                 // failure in this middleware.
-                /** @var \SplObjectStorage<\Throwable, true> $downstreamErrors */
-                $downstreamErrors = new \SplObjectStorage();
+                /** @var \WeakMap<\Throwable, true> $downstreamErrors */
+                $downstreamErrors = new \WeakMap();
 
                 $wrappedInnerHandler = static function (array $passedRequest) use ($handler, $originalState, $downstreamErrors): mixed {
                     $mergedState = [...$originalState, ...(array) ($passedRequest['state'] ?? [])];
                     try {
                         return $handler([...$passedRequest, 'state' => $mergedState]);
                     } catch (\Throwable $error) {
-                        $downstreamErrors->attach($error);
+                        $downstreamErrors[$error] = true;
 
                         throw $error;
                     }
@@ -555,7 +555,7 @@ final class Utils
 
                     return $result;
                 } catch (\Throwable $error) {
-                    if ($downstreamErrors->contains($error)) {
+                    if (isset($downstreamErrors[$error])) {
                         throw $error;
                     }
 
