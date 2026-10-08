@@ -283,7 +283,7 @@ class MongoDBSaver extends BaseCheckpointSaver
         // `[].every(...)` is true upstream, but an empty batch writes nothing either way.
         $allSpecial = CheckpointConstants::allSpecialChannels($writes);
 
-        // MongoDB rejects an empty bulk write, and `interrupt()` flows send empty batches.
+        // An empty batch (an `interrupt()` flow) issues no calls at all.
         $collection = $this->db->collection($this->checkpointWritesCollectionName);
         foreach ($writes as $position => $write) {
             $channel = (string) $write[0];
