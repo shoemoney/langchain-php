@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace LangGraph\State;
 
 use LangChain\Runnables\RunnableInterface;
+use LangGraph\Graph\Branch;
+use LangGraph\Graph\Graph;
 use LangChain\Runnables\RunnableLambda;
 use LangGraph\Channels\EphemeralValue;
 use LangGraph\Channels\Missing;
@@ -53,21 +55,12 @@ use LangGraph\Pregel\Send;
  * destination node subscribes to that channel. Routing becomes a write, and
  * writes are what Pregel already knows how to schedule.
  */
-class StateGraph
+class StateGraph extends Graph
 {
     public const SELF = Constants::SELF;
 
     /** The sentinel channel a whole-value return is written to. */
     public const ROOT = '__root__';
-
-    /** @var array<string, PregelNode> */
-    protected array $nodes = [];
-
-    /** @var list<array{0: string, 1: string}> */
-    protected array $edges = [];
-
-    /** @var array<string, array<string, callable|RunnableInterface>> */
-    protected array $branches = [];
 
     /**
      * @param AnnotationRoot|array<string, mixed> $schema A channel map, or the
@@ -85,6 +78,52 @@ class StateGraph
         }
     }
 
+    protected function allowsMultipleEdges(): bool
+    {
+        return true;
+    }
+
+    protected function reservedNodeNames(): array
+    {
+        return [Constants::END, Constants::START];
+    }
+
+    protected function assertNodeKeyIsValid(string $key): void
+    {
+        if (array_key_exists($key, $this->schema->spec)) {
+            throw new \InvalidArgumentException(
+                $key . ' is already being used as a state attribute (a.k.a. a channel), '
+                . 'cannot also be used as a node name.'
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    protected function buildNode(RunnableInterface $runnable, array $options): PregelNode
+    {
+        return new PregelNode(
+            bound: $runnable,
+            metadata: $options['metadata'] ?? [],
+            tags: $options['tags'] ?? [],
+            retryPolicy: $options['retryPolicy'] ?? null,
+            cachePolicy: ($options['cachePolicy'] ?? null) === false ? null : ($options['cachePolicy'] ?? null),
+            subgraphs: $runnable instanceof \LangGraph\Pregel\Pregel ? [$runnable] : ($options['subgraphs'] ?? []),
+            ends: $options['ends'] ?? [],
+            errorHandlerNode: $options['errorHandler'] ?? null,
+        );
+    }
+
+    /**
+     * Conditional edges are keyed by the first `pathMap` value (or `SELF` without one), so two edges
+     * from one node stay distinct when they declare different maps.
+     */
+    protected function branchName(Branch $branch, ?array $pathMap): string
+    {
+        return $pathMap === null ? Constants::SELF : (string) (array_values($pathMap)[0] ?? Constants::SELF);
+    }
+
     /** The channels this graph's state is made of. */
     public function channels(): array
     {
@@ -92,66 +131,11 @@ class StateGraph
     }
 
     /**
-     * Add a node.
-     *
-     * Port of `StateGraph.addNode`. The name doubles as the channel the node's
-     * completion is published to, which is why it may not collide with a state
-     * key: a node called `items` and a state key called `items` would make
-     * "did this node run" and "what is this field" the same question. Rejected
-     * here rather than left to produce a graph whose behaviour depends on
-     * write ordering.
-     *
-     * @param array{retryPolicy?: \LangGraph\Pregel\Retry\RetryPolicy, cachePolicy?: array|false, metadata?: array<string, mixed>, tags?: list<string>, errorHandler?: string, ends?: list<string>} $options
-     */
-    public function addNode(
-        string $key,
-        callable|RunnableInterface $action,
-        array $options = [],
-    ): self {
-        if (array_key_exists($key, $this->schema->spec)) {
-            throw new \InvalidArgumentException(
-                $key . ' is already being used as a state attribute (a.k.a. a channel), '
-                . 'cannot also be used as a node name.'
-            );
-        }
-
-        foreach ([Constants::CHECKPOINT_NAMESPACE_SEPARATOR, Constants::CHECKPOINT_NAMESPACE_END] as $reserved) {
-            if (str_contains($key, $reserved)) {
-                throw new \InvalidArgumentException(
-                    '"' . $reserved . '" is a reserved character and is not allowed in node names.'
-                );
-            }
-        }
-
-        if (isset($this->nodes[$key])) {
-            throw new \InvalidArgumentException('Node `' . $key . '` already present.');
-        }
-
-        if ($key === Constants::END || $key === Constants::START) {
-            throw new \InvalidArgumentException('Node `' . $key . '` is reserved.');
-        }
-
-        $runnable = \LangChain\Runnables\coerceToRunnable($action, $key);
-
-        $this->nodes[(string) $key] = new PregelNode(
-            bound: $runnable,
-            metadata: $options['metadata'] ?? [],
-            tags: $options['tags'] ?? [],
-            retryPolicy: $options['retryPolicy'] ?? null,
-            cachePolicy: ($options['cachePolicy'] ?? null) === false ? null : ($options['cachePolicy'] ?? null),
-            ends: $options['ends'] ?? [],
-            errorHandlerNode: $options['errorHandler'] ?? null,
-        );
-
-        return $this;
-    }
-
-    /**
      * Add several nodes at once.
      *
      * @param array<string, callable|RunnableInterface> $actions
      */
-    public function addNodes(array $actions): self
+    public function addNodes(array $actions): static
     {
         foreach ($actions as $key => $action) {
             $this->addNode((string) $key, $action);
@@ -171,7 +155,7 @@ class StateGraph
      * instead, because Pregel has no stop node — reaching the end is an event
      * that the loop reads, not an edge.
      */
-    public function addEdge(string $start, string $end): self
+    public function addEdge(string $start, string $end): static
     {
         if ($start !== Constants::START && !isset($this->nodes[$start])) {
             throw new \InvalidArgumentException('Node `' . $start . '` not found');
@@ -185,14 +169,11 @@ class StateGraph
                 [['channel' => Constants::END, 'value' => ChannelWrite::passthrough()]],
                 [Constants::TAG_HIDDEN],
             );
-        } else {
-            if (!isset($this->nodes[$end])) {
-                throw new \InvalidArgumentException('Node `' . $end . '` not found');
-            }
-            $this->edges[] = [$start, $end];
+        } elseif (!isset($this->nodes[$end])) {
+            throw new \InvalidArgumentException('Node `' . $end . '` not found');
         }
 
-        return $this;
+        return parent::addEdge($start, $end);
     }
 
     /**
@@ -203,10 +184,15 @@ class StateGraph
      * {@see Send} packets. Returning `null` or `[]` routes nowhere, which is how
      * a node declines to continue — a normal outcome, not an error.
      *
-     * @param list<string>|null $pathMap Optional display names per branch.
+     * @param array<string, string>|list<string>|null $pathMap Maps the path's answers to destinations; also names the branch.
      */
-    public function addConditionalEdges(string $start, callable|RunnableInterface $path, ?array $pathMap = null): self
-    {
+    public function addConditionalEdges(
+        string|array $source,
+        callable|RunnableInterface|null $path = null,
+        ?array $pathMap = null,
+    ): static {
+        $start = is_array($source) ? (string) $source['source'] : $source;
+
         // START is permitted here exactly as addEdge() permits it, and exactly as
         // upstream's own fixtures use it — `addConditionalEdges(START, fanOut,
         // ["review"])` appears in langgraph-js' multi-interrupt-graph.ts:48 and
@@ -217,46 +203,11 @@ class StateGraph
             throw new \InvalidArgumentException('Node `' . $start . '` not found');
         }
 
-        $branchName = $pathMap === null ? Constants::SELF : (array_values($pathMap)[0] ?? Constants::SELF);
-
         // Upstream REFUSES a duplicate condition name rather than overwriting it
-        // (langgraph-core/src/graph/graph.ts:488-495):
-        //
-        //     if (this.branches[source] && this.branches[source][name]) {
-        //       throw new Error(`Condition \`${name}\` already present for node \`${source}\``);
-        //     }
-        //     this.branches[source] ??= {};
-        //     this.branches[source][name] = new Branch(options);
-        //
-        // The keyed-by-name storage is the same; the guard is what was missing. Two
-        // conditional edges from one node with no pathMap both resolve to SELF, and
-        // this port silently kept the second — a branch a caller registered and
-        // could see accepted simply disappearing, with nothing thrown. Upstream makes
-        // it loud at REGISTRATION time, which is the only moment the caller can
+        // (langgraph-core/src/graph/graph.ts:488-495); {@see Graph::addConditionalEdges()}
+        // does the refusing, at registration time, which is the only moment the caller can
         // still do anything about it.
-        if (isset($this->branches[$start][$branchName])) {
-            throw new \InvalidArgumentException(sprintf(
-                'Condition `%s` already present for node `%s`',
-                $branchName,
-                $start,
-            ));
-        }
-
-        $this->branches[$start][$branchName] = $path;
-
-        return $this;
-    }
-
-    /** Set the graph's start node. */
-    public function setEntryPoint(string $node): self
-    {
-        return $this->addEdge(Constants::START, $node);
-    }
-
-    /** Set the graph's finish node. */
-    public function setFinishPoint(string $node): self
-    {
-        return $this->addEdge($node, Constants::END);
+        return parent::addConditionalEdges($source, $path, $pathMap);
     }
 
     /**
@@ -279,8 +230,11 @@ class StateGraph
      */
     public function compile(array $options = []): CompiledStateGraph
     {
+        $this->compiled = true;
+
         $stateChannels = $this->schema->spec;
         $outputKeys = array_keys($stateChannels);
+        $isRoot = $outputKeys === [self::ROOT];
 
         $checkpointer = $options['checkpointer'] ?? null;
         $checkpointerDisabled = $checkpointer === false;
@@ -322,7 +276,9 @@ class StateGraph
                 // shape is what lets `_procInput` distinguish a trigger channel
                 // (empty means "not scheduled") from an ordinary one (empty
                 // means "absent from this input").
-                channels: array_combine($outputKeys, $outputKeys),
+                // A whole-value (`__root__`) state is read as the bare value, not a one-key map:
+                // a positional list reads the first channel that has a value.
+                channels: $isRoot ? [self::ROOT] : array_combine($outputKeys, $outputKeys),
                 bound: $spec->bound,
                 metadata: $spec->metadata,
                 tags: $spec->tags,
@@ -386,8 +342,8 @@ class StateGraph
         // point: routing is a write, and there is only one kind of write.
         foreach ($this->branches as $rawStart => $branches) {
             $start = (string) $rawStart;
-            foreach ($branches as $name => $path) {
-                $writer = $this->makeBranchWriter($path, $start === Constants::START, $start);
+            foreach ($branches as $name => $branch) {
+                $writer = $this->makeBranchWriter($branch, $start === Constants::START, $start);
                 if ($start === Constants::START) {
                     $startNode->writers[] = $writer;
                 } else {
@@ -539,6 +495,11 @@ class StateGraph
             return $updates;
         }
 
+        // A whole-value state (`MessageGraph`): the return value IS the state update.
+        if ($outputKeys === [self::ROOT]) {
+            return [[self::ROOT, $input]];
+        }
+
         if (is_array($input) && !array_is_list($input)) {
             $updates = [];
             foreach ($input as $key => $value) {
@@ -604,7 +565,7 @@ class StateGraph
     /**
      * Wrap a branch callable as a writer on its source node.
      */
-    private function makeBranchWriter(callable|RunnableInterface $path, bool $isStart = false, ?string $start = null): \LangGraph\Pregel\RunnableBranchWriter
+    private function makeBranchWriter(callable|RunnableInterface|Branch $path, bool $isStart = false, ?string $start = null): \LangGraph\Pregel\RunnableBranchWriter
     {
         return new \LangGraph\Pregel\RunnableBranchWriter(
             path: $path,

@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace LangGraph\Pregel;
 
 use LangGraph\Cache\BaseCache;
+use LangGraph\Graph\CompiledGraph;
 use LangGraph\State\StateGraph;
 use LangGraph\Store\BaseStore;
 
 /**
- * A {@see Pregel} graph whose state is declared as a set of channels.
+ * A {@see CompiledGraph} (a {@see Pregel} graph) whose state is declared as a set of channels.
  *
  * Port of `CompiledStateGraph` from `langgraph-core/src/graph/state.ts`.
  *
@@ -20,7 +21,7 @@ use LangGraph\Store\BaseStore;
  * compiled state graph as a plain `Pregel` is what lets one graph be used as a
  * node inside another.
  */
-class CompiledStateGraph extends Pregel
+class CompiledStateGraph extends CompiledGraph
 {
     public function __construct(
         array $nodes = [],
@@ -36,7 +37,7 @@ class CompiledStateGraph extends Pregel
         array $streamMode = ['updates', 'values'],
         ?Retry\RetryPolicy $retryPolicy = null,
         array $triggerToNodes = [],
-        public readonly ?StateGraph $builder = null,
+        ?StateGraph $builder = null,
         bool $checkpointerDisabled = false,
         ?BaseStore $store = null,
         ?BaseCache $cache = null,
@@ -58,6 +59,7 @@ class CompiledStateGraph extends Pregel
             checkpointerDisabled: $checkpointerDisabled,
             store: $store,
             cache: $cache,
+            builder: $builder,
         );
     }
 }
