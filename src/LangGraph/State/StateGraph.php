@@ -376,7 +376,7 @@ class StateGraph extends Graph
             // `__start__` would never reach its first node.
             inputChannels: Constants::START,
             outputChannels: $outputChannels,
-            streamChannels: $outputChannels,
+            streamChannels: (array) $outputChannels,
             checkpointer: $checkpointer,
             interruptBefore: $options['interruptBefore'] ?? [],
             interruptAfter: $options['interruptAfter'] ?? [],

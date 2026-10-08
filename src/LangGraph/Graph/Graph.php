@@ -255,6 +255,15 @@ class Graph
             }
         }
 
+        // Which nodes each channel wakes. Upstream's Pregel constructor derives this; here the
+        // compiler does, because `Pregel` takes it as given.
+        $triggerToNodes = [];
+        foreach ($nodes as $key => $node) {
+            foreach ($node->triggers as $trigger) {
+                $triggerToNodes[$trigger][] = (string) $key;
+            }
+        }
+
         $checkpointer = $options['checkpointer'] ?? null;
 
         return new CompiledGraph(
@@ -265,6 +274,7 @@ class Graph
             streamChannels: $streamChannels,
             checkpointer: $checkpointer === false ? null : $checkpointer,
             streamMode: ['values'],
+            triggerToNodes: $triggerToNodes,
             name: $options['name'] ?? null,
             interruptBefore: (array) $interruptBefore,
             interruptAfter: (array) $interruptAfter,
