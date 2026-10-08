@@ -129,12 +129,12 @@ final class DocsMatchRealityTest extends TestCase
      * recursively running the suite from inside a suite.
      *
      * And the vestige proves the omission was an oversight, not a decision:
-     * `testHandoffStatesACurrentSuiteSize()`'s regex captures BOTH numbers —
-     * `(\d+) passing, (\d+) assertions` — so the assertion count IS parsed into
-     * `$m[2]`… and that method then reads only `$m[1]` (verified: its two
-     * asserts, at the `assertGreaterThanOrEqual`/`assertLessThanOrEqual` pair,
-     * both interpolate `$m[1]`). The `$m[2]` uses elsewhere in this file belong
-     * to the FILE-count and LINE-count regexes, not this one. Captured,
+     * `testHandoffStatesACurrentSuiteSize()`'s regex captures the assertion
+     * count too — `(\d+) tests ((\d+) passing, (\d+) skipped), (\d+) assertions`
+     * parses it into `$m[4]`… and that method reads only `$m[1]`..`$m[3]` (the
+     * total, and the passing + skipped split it must add up to). The `$m[4]`
+     * uses elsewhere in this file belong to the FILE-count and LINE-count
+     * regexes, not this one. Captured,
      * bound, never read — the "written-but-never-read" shape this repo's own
      * hard rules name first, sitting in the guard that was supposed to catch it.
      *
@@ -183,13 +183,15 @@ final class DocsMatchRealityTest extends TestCase
         $tests = self::suiteSize();
         $doc = (string) file_get_contents(dirname(__DIR__, 2) . '/HANDOFF.md');
 
-        self::assertMatchesRegularExpression(
-            '/\| Tests \| \*\*(\d+) passing, (\d+) assertions\*\* \|/',
-            $doc,
-            'HANDOFF.md must state the suite size',
-        );
+        $row = '/\| Tests \| \*\*(\d+) tests \((\d+) passing, (\d+) skipped\), (\d+) assertions\*\* \|/';
+        self::assertMatchesRegularExpression($row, $doc, 'HANDOFF.md must state the suite size');
 
-        preg_match('/\| Tests \| \*\*(\d+) passing, (\d+) assertions\*\* \|/', $doc, $m);
+        preg_match($row, $doc, $m);
+        self::assertSame(
+            (int) $m[1],
+            (int) $m[2] + (int) $m[3],
+            'the Tests row must split the total into passing + skipped exactly',
+        );
         self::assertGreaterThanOrEqual(
             (int) ($tests * 0.98),
             (int) $m[1],

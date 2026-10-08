@@ -40,7 +40,7 @@ def failing_tests(junit: Path) -> set[str]:
     return names
 
 
-def measure() -> tuple[str, str]:
+def measure() -> tuple[str, str, str]:
     """The FULL suite — bare `phpunit`, the same command `composer test` and
     the CI unit+integration steps run. Not `--testsuite unit`: that omits the
     integration testsuite and undercounts by ten."""
@@ -75,6 +75,7 @@ def measure() -> tuple[str, str]:
     root = ET.parse(JUNIT).getroot()
     suite = root.find("testsuite") if root.tag == "testsuites" else root
     tests, assertions = suite.get("tests"), suite.get("assertions")
+    skipped = suite.get("skipped") or "0"
     failures, errors = suite.get("failures"), suite.get("errors")
 
     # Bootstrap: the guard that enforces these numbers is itself a test, so a
@@ -96,23 +97,28 @@ def measure() -> tuple[str, str]:
                 f"refusing to record a failing run as the truth. Unrelated failures: {sorted(offending)}\n"
                 + proc.stdout[-600:]
             )
-    if not (tests and tests.isdigit() and assertions and assertions.isdigit()):
-        sys.exit(f"junit log gave no usable counts: tests={tests!r} assertions={assertions!r}")
+    if not (tests and tests.isdigit() and assertions and assertions.isdigit() and skipped.isdigit()):
+        sys.exit(f"junit log gave no usable counts: tests={tests!r} assertions={assertions!r} skipped={skipped!r}")
 
-    return tests, assertions
+    return tests, assertions, skipped
 
 
-def write_counts(tests: str, assertions: str) -> None:
-    """Write the measured counts into both documents."""
+def write_counts(tests: str, assertions: str, skipped: str) -> None:
+    """Write the measured counts into both documents.
+
+    Skipped tests (env-gated integration suites with no server configured) are
+    stated separately: counting them as "passing" made the row claim 455 tests
+    passed that never ran (the MongoDB integration spec, Wave 2)."""
+    passing = int(tests) - int(skipped)
     hand = ROOT / "HANDOFF.md"
     s = hand.read_text(encoding="utf-8")
     s, n = re.subn(
-        r"\| Tests \| \*\*\d+ passing, \d+ assertions\*\* \|",
-        f"| Tests | **{tests} passing, {assertions} assertions** |",
+        r"\| Tests \| \*\*[^|]*assertions\*\* \|",
+        f"| Tests | **{tests} tests ({passing} passing, {skipped} skipped), {assertions} assertions** |",
         s, count=1,
     )
     if n != 1:
-        sys.exit("HANDOFF.md has no '| Tests | **N passing, M assertions** |' row to update")
+        sys.exit("HANDOFF.md has no '| Tests | **... assertions** |' row to update")
     hand.write_text(s, encoding="utf-8")
 
     status = ROOT / "PORT_STATUS.md"
@@ -203,12 +209,12 @@ def main() -> None:
     # now-green run reproduces. One pass of the loop costs ~10s; correctness of a
     # number every other guard reads is worth it.
     for attempt in range(1, 4):
-        tests, assertions = measure()
-        print(f"  measured (full suite): {tests} tests, {assertions} assertions")
-        write_counts(tests, assertions)
+        tests, assertions, skipped = measure()
+        print(f"  measured (full suite): {tests} tests ({skipped} skipped), {assertions} assertions")
+        write_counts(tests, assertions, skipped)
 
-        after_tests, after_assertions = measure()
-        if (after_tests, after_assertions) == (tests, assertions):
+        after_tests, after_assertions, after_skipped = measure()
+        if (after_tests, after_assertions, after_skipped) == (tests, assertions, skipped):
             print(f"  stable at {tests} tests / {assertions} assertions after {attempt} pass(es)")
             return
 
