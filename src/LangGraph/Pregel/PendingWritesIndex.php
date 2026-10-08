@@ -29,6 +29,7 @@ final class PendingWritesIndex
         public readonly mixed $nullResume = null,
         public readonly array $resumeByTaskId = [],
         public readonly array $successfulWriteTaskIds = [],
+        public readonly array $completedWriteTaskIds = [],
     ) {
     }
 
@@ -41,6 +42,7 @@ final class PendingWritesIndex
         $nullResumeSet = false;
         $resumeByTaskId = [];
         $successfulWriteTaskIds = [];
+        $completedWriteTaskIds = [];
 
         foreach ($pendingWrites ?? [] as $write) {
             $taskId = (string) $write[0];
@@ -61,15 +63,36 @@ final class PendingWritesIndex
             if ($channel !== Constants::ERROR) {
                 $successfulWriteTaskIds[$taskId] = true;
             }
+
+            if (!in_array($channel, [
+                Constants::ERROR,
+                Constants::ERROR_SOURCE_NODE,
+                Constants::INTERRUPT,
+                Constants::RESUME,
+            ], true)) {
+                $completedWriteTaskIds[$taskId] = true;
+            }
         }
 
-        return new self($nullResume, $resumeByTaskId, $successfulWriteTaskIds);
+        return new self($nullResume, $resumeByTaskId, $successfulWriteTaskIds, $completedWriteTaskIds);
     }
 
     /** Whether a task has at least one write that is not an `ERROR` marker. */
     public function hasSuccessfulWrite(string $taskId): bool
     {
         return isset($this->successfulWriteTaskIds[$taskId]);
+    }
+
+    /**
+     * Whether a task has finished: it wrote something that is not a control signal.
+     *
+     * An `INTERRUPT` or `RESUME` write records that a task paused, not that it ran
+     * to completion, so a task carrying only those must be prepared again — the
+     * re-execution is how `interrupt()` returns its resume value.
+     */
+    public function hasCompletedWrite(string $taskId): bool
+    {
+        return isset($this->completedWriteTaskIds[$taskId]);
     }
 
     /**

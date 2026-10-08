@@ -671,6 +671,7 @@ final class Algorithm
                     path: $taskPath,
                     triggers: $triggers,
                     metadata: $metadata,
+                    interrupts: self::interruptsFor($pendingWrites, $taskId),
                 );
             }
 
@@ -788,7 +789,7 @@ final class Algorithm
             // re-preparing it would schedule the work twice. Checked AFTER the
             // trigger is resolved, because the id depends on it.
             if ($pendingWrites !== null && $pendingWrites !== []) {
-                if ($extra->indexFor($pendingWrites)->hasSuccessfulWrite($taskId)) {
+                if ($extra->indexFor($pendingWrites)->hasCompletedWrite($taskId)) {
                     return null;
                 }
             }
@@ -810,6 +811,7 @@ final class Algorithm
                     path: $taskPath,
                     triggers: [$trigger],
                     metadata: $metadata,
+                    interrupts: self::interruptsFor($pendingWrites, $taskId),
                 );
             }
 
@@ -957,7 +959,7 @@ final class Algorithm
             Constants::CONFIG_KEY_SCRATCHPAD => self::buildScratchpad(
                 taskId: $taskId,
                 currentTaskInput: $currentTaskInput,
-                resumeMap: $extra->resumeMap,
+                resumeMap: $configurable[Constants::CONFIG_KEY_RESUME_MAP] ?? $extra->resumeMap,
                 namespaceHash: hash('xxh128', $taskCheckpointNamespace),
                 index: $index,
             ),
@@ -966,6 +968,28 @@ final class Algorithm
             'checkpoint_ns' => $taskCheckpointNamespace,
         ]);
         return $taskConfig;
+    }
+
+    /**
+     * The interrupts a task has raised, read back off the pending writes.
+     *
+     * Upstream surfaces these on `StateSnapshot.tasks[].interrupts` (its
+     * `tasksWithWrites`, `pregel/debug.ts`); here the description-only task
+     * carries them so `getState()` can report what a paused graph is asking.
+     *
+     * @param list<array{0: string, 1: string, 2: mixed}>|null $pendingWrites
+     * @return list<array{id: string|null, value: mixed}>
+     */
+    public static function interruptsFor(?array $pendingWrites, string $taskId): array
+    {
+        $out = [];
+        foreach ($pendingWrites ?? [] as $write) {
+            if ((string) $write[0] === $taskId && $write[1] === Constants::INTERRUPT) {
+                $out[] = $write[2] ?? null;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -982,7 +1006,18 @@ final class Algorithm
         string $namespaceHash,
         PendingWritesIndex $index,
     ): PregelScratchpad {
-        $resume = $index->resumeFor($taskId);
+        // Each recorded write holds a LIST of resume values (one per interrupt answered so far),
+        // and upstream flattens them one level: `resumeByTaskId.get(taskId).flat()`.
+        $resume = [];
+        foreach ($index->resumeFor($taskId) as $recorded) {
+            if (\is_array($recorded) && array_is_list($recorded)) {
+                foreach ($recorded as $value) {
+                    $resume[] = $value;
+                }
+            } else {
+                $resume[] = $recorded;
+            }
+        }
 
         if ($resumeMap !== null && array_key_exists($namespaceHash, $resumeMap)) {
             $resume[] = $resumeMap[$namespaceHash];

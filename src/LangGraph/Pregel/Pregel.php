@@ -79,6 +79,7 @@ class Pregel extends Runnable
         public array $interruptAfter = [],
         public ?int $stepTimeout = null,
         public ?string $description = null,
+        public bool $checkpointerDisabled = false,
     ) {
         if (isset($channels[self::TASKS_CHANNEL])
             && $channels[self::TASKS_CHANNEL]->lcGraphName !== 'Topic') {
@@ -153,6 +154,7 @@ class Pregel extends Runnable
             'input' => $validInput,
             'config' => $config,
             'checkpointer' => $this->checkpointer,
+            'checkpointerDisabled' => $this->checkpointerDisabled,
             'nodes' => $this->nodes,
             'channelSpecs' => ChannelRegistry::getOnlyChannels($this->channels),
             'outputKeys' => $this->outputChannels,

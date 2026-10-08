@@ -10,8 +10,6 @@ use LangGraph\Checkpoint\CheckpointConstants;
 use LangGraph\Checkpoint\CheckpointId;
 use LangGraph\Checkpoint\CheckpointListOptions;
 use LangGraph\Checkpoint\CheckpointTuple;
-use LangGraph\Checkpoint\MemorySaver;
-use LangGraph\Checkpoint\SqliteSaver;
 use LangGraph\Pregel\Checkpoint\CheckpointTuple as PregelCheckpointTuple;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -23,53 +21,28 @@ use PHPUnit\Framework\TestCase;
  * Port of `checkpoint-validation/src/spec/{put,put_writes,get_tuple,list,delete_thread}.ts`
  * plus the `MemorySaver` block of `libs/checkpoint/src/tests/checkpoints.test.ts`.
  *
- * The suite is written **once** and executed against both savers, which is the
+ * The suite is written **once** and executed against every saver — a concrete
+ * subclass supplies {@see self::makeSaver()} and inherits every test — which is the
  * whole point: a checkpointer's job is to be interchangeable, and a contract that
  * only one implementation satisfies is not a contract. The upstream
  * `checkpoint-sqlite` package runs the identical spec.
  */
 #[CoversClass(BaseCheckpointSaver::class)]
-#[CoversClass(MemorySaver::class)]
-#[CoversClass(SqliteSaver::class)]
 #[CoversClass(Checkpoint::class)]
 #[CoversClass(CheckpointListOptions::class)]
-final class CheckpointerSpecTest extends TestCase
+abstract class CheckpointerSpecCase extends TestCase
 {
-    /** @var list<array{0: string, 1: callable(): BaseCheckpointSaver}> */
-    private const SAVERS = [
-        ['MemorySaver', self::class . '::newMemorySaver'],
-        ['SqliteSaver', self::class . '::newSqliteSaver'],
-    ];
-
-    public static function newMemorySaver(): BaseCheckpointSaver
-    {
-        return new MemorySaver();
-    }
-
-    public static function newSqliteSaver(): BaseCheckpointSaver
-    {
-        return SqliteSaver::fromConnString(':memory:');
-    }
-
     /**
-     * @return list<array{0: string, 1: callable(): BaseCheckpointSaver}>
+     * A fresh, empty saver for each test.
+     *
+     * The one thing a subclass supplies: the whole contract below then runs against it.
      */
-    public static function savers(): array
-    {
-        return self::SAVERS;
-    }
+    abstract protected function makeSaver(): BaseCheckpointSaver;
 
     // ---- put --------------------------------------------------------------
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutReturnsAConfigWithOnlyTheThreeAddressingKeys(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testPutReturnsAConfigWithOnlyTheThreeAddressingKeys(): void {
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $checkpointId = CheckpointId::uuid6(3);
 
@@ -83,26 +56,19 @@ final class CheckpointerSpecTest extends TestCase
             $tuple->metadata,
         );
 
-        self::assertArrayHasKey('configurable', $returned, $name);
+        self::assertArrayHasKey('configurable', $returned, static::class);
         self::assertSame(
             ['thread_id', 'checkpoint_ns', 'checkpoint_id'],
             array_keys($returned['configurable']),
-            $name,
+            static::class,
         );
-        self::assertSame($threadId, $returned['configurable']['thread_id'], $name);
-        self::assertSame('root-ns', $returned['configurable']['checkpoint_ns'], $name);
-        self::assertSame($checkpointId, $returned['configurable']['checkpoint_id'], $name);
+        self::assertSame($threadId, $returned['configurable']['thread_id'], static::class);
+        self::assertSame('root-ns', $returned['configurable']['checkpoint_ns'], static::class);
+        self::assertSame($checkpointId, $returned['configurable']['checkpoint_id'], static::class);
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutStoresTheCheckpointAndMetadataWithoutAlteration(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testPutStoresTheCheckpointAndMetadataWithoutAlteration(): void {
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $checkpointId = CheckpointId::uuid6(3);
 
@@ -113,7 +79,7 @@ final class CheckpointerSpecTest extends TestCase
             ['animals' => ['dog'], 'count' => 3],
         );
 
-        self::assertNull($saver->get(['thread_id' => $threadId, 'checkpoint_ns' => 'root-ns', 'checkpoint_id' => $checkpointId]), $name);
+        self::assertNull($saver->get(['thread_id' => $threadId, 'checkpoint_ns' => 'root-ns', 'checkpoint_id' => $checkpointId]), static::class);
 
         $returned = $saver->put(
             ['thread_id' => $threadId, 'checkpoint_ns' => 'root-ns'],
@@ -123,56 +89,41 @@ final class CheckpointerSpecTest extends TestCase
 
         $roundTripped = $saver->getTuple($returned);
 
-        self::assertNotNull($roundTripped, $name);
-        self::assertEquals($tuple->checkpoint->toArray(), $roundTripped->checkpoint->toArray(), $name);
-        self::assertEquals($tuple->metadata, $roundTripped->metadata, $name);
+        self::assertNotNull($roundTripped, static::class);
+        self::assertEquals($tuple->checkpoint->toArray(), $roundTripped->checkpoint->toArray(), static::class);
+        self::assertEquals($tuple->metadata, $roundTripped->metadata, static::class);
         self::assertEquals(
             ['thread_id' => $threadId, 'checkpoint_ns' => 'root-ns', 'checkpoint_id' => $checkpointId],
             $roundTripped->config['configurable'],
-            $name,
+            static::class,
         );
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutDefaultsAnAbsentNamespaceToTheEmptyString(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testPutDefaultsAnAbsentNamespaceToTheEmptyString(): void {
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $checkpointId = CheckpointId::uuid6(3);
         $tuple = CheckpointerFixture::initialCheckpointTuple($threadId, '', $checkpointId);
 
         $returned = $saver->put(['thread_id' => $threadId], $tuple->checkpoint, $tuple->metadata);
 
-        self::assertArrayHasKey('checkpoint_ns', $returned['configurable'], $name);
-        self::assertSame('', $returned['configurable']['checkpoint_ns'], $name);
-        self::assertNotNull($saver->getTuple(['thread_id' => $threadId, 'checkpoint_ns' => '']), $name);
+        self::assertArrayHasKey('checkpoint_ns', $returned['configurable'], static::class);
+        self::assertSame('', $returned['configurable']['checkpoint_ns'], static::class);
+        self::assertNotNull($saver->getTuple(['thread_id' => $threadId, 'checkpoint_ns' => '']), static::class);
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutFailsWithoutAConfigurable(string $name, callable $make): void
+    public function testPutFailsWithoutAConfigurable(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $tuple = CheckpointerFixture::initialCheckpointTuple(CheckpointId::uuid6(3), '', CheckpointId::uuid6(3));
 
         $this->expectException(\InvalidArgumentException::class);
         $saver->put([], $tuple->checkpoint, $tuple->metadata);
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutFailsWithoutAThreadId(string $name, callable $make): void
+    public function testPutFailsWithoutAThreadId(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $tuple = CheckpointerFixture::initialCheckpointTuple(CheckpointId::uuid6(3), 'ns', CheckpointId::uuid6(3));
 
         $this->expectException(\InvalidArgumentException::class);
@@ -181,16 +132,9 @@ final class CheckpointerSpecTest extends TestCase
 
     // ---- putWrites --------------------------------------------------------
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutWritesStoresWritesAgainstTheCheckpoint(
-        string $name,
-        callable $make,
-    ): void {
+    public function testPutWritesStoresWritesAgainstTheCheckpoint(): void {
         foreach (['', 'child'] as $namespace) {
-            $saver = $make();
+            $saver = $this->makeSaver();
             $threadId = CheckpointId::uuid6(3);
             $checkpointId = CheckpointId::uuid6(3);
             $tuple = CheckpointerFixture::initialCheckpointTuple($threadId, $namespace, $checkpointId);
@@ -204,30 +148,22 @@ final class CheckpointerSpecTest extends TestCase
 
             $saved = $saver->getTuple($returned);
 
-            self::assertNotNull($saved, $name);
-            self::assertSame([['pet_task', 'animals', 'dog']], $saved->pendingWrites, $name . '/' . $namespace);
+            self::assertNotNull($saved, static::class);
+            self::assertSame([['pet_task', 'animals', 'dog']], $saved->pendingWrites, static::class . '/' . $namespace);
         }
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutWritesFailsWithoutAThreadId(string $name, callable $make): void
+    public function testPutWritesFailsWithoutAThreadId(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
 
         $this->expectException(\InvalidArgumentException::class);
         $saver->putWrites(['checkpoint_ns' => '', 'checkpoint_id' => 'x'], [['animals', 'dog']], 'pet_task');
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testPutWritesFailsWithoutACheckpointId(string $name, callable $make): void
+    public function testPutWritesFailsWithoutACheckpointId(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
 
         $this->expectException(\InvalidArgumentException::class);
         $saver->putWrites(['thread_id' => 't', 'checkpoint_ns' => ''], [['animals', 'dog']], 'pet_task');
@@ -237,12 +173,10 @@ final class CheckpointerSpecTest extends TestCase
      * A regular write is stored once. A second call at the same `(task, index)`
      * must not replace it, or a retried task's first attempt would be lost.
      *
-     * @param callable(): BaseCheckpointSaver $make
      */
-    #[DataProvider('savers')]
-    public function testARegularWriteIsNeverReplaced(string $name, callable $make): void
+    public function testARegularWriteIsNeverReplaced(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $tuple = CheckpointerFixture::initialCheckpointTuple($threadId, '', CheckpointId::uuid6(3));
         $returned = $saver->put(['thread_id' => $threadId], $tuple->checkpoint, $tuple->metadata);
@@ -253,7 +187,7 @@ final class CheckpointerSpecTest extends TestCase
         self::assertSame(
             [['task', 'animals', 'first']],
             $saver->getTuple($returned)?->pendingWrites,
-            $name,
+            static::class,
         );
     }
 
@@ -261,12 +195,10 @@ final class CheckpointerSpecTest extends TestCase
      * A special-channel write always replaces, which is what lets a resume
      * overwrite the interrupt it is answering.
      *
-     * @param callable(): BaseCheckpointSaver $make
      */
-    #[DataProvider('savers')]
-    public function testASpecialChannelWriteAlwaysReplaces(string $name, callable $make): void
+    public function testASpecialChannelWriteAlwaysReplaces(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $tuple = CheckpointerFixture::initialCheckpointTuple($threadId, '', CheckpointId::uuid6(3));
         $returned = $saver->put(['thread_id' => $threadId], $tuple->checkpoint, $tuple->metadata);
@@ -277,7 +209,7 @@ final class CheckpointerSpecTest extends TestCase
         self::assertSame(
             [['task', CheckpointConstants::INTERRUPT, 'still paused']],
             $saver->getTuple($returned)?->pendingWrites,
-            $name,
+            static::class,
         );
     }
 
@@ -285,12 +217,10 @@ final class CheckpointerSpecTest extends TestCase
      * One task's special write must not collide with another's regular write at
      * the same ordinal position.
      *
-     * @param callable(): BaseCheckpointSaver $make
      */
-    #[DataProvider('savers')]
-    public function testSpecialAndRegularWritesDoNotCollide(string $name, callable $make): void
+    public function testSpecialAndRegularWritesDoNotCollide(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $tuple = CheckpointerFixture::initialCheckpointTuple($threadId, '', CheckpointId::uuid6(3));
         $returned = $saver->put(['thread_id' => $threadId], $tuple->checkpoint, $tuple->metadata);
@@ -312,20 +242,13 @@ final class CheckpointerSpecTest extends TestCase
             'task_A:' . CheckpointConstants::INTERRUPT => true,
             'task_A:' . CheckpointConstants::RESUME => true,
             'task_B:baz' => true,
-        ], $seen, $name);
+        ], $seen, static::class);
     }
 
     // ---- getTuple ---------------------------------------------------------
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testGetTupleReturnsTheRequestedCheckpointAndItsAncestry(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testGetTupleReturnsTheRequestedCheckpointAndItsAncestry(): void {
+        $saver = $this->makeSaver();
 
         foreach (['', 'child'] as $namespace) {
             $threadId = CheckpointId::uuid6(3);
@@ -357,7 +280,7 @@ final class CheckpointerSpecTest extends TestCase
             ]), false);
 
             [$parentTuple, $childTuple] = $stored;
-            $label = $name . '/' . ($namespace === '' ? 'root' : $namespace);
+            $label = static::class . '/' . ($namespace === '' ? 'root' : $namespace);
 
             // The first checkpoint: no parent, and its own writes.
             self::assertEquals($parent->checkpoint->toArray(), $parentTuple->checkpoint->toArray(), $label);
@@ -416,41 +339,26 @@ final class CheckpointerSpecTest extends TestCase
         }
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testGetTupleReturnsNullForAnUnknownCheckpointId(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testGetTupleReturnsNullForAnUnknownCheckpointId(): void {
+        $saver = $this->makeSaver();
 
         self::assertNull($saver->getTuple([
             'thread_id' => CheckpointId::uuid6(3),
             'checkpoint_ns' => 'ns',
             'checkpoint_id' => CheckpointId::uuid6(3),
-        ]), $name);
+        ]), static::class);
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testGetTupleReturnsNullWithoutAThreadId(string $name, callable $make): void
+    public function testGetTupleReturnsNullWithoutAThreadId(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
 
-        self::assertNull($saver->getTuple(['checkpoint_ns' => 'ns']), $name);
+        self::assertNull($saver->getTuple(['checkpoint_ns' => 'ns']), static::class);
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testGetReturnsOnlyTheCheckpoint(string $name, callable $make): void
+    public function testGetReturnsOnlyTheCheckpoint(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $tuple = CheckpointerFixture::initialCheckpointTuple($threadId, '', CheckpointId::uuid6(3), ['animals' => ['dog']]);
         $saver->put(['thread_id' => $threadId], $tuple->checkpoint, $tuple->metadata);
@@ -458,9 +366,9 @@ final class CheckpointerSpecTest extends TestCase
         self::assertEquals(
             $tuple->checkpoint->toArray(),
             $saver->get(['thread_id' => $threadId])?->toArray(),
-            $name,
+            static::class,
         );
-        self::assertNull($saver->get(['thread_id' => 'never-used']), $name);
+        self::assertNull($saver->get(['thread_id' => 'never-used']), static::class);
     }
 
     /**
@@ -468,14 +376,9 @@ final class CheckpointerSpecTest extends TestCase
      * read back from the latest checkpoint — otherwise resuming at that
      * checkpoint silently forgets the channel.
      *
-     * @param callable(): BaseCheckpointSaver $make
      */
-    #[DataProvider('savers')]
-    public function testChannelsCarriedOverFromAnAncestorArePreserved(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testChannelsCarriedOverFromAnAncestorArePreserved(): void {
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $parentId = CheckpointId::uuid6(3);
         $childId = CheckpointId::uuid6(3);
@@ -517,23 +420,19 @@ final class CheckpointerSpecTest extends TestCase
 
         $latest = $saver->getTuple(['thread_id' => $threadId, 'checkpoint_ns' => '']);
 
-        self::assertNotNull($latest, $name);
+        self::assertNotNull($latest, static::class);
         self::assertSame(
             ['messages' => ['hi'], 'stepCount' => 3],
             $latest->checkpoint->channelValues,
-            $name,
+            static::class,
         );
     }
 
     // ---- the pre-format-4 pending-sends migration -------------------------
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testMigratesPendingSendsOnRead(string $name, callable $make): void
+    public function testMigratesPendingSendsOnRead(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $config = ['thread_id' => 'thread-1', 'checkpoint_ns' => ''];
 
         $checkpoint0 = new Checkpoint(v: 1, id: CheckpointId::uuid6(0), ts: '2024-04-19T17:19:07.952Z');
@@ -548,8 +447,8 @@ final class CheckpointerSpecTest extends TestCase
         // The sends belong to the *next* checkpoint, not to the one they were
         // scheduled from.
         $tuple0 = $saver->getTuple($config);
-        self::assertSame([], $tuple0?->checkpoint->channelValues, $name);
-        self::assertSame([], $tuple0?->checkpoint->channelVersions, $name);
+        self::assertSame([], $tuple0?->checkpoint->channelValues, static::class);
+        self::assertSame([], $tuple0?->checkpoint->channelVersions, static::class);
 
         $checkpoint1 = new Checkpoint(v: 1, id: CheckpointId::uuid6(1), ts: '2024-04-20T17:19:07.952Z');
         $config = $saver->put($config, $checkpoint1, ['source' => 'loop', 'parents' => [], 'step' => 1]);
@@ -558,22 +457,18 @@ final class CheckpointerSpecTest extends TestCase
         self::assertSame(
             [CheckpointConstants::TASKS => ['send-1', 'send-2', 'send-3']],
             $tuple1?->checkpoint->channelValues,
-            $name,
+            static::class,
         );
         self::assertArrayHasKey(
             CheckpointConstants::TASKS,
             $tuple1?->checkpoint->channelVersions ?? [],
-            $name,
+            static::class,
         );
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testListAlsoMigratesOldCheckpoints(string $name, callable $make): void
+    public function testListAlsoMigratesOldCheckpoints(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $config = ['thread_id' => 'thread-1', 'checkpoint_ns' => ''];
 
         $config = $saver->put(
@@ -595,13 +490,13 @@ final class CheckpointerSpecTest extends TestCase
 
         $tuples = $saver->list(['thread_id' => 'thread-1']);
 
-        self::assertCount(2, $tuples, $name);
+        self::assertCount(2, $tuples, static::class);
         self::assertSame(
             [CheckpointConstants::TASKS => ['send-1', 'send-2', 'send-3']],
             $tuples[0]->checkpoint->channelValues,
-            $name,
+            static::class,
         );
-        self::assertArrayHasKey(CheckpointConstants::TASKS, $tuples[0]->checkpoint->channelVersions, $name);
+        self::assertArrayHasKey(CheckpointConstants::TASKS, $tuples[0]->checkpoint->channelVersions, static::class);
     }
 
     // ---- list -------------------------------------------------------------
@@ -609,7 +504,7 @@ final class CheckpointerSpecTest extends TestCase
     /**
      * The argument matrix, built exactly as the upstream spec builds it.
      *
-     * @return list<array{0: string, 1: callable(): BaseCheckpointSaver, 2: array<string, mixed>, 3: list<string>}>
+     * @return list<array{0: string, 1: array<string, mixed>, 2: list<string>}>
      */
     public static function listCases(): array
     {
@@ -665,21 +560,6 @@ final class CheckpointerSpecTest extends TestCase
 
                             $cases[] = [
                                 self::describeListCase($threadId, $namespace, $limit, $before, $filter, $expected),
-                                self::class . '::newMemorySaver',
-                                [
-                                    'thread_id' => $threadId,
-                                    'checkpoint_ns' => $namespace,
-                                    'thread_ns' => $namespace !== null,
-                                    'limit' => $limit,
-                                    'before' => $before,
-                                    'filter' => $filter,
-                                ],
-                                $expected,
-                            ];
-                            $cases[] = [
-                                self::describeListCase($threadId, $namespace, $limit, $before, $filter, $expected)
-                                    . ' [sqlite]',
-                                self::class . '::newSqliteSaver',
                                 [
                                     'thread_id' => $threadId,
                                     'checkpoint_ns' => $namespace,
@@ -706,11 +586,10 @@ final class CheckpointerSpecTest extends TestCase
     #[DataProvider('listCases')]
     public function testListFiltersByThreadNamespaceLimitBeforeAndMetadata(
         string $description,
-        callable $make,
         array $options,
         array $expectedIds,
     ): void {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $stored = CheckpointerFixture::toMap(
             iterator_to_array(CheckpointerFixture::putTuples($saver, CheckpointerFixture::generatedTuples()), false),
         );
@@ -759,15 +638,8 @@ final class CheckpointerSpecTest extends TestCase
         }
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testListReturnsNewestFirstAndAcceptsABareLimit(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testListReturnsNewestFirstAndAcceptsABareLimit(): void {
+        $saver = $this->makeSaver();
         iterator_to_array(CheckpointerFixture::putTuples($saver, CheckpointerFixture::generatedTuples()), false);
 
         // Within one thread *and* namespace the order is a single descending run.
@@ -775,19 +647,19 @@ final class CheckpointerSpecTest extends TestCase
         $tuples = $saver->list(['thread_id' => $threadId, 'checkpoint_ns' => '']);
 
         $ids = array_map(static fn (PregelCheckpointTuple $t): string => $t->checkpoint->id, $tuples);
-        self::assertNotEmpty($ids, $name);
+        self::assertNotEmpty($ids, static::class);
         $sorted = $ids;
         rsort($sorted, SORT_STRING);
-        self::assertSame($sorted, $ids, $name);
+        self::assertSame($sorted, $ids, static::class);
 
         // A thread spans two namespaces here, and across every thread the result
         // is still newest-first within each thread and namespace.
-        self::assertNewestFirstPerGroup($saver->list(['thread_id' => $threadId]), $name);
-        self::assertNewestFirstPerGroup($saver->list([]), $name);
+        self::assertNewestFirstPerGroup($saver->list(['thread_id' => $threadId]), static::class);
+        self::assertNewestFirstPerGroup($saver->list([]), static::class);
 
         // The engine passes a bare integer; the options object is the richer form.
-        self::assertCount(1, $saver->list([], 1), $name);
-        self::assertSame([], $saver->list([], 0), $name);
+        self::assertCount(1, $saver->list([], 1), static::class);
+        self::assertSame([], $saver->list([], 0), static::class);
     }
 
     /**
@@ -819,32 +691,24 @@ final class CheckpointerSpecTest extends TestCase
 
     // ---- deleteThread -----------------------------------------------------
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testDeleteThreadRemovesOnlyThatThread(string $name, callable $make): void
+    public function testDeleteThreadRemovesOnlyThatThread(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $meta = ['source' => 'update', 'step' => -1, 'parents' => []];
 
         $saver->put(['thread_id' => '1', 'checkpoint_ns' => ''], Checkpoint::empty(), $meta);
         $saver->put(['thread_id' => '2', 'checkpoint_ns' => ''], Checkpoint::empty(), $meta);
-        self::assertNotNull($saver->getTuple(['thread_id' => '1', 'checkpoint_ns' => '']), $name);
+        self::assertNotNull($saver->getTuple(['thread_id' => '1', 'checkpoint_ns' => '']), static::class);
 
         $saver->deleteThread('1');
 
-        self::assertNull($saver->getTuple(['thread_id' => '1', 'checkpoint_ns' => '']), $name);
-        self::assertNotNull($saver->getTuple(['thread_id' => '2', 'checkpoint_ns' => '']), $name);
+        self::assertNull($saver->getTuple(['thread_id' => '1', 'checkpoint_ns' => '']), static::class);
+        self::assertNotNull($saver->getTuple(['thread_id' => '2', 'checkpoint_ns' => '']), static::class);
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testDeleteThreadAlsoRemovesItsWrites(string $name, callable $make): void
+    public function testDeleteThreadAlsoRemovesItsWrites(): void
     {
-        $saver = $make();
+        $saver = $this->makeSaver();
         $config = $saver->put(
             ['thread_id' => '1'],
             Checkpoint::empty(),
@@ -854,20 +718,13 @@ final class CheckpointerSpecTest extends TestCase
 
         $saver->deleteThread('1');
 
-        self::assertSame([], $saver->list(['thread_id' => '1']), $name);
+        self::assertSame([], $saver->list(['thread_id' => '1']), static::class);
     }
 
     // ---- getDeltaChannelHistory -------------------------------------------
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testGetDeltaChannelHistoryCollectsWritesAndSeed(
-        string $name,
-        callable $make,
-    ): void {
-        $saver = $make();
+    public function testGetDeltaChannelHistoryCollectsWritesAndSeed(): void {
+        $saver = $this->makeSaver();
         $threadId = CheckpointId::uuid6(3);
         $parentId = CheckpointId::uuid6(3);
         $childId = CheckpointId::uuid6(3);
@@ -917,22 +774,15 @@ final class CheckpointerSpecTest extends TestCase
             ['log', 'never-written'],
         );
 
-        self::assertSame([['task', 'log', 'from-parent']], $history['log']->writes, $name);
-        self::assertTrue($history['log']->hasSeed, $name);
-        self::assertSame(['seed'], $history['log']->seed, $name);
-        self::assertFalse($history['never-written']->hasSeed, $name);
-        self::assertSame([], $history['never-written']->writes, $name);
+        self::assertSame([['task', 'log', 'from-parent']], $history['log']->writes, static::class);
+        self::assertTrue($history['log']->hasSeed, static::class);
+        self::assertSame(['seed'], $history['log']->seed, static::class);
+        self::assertFalse($history['never-written']->hasSeed, static::class);
+        self::assertSame([], $history['never-written']->writes, static::class);
     }
 
-    /**
-     * @param callable(): BaseCheckpointSaver $make
-     */
-    #[DataProvider('savers')]
-    public function testGetDeltaChannelHistoryWithNoChannelsIsEmpty(
-        string $name,
-        callable $make,
-    ): void {
-        self::assertSame([], $make()->getDeltaChannelHistory(['thread_id' => 'x'], []), $name);
+    public function testGetDeltaChannelHistoryWithNoChannelsIsEmpty(): void {
+        self::assertSame([], $this->makeSaver()->getDeltaChannelHistory(['thread_id' => 'x'], []), static::class);
     }
 
     // ---- helpers ----------------------------------------------------------

@@ -283,6 +283,7 @@ class StateGraph
         $outputKeys = array_keys($stateChannels);
 
         $checkpointer = $options['checkpointer'] ?? null;
+        $checkpointerDisabled = $checkpointer === false;
         if ($checkpointer === true) {
             $checkpointer = new \LangGraph\Pregel\Checkpoint\MemorySaver();
         } elseif ($checkpointer === false) {
@@ -429,6 +430,7 @@ class StateGraph
             retryPolicy: $options['retryPolicy'] ?? null,
             triggerToNodes: $triggerToNodes,
             builder: $this,
+            checkpointerDisabled: $checkpointerDisabled,
         );
     }
 

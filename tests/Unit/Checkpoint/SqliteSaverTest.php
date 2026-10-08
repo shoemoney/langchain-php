@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Port of `libs/checkpoint-sqlite/src/tests/checkpoints.test.ts`.
  *
- * The shared contract lives in {@see CheckpointerSpecTest}; what is left here is
+ * The shared contract lives in {@see CheckpointerSpecCase}; what is left here is
  * the SQL itself — the parts where a parent id, a metadata filter or a write
  * conflict can be expressed in a way an in-process map cannot accidentally get
  * right.

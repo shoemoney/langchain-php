@@ -148,7 +148,17 @@ class PregelLoop
 
         $checkpointNamespace = self::namespaceFromNs($config->configurable['checkpoint_ns'] ?? null);
 
-        $checkpointer = $params['checkpointer'] ?? null;
+        // A subgraph is compiled without a checkpointer of its own and persists through its
+        // parent's: the parent publishes it on the task config, and it takes priority over the
+        // graph's own (upstream `_defaults`). Without this a subgraph never saved a checkpoint,
+        // so a resume found nothing, minted a fresh checkpoint id, derived different task ids
+        // and re-fired the same interrupt forever.
+        // `checkpointer: false` opts out entirely and is checked first (upstream `_defaults`).
+        $checkpointer = ($params['checkpointerDisabled'] ?? false)
+            ? null
+            : ($config->configurable[Constants::CONFIG_KEY_CHECKPOINTER]
+                ?? $params['checkpointer']
+                ?? null);
         $saved = null;
         if ($checkpointer !== null) {
             $saved = $checkpointer->getTuple($checkpointConfig->configurable);
@@ -243,6 +253,7 @@ class PregelLoop
 
         $inputIsNullOrUndefined = $this->input === null;
         $inputIsCommandResuming = $this->input instanceof Command && $this->input->resume !== null;
+        $inputIsResuming = $this->input instanceof PregelInputResuming;
 
         $runIdMatchesPrevious = !$this->isNested
             && ($this->config->metadata['run_id'] ?? null) !== null
@@ -253,6 +264,7 @@ class PregelLoop
             $configResuming === true
             || $inputIsNullOrUndefined
             || $inputIsCommandResuming
+            || $inputIsResuming
             || $runIdMatchesPrevious
         );
     }
@@ -758,18 +770,12 @@ class PregelLoop
                 $interruptWrites = [];
                 foreach ($writes as $write) {
                     if ($write[0] === Constants::INTERRUPT) {
-                        foreach ((array) ($write[1] ?? []) as $interrupt) {
-                            $interruptWrites[] = $interrupt;
-                        }
+                        $interruptWrites[] = $write[1] ?? null;
                     }
                 }
 
-                $this->emit([
-                    [$task->name, [Constants::INTERRUPT => $interruptWrites]],
-                ], 'updates');
-                $this->emit([
-                    [$task->name, [Constants::INTERRUPT => $interruptWrites]],
-                ], 'values');
+                $this->emit([[Constants::INTERRUPT => $interruptWrites]], 'updates');
+                $this->emit([[Constants::INTERRUPT => $interruptWrites]], 'values');
             } elseif ($firstChannel !== Constants::ERROR) {
                 foreach (IO::mapOutputUpdates($this->outputKeys, [[$task, $writes]], $cached) as $update) {
                     $this->emit([$update], 'updates');
@@ -1063,14 +1069,21 @@ class PregelLoop
                 $this->prevCheckpointConfig = null;
             }
 
-            $this->checkpointMetadata = array_merge($this->checkpointMetadata, [
-                'source' => $source,
-                'step' => $this->step,
-                // The checkpoint map is the subgraph lineage: every namespace
-                // this run has touched, mapped to the checkpoint it was at.
-                // A subgraph resuming later reads its parent's id from here.
-                'parents' => (object) ($this->config->configurable[Constants::CONFIG_KEY_CHECKPOINT_MAP] ?? []),
-            ]);
+            // An exiting save re-puts the checkpoint the loop already holds, so its metadata
+            // stays as it was (upstream only rewrites `step` and `parents` when `!exiting`).
+            // Bumping `step` here would make the NEXT run resume at `step + 1`, derive different
+            // task ids, and orphan every pending write (RESUME and INTERRUPT included) that was
+            // stored under the ids of the run that was interrupted.
+            if (!$exiting) {
+                $this->checkpointMetadata = array_merge($this->checkpointMetadata, [
+                    'source' => $source,
+                    'step' => $this->step,
+                    // The checkpoint map is the subgraph lineage: every namespace
+                    // this run has touched, mapped to the checkpoint it was at.
+                    // A subgraph resuming later reads its parent's id from here.
+                    'parents' => (object) ($this->config->configurable[Constants::CONFIG_KEY_CHECKPOINT_MAP] ?? []),
+                ]);
+            }
 
             $this->checkpointer->put(
                 $config->configurable,

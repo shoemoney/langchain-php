@@ -226,22 +226,14 @@ final class StateSnapshotShapeTest extends TestCase
     }
 
     /**
-     * KNOWN WRONG: `tasks[].interrupts` is empty on a paused graph.
+     * `tasks[].interrupts` carries the interrupt a paused graph is asking.
      *
-     * Upstream reports `[{id, value: 'need input'}]`; this port reports `[]`.
-     * Nothing populates the field — `PregelExecutableTask::$interrupts` is written
-     * by no code path, and `prepareNextTasks()` does not read the INTERRUPT pending
-     * writes it is handed. The data exists on the tuple as
-     * `[taskId, '__interrupt__', {id, value}]`; what is missing is the identity to
-     * attach it by, because a task re-prepared by `getState()` carries a different
-     * id from the task that raised the interrupt.
-     *
-     * This is asserted as an EMPTY value on purpose. If someone populates the
-     * field, this test fails and the fix is to invert it — which is the point. A
-     * known gap left unasserted becomes a documented feature within a few
-     * iterations, and this project has a recorded instance of exactly that.
+     * This was a pinned known gap (reported `[]`) for two reasons, both fixed: nothing
+     * read the INTERRUPT pending writes when describing a task, and a task re-prepared
+     * by `getState()` carried a different id from the one that raised the interrupt,
+     * because an exiting checkpoint save bumped `step` and task ids derive from it.
      */
-    public function testTheInterruptFieldIsKnownEmptyAndWhyThatIsPinned(): void
+    public function testTheInterruptFieldIsPopulatedOnAPausedGraph(): void
     {
         $config = new RunnableConfig(configurable: ['thread_id' => 'int-1']);
 
@@ -254,13 +246,9 @@ final class StateSnapshotShapeTest extends TestCase
         $snapshot = $this->pausedGraph()->getState($config);
         $interrupts = $snapshot->tasks[0]?->interrupts ?? [];
 
-        self::assertSame(
-            [],
-            $interrupts,
-            'KNOWN GAP. Upstream reports [{id, value}] here and this port reports []. '
-            . 'If you have just populated it, invert this assertion and delete the note at '
-            . 'audit/getstate-interrupts-empty — that is the signal this guard exists to give.',
-        );
+        self::assertCount(1, $interrupts);
+        self::assertSame('need input', $interrupts[0]['value']);
+        self::assertSame(32, strlen((string) $interrupts[0]['id']));
 
         // The tuple really does carry the interrupt, so the gap is in the wiring and
         // not in the data. This is what makes it fixable rather than impossible.

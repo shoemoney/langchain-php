@@ -25,22 +25,26 @@ class GraphInterrupt extends GraphBubbleUp
     /**
      * The pending interrupt payloads, in the order they were raised.
      *
-     * @var list<array{id: string|null, value: mixed}>
+     * @var list<array{id: string|null, value: mixed, response_schema?: array<string, mixed>}>
      */
     public array $interrupts;
 
     /**
-     * @param list<array{id?: string|null, value: mixed}>|null $interrupts
+     * @param list<array{id?: string|null, value: mixed, response_schema?: array<string, mixed>}>|null $interrupts
      * @param array<string, mixed>                              $fields
      */
     public function __construct(?array $interrupts = null, array $fields = [])
     {
         $this->interrupts = [];
         foreach ($interrupts ?? [] as $interrupt) {
-            $this->interrupts[] = [
+            $entry = [
                 'id' => $interrupt['id'] ?? null,
                 'value' => $interrupt['value'] ?? null,
             ];
+            if (isset($interrupt['response_schema'])) {
+                $entry['response_schema'] = $interrupt['response_schema'];
+            }
+            $this->interrupts[] = $entry;
         }
 
         parent::__construct(
