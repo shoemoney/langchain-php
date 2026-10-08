@@ -147,6 +147,11 @@ final class MessageInputs
             ),
         };
 
+        // Opt-in: only a message that was built as standard (v1) content takes this path.
+        if ($message instanceof AIMessage && ($message->response_metadata['output_version'] ?? null) === 'v1') {
+            return ['role' => $role, 'content' => Standard::formatStandardContent($message)];
+        }
+
         if ($message instanceof AIMessage && $message->toolCalls !== []) {
             return [
                 'role' => 'assistant',
