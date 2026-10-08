@@ -18,8 +18,10 @@ use PHPUnit\Framework\TestCase;
  * malformed-input matrix, the number/string/whitespace tables, the
  * every-prefix walks and the kitchen-sink document.
  *
- * Two upstream expectations are NOT converted because the PHP parser
- * (`PartialJsonParser`, outside this work package) diverges from upstream; see
+ * Two kinds of upstream expectation are NOT converted because the PHP parser
+ * (`PartialJsonParser`, outside this work package) diverges from upstream: a
+ * truncated literal or lone minus sign is rejected, and a partial `\u` escape
+ * keeps its backslash (`"15\u` -> `15\u`, upstream `15u`); see
  * {@see self::testKnownDivergencesFromUpstream()}.
  */
 #[CoversClass(JsonUtils::class)]
@@ -142,6 +144,24 @@ final class JsonUtilsTest extends TestCase
 
     public function testKnownDivergencesFromUpstream(): void
     {
+        // Upstream drops the backslash of a string cut inside a `\u` escape
+        // (`"15\u` -> "15u", `"15\u00` -> "15u00", `"15\u00f` -> "15u00f"). The
+        // PHP parser deliberately re-emits it so a stream cut mid-escape stays
+        // byte-stable (see the "stream cut mid-escape keeps its backslash" fix).
+        // Pinned here; when the parser changes this fails and the upstream
+        // expectations should be converted into partialDocuments().
+        foreach ([
+            ['"15\\u', '15\\u', '15u'],
+            ['"15\\u00', '15\\u00', '15u00'],
+            ['"15\\u00f', '15\\u00f', '15u00f'],
+        ] as [$input, $phpOutput, $upstream]) {
+            self::assertSame(
+                $phpOutput,
+                JsonUtils::strictParsePartialJson($input),
+                "[{$input}] no longer keeps the backslash; convert the upstream expectation ({$upstream})",
+            );
+        }
+
         // Upstream accepts a truncated literal or a lone minus sign and answers
         // with the value it is on its way to (`[t` -> [true], `-` -> -0). The PHP
         // `PartialJsonParser` rejects them. That file is outside this work

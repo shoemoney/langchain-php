@@ -6,6 +6,8 @@ namespace LangChain\Tests\Unit\Utils;
 
 use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
 use LangChain\Messages\AIMessage;
+use LangChain\Runnables\Runnable;
+use LangChain\Runnables\RunnableConfig;
 use LangChain\Tools\DynamicStructuredTool;
 use LangChain\Tools\Schema;
 use LangChain\Tools\ToolUtils;
@@ -129,6 +131,46 @@ final class FunctionCallingTest extends TestCase
         );
     }
 
+    public function testARunnableToolLikeConvertsLikeAnyOtherTool(): void
+    {
+        $expected = [
+            'name' => 'runnable_tool',
+            'description' => 'wraps a runnable',
+            'parameters' => ['type' => 'object', 'properties' => ['q' => ['type' => 'string']]],
+        ];
+        $tool = self::runnableToolLike();
+
+        self::assertSame($expected, FunctionCalling::convertToOpenAIFunction($tool));
+        self::assertSame(
+            ['type' => 'function', 'function' => $expected],
+            FunctionCalling::convertToOpenAITool($tool),
+        );
+    }
+
+    private static function runnableToolLike(): Runnable
+    {
+        return new class extends Runnable {
+            public string $name = 'runnable_tool';
+            public string $description = 'wraps a runnable';
+            public Schema $schema;
+
+            public function __construct()
+            {
+                $this->schema = new Schema(['type' => 'object', 'properties' => ['q' => ['type' => 'string']]]);
+            }
+
+            public static function lcName(): string
+            {
+                return 'RunnableToolLike';
+            }
+
+            public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
+            {
+                return $input;
+            }
+        };
+    }
+
     public function testAnUnconvertibleValueIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -151,6 +193,9 @@ final class FunctionCallingTest extends TestCase
         self::assertFalse(ToolUtils::isStructuredToolParams('x'));
         self::assertFalse(ToolUtils::isRunnableToolLike($tool));
         self::assertFalse(ToolUtils::isRunnableToolLike(null));
+        $runnableTool = self::runnableToolLike();
+        self::assertTrue(ToolUtils::isRunnableToolLike($runnableTool));
+        self::assertTrue(ToolUtils::isLangChainTool($runnableTool));
         self::assertTrue(ToolUtils::isLangChainTool($tool));
         self::assertTrue(ToolUtils::isLangChainTool($spec));
         self::assertFalse(ToolUtils::isLangChainTool(['type' => 'function', 'function' => ['name' => 'x']]));

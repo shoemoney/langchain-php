@@ -90,6 +90,12 @@ final class FunctionCalling
             return [$tool->name, $tool->description, $tool->schema];
         }
 
+        if (ToolUtils::isRunnableToolLike($tool) && is_object($tool) && isset($tool->name, $tool->schema)) {
+            $description = $tool->description ?? null;
+
+            return [(string) $tool->name, $description === null ? null : (string) $description, $tool->schema];
+        }
+
         if (is_array($tool) && isset($tool['name'], $tool['schema'])) {
             $description = $tool['description'] ?? null;
 
@@ -98,7 +104,7 @@ final class FunctionCalling
 
         throw new \InvalidArgumentException(
             'Cannot convert ' . get_debug_type($tool) . ' to a function definition. Pass a StructuredTool,'
-            . ' a StructuredToolSpec, or an array with a name and a schema.'
+            . ' a StructuredToolSpec, a RunnableToolLike, or an array with a name and a schema.'
         );
     }
 }
