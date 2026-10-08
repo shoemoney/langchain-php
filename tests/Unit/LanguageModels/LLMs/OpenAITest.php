@@ -420,7 +420,16 @@ final class OpenAITest extends TestCase
         $model->invoke('x');
 
         self::assertSame('!', self::sent($model)['suffix']);
-        self::assertSame(5, self::sent($model)['max_tokens'], 'a field already set keeps its value; modelKwargs only add');
+        self::assertSame(9, self::sent($model)['max_tokens'], 'modelKwargs are spread last and override named fields');
+    }
+
+    public function testModelKwargsOverrideN(): void
+    {
+        $model = self::model(['n' => 1, 'modelKwargs' => ['n' => 3]]);
+
+        $model->invoke('x');
+
+        self::assertSame(3, self::sent($model)['n']);
     }
 
     public function testBestOfCannotStream(): void

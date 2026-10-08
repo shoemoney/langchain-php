@@ -111,6 +111,15 @@ final class OpenAIEmbeddingsTest extends TestCase
         self::assertSame('Bearer sk-test', $embeddings->httpClient->requests[0]['headers']['Authorization']);
     }
 
+    public function testAzureEmbeddingsIgnoreOpenAIApiKey(): void
+    {
+        $embeddings = self::azure(['azureOpenAIApiKey' => null, 'openAIApiKey' => 'sk-wrong', 'apiKey' => 'right-key']);
+
+        $embeddings->embedQuery('hi');
+
+        self::assertSame('right-key', $embeddings->httpClient->requests[0]['headers']['api-key']);
+    }
+
     public function testEmbedDocuments(): void
     {
         $res = self::openAI()->embedDocuments(['Hello world', 'Bye bye']);

@@ -47,6 +47,7 @@ trait ConfiguresAzureOpenAI
      * @param list<string>         $deploymentFieldKeys Field names that may carry the deployment, first non-empty wins.
      * @param list<string>         $deploymentEnvNames  Environment variables tried when no field is given, first non-empty wins.
      * @param ?string              $apiKey              The non-Azure key already resolved, counted as a credential.
+     * @param bool                 $allowOpenAIApiKey   Whether `openAIApiKey` is a fallback Azure key (not for embeddings, as upstream).
      */
     protected function constructAzureFields(
         array $fields,
@@ -54,11 +55,12 @@ trait ConfiguresAzureOpenAI
         array $deploymentEnvNames = ['AZURE_OPENAI_API_DEPLOYMENT_NAME'],
         bool $requireCredentials = true,
         ?string $apiKey = null,
+        bool $allowOpenAIApiKey = true,
     ): void {
         $this->azureConstructorFields = $fields;
 
         $this->azureOpenAIApiKey = self::azureString($fields['azureOpenAIApiKey'] ?? null)
-            ?? self::azureString($fields['openAIApiKey'] ?? null)
+            ?? ($allowOpenAIApiKey ? self::azureString($fields['openAIApiKey'] ?? null) : null)
             ?? self::azureString($fields['apiKey'] ?? null)
             ?? Env::getEnvironmentVariable('AZURE_OPENAI_API_KEY');
 

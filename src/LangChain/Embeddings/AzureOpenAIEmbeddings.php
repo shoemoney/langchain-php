@@ -35,6 +35,7 @@ class AzureOpenAIEmbeddings extends OpenAIEmbeddings
             ['azureOpenAIApiEmbeddingsDeploymentName', 'azureOpenAIApiDeploymentName'],
             ['AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME', 'AZURE_OPENAI_API_DEPLOYMENT_NAME'],
             requireCredentials: false,
+            allowOpenAIApiKey: false,
         );
         $this->azureOpenAIEndpoint = null;
     }

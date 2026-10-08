@@ -207,7 +207,7 @@ class OpenAI extends BaseLLM
             'stream' => $this->streaming,
         ];
 
-        return array_filter($params, static fn (mixed $v): bool => $v !== null) + $this->modelKwargs;
+        return array_merge(array_filter($params, static fn (mixed $v): bool => $v !== null), $this->modelKwargs);
     }
 
     /**

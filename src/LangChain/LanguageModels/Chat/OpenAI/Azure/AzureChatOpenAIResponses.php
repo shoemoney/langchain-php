@@ -33,6 +33,7 @@ class AzureChatOpenAIResponses extends ChatOpenAIResponses
     /**
      * The Responses route is not deployment-scoped: a deployment URL
      * (`.../openai/deployments/{name}`) is cut back to `.../openai/responses`.
+     * Non-exact: upstream builds this URL in the openai SDK's AzureOpenAI client from a deployment-scoped baseURL.
      */
     protected function url(): string
     {
