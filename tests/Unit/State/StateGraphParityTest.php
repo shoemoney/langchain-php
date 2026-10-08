@@ -25,8 +25,6 @@ use LangGraph\State\StateGraphNodeSpec;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-use const LangGraph\Pregel\Constants\X;
-
 /**
  * Port of the `StateGraph` describe of `langgraph-core/src/graph/state.test.ts`, plus the parts of
  * `state.ts` it does not exercise (`addSequence`, joins, `validate`, `ends`, `defer`) and
