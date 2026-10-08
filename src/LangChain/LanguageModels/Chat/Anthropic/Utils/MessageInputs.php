@@ -201,6 +201,22 @@ final class MessageInputs
      */
     public static function convertTool(mixed $tool, ?bool $strict = null): array
     {
+        // A tool that carries its own provider definition (bash, computer, text editor, memory) is
+        // sent as that definition, not as a generated function schema.
+        if ($tool instanceof \LangChain\Tools\StructuredTool
+            && is_array($tool->extras['providerToolDefinition'] ?? null)
+        ) {
+            return $tool->extras['providerToolDefinition'];
+        }
+
+        // Server and built-in tools (`web_search_20250305`, `mcp_toolset`, ...) pass through untouched.
+        // This sits BEFORE the schema branch and does not loosen it: it only fires when there is no
+        // `input_schema` and the `type` is a dated built-in name, so the OpenAI-shape guard below is
+        // unaffected.
+        if (self::isServerTool($tool)) {
+            return $tool;
+        }
+
         if ($tool instanceof \LangChain\Tools\StructuredTool) {
             $name = $tool->name;
             $description = $tool->description;
@@ -262,6 +278,21 @@ final class MessageInputs
         }
 
         return $converted;
+    }
+
+    /**
+     * Whether a tool is an Anthropic server/built-in tool: no `input_schema`, and a `type` that is
+     * a dated tool name (`*_20YYMMDD`) or `mcp_toolset`.
+     */
+    public static function isServerTool(mixed $tool): bool
+    {
+        if (!is_array($tool) || isset($tool['input_schema'])) {
+            return false;
+        }
+
+        $type = $tool['type'] ?? null;
+
+        return is_string($type) && ($type === 'mcp_toolset' || preg_match('/_20\d{6}$/', $type) === 1);
     }
 
     /**

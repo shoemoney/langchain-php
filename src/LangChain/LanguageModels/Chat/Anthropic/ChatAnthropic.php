@@ -6,6 +6,7 @@ namespace LangChain\LanguageModels\Chat\Anthropic;
 
 use LangChain\LanguageModels\Chat\NormalisesProviderOptions;
 use LangChain\LanguageModels\BaseChatModel;
+use LangChain\LanguageModels\Chat\Anthropic\Tools\Types;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageInputs;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageOutputs;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\Standard;
@@ -118,6 +119,13 @@ class ChatAnthropic extends BaseChatModel
      */
     public array $defaultHeaders = [];
 
+    /**
+     * Beta feature flags sent in the `anthropic-beta` header, in addition to those the bound tools need.
+     *
+     * @var list<string>
+     */
+    public array $betas = [];
+
     public bool $streamUsage = true;
 
     public ?float $timeout = null;
@@ -151,6 +159,7 @@ class ChatAnthropic extends BaseChatModel
         $this->maxTokens = (int) ($fields['maxTokens'] ?? $this->maxTokens);
         $this->stopSequences = isset($fields['stopSequences']) ? array_values((array) $fields['stopSequences']) : $this->stopSequences;
         $this->defaultHeaders = (array) ($fields['defaultHeaders'] ?? []);
+        $this->betas = array_values((array) ($fields['betas'] ?? []));
         $this->streamUsage = (bool) ($fields['streamUsage'] ?? $this->streamUsage);
         $this->timeout = isset($fields['timeout']) ? (float) $fields['timeout'] : $this->timeout;
         $this->maxRetries = (int) ($fields['maxRetries'] ?? $this->maxRetries);
@@ -250,6 +259,18 @@ class ChatAnthropic extends BaseChatModel
         $cacheControl = $options['cache_control'] ?? $options['cacheControl'] ?? null;
         if (is_array($cacheControl)) {
             $params['cache_control'] = $cacheControl;
+        }
+
+        // Beta flags travel in a header, not the body; `post()` and `rawEventStream()` lift this key out.
+        // Constructor, bound and per-call betas are merged with those the offered tools require.
+        $betas = array_values(array_unique([
+            ...$this->betas,
+            ...array_map('strval', (array) ($bound['betas'] ?? [])),
+            ...array_map('strval', (array) ($options['betas'] ?? [])),
+            ...Types::betasFor((array) ($params['tools'] ?? [])),
+        ]));
+        if ($betas !== []) {
+            $params['betas'] = $betas;
         }
 
         if (($extra['streaming'] ?? false) === true) {
@@ -475,6 +496,7 @@ class ChatAnthropic extends BaseChatModel
      */
     private function rawEventStream(array $params): \Generator
     {
+        [$params, $betas] = self::splitBetas($params);
         $body = Js::encode($params);
         $attempt = 0;
 
@@ -483,7 +505,7 @@ class ChatAnthropic extends BaseChatModel
             $delivered = false;
 
             try {
-                $raw = $this->http()->postStream($this->url(), $this->headers(), $body, [], $this->timeout);
+                $raw = $this->http()->postStream($this->url(), $this->headers($betas), $body, [], $this->timeout);
 
                 foreach ($raw as $bytes) {
                     if ($bytes !== '') {
@@ -636,12 +658,13 @@ class ChatAnthropic extends BaseChatModel
         // could not represent was sent as an EMPTY BODY and came back as an
         // opaque 400 from the provider — local data loss disguised as a remote
         // API error. The cast is exactly what hid it.
+        [$params, $betas] = self::splitBetas($params);
         $body = Js::encode($params);
 
         $attempt = 0;
         while (true) {
             try {
-                $response = $this->http()->post($this->url(), $this->headers(), $body, [], $this->timeout);
+                $response = $this->http()->post($this->url(), $this->headers($betas), $body, [], $this->timeout);
             } catch (AnthropicException $e) {
                 // Already one of ours — a missing API key, a rejected tool
                 // choice, a refusal. Re-wrapping it would replace an actionable
@@ -712,9 +735,24 @@ class ChatAnthropic extends BaseChatModel
     }
 
     /**
+     * @param array<string, mixed> $params
+     *
+     * @return array{0: array<string, mixed>, 1: list<string>} the body params without `betas`, and the betas
+     */
+    private static function splitBetas(array $params): array
+    {
+        $betas = array_values(array_map('strval', (array) ($params['betas'] ?? [])));
+        unset($params['betas']);
+
+        return [$params, $betas];
+    }
+
+    /**
+     * @param list<string> $betas
+     *
      * @return array<string, string>
      */
-    private function headers(): array
+    private function headers(array $betas = []): array
     {
         if ($this->apiKey === null) {
             throw new AnthropicException(
@@ -744,6 +782,6 @@ class ChatAnthropic extends BaseChatModel
             'x-api-key' => $this->apiKey,
             'anthropic-version' => self::API_VERSION,
             'content-type' => 'application/json',
-        ] + $this->defaultHeaders;
+        ] + ($betas === [] ? [] : ['anthropic-beta' => implode(',', $betas)]) + $this->defaultHeaders;
     }
 }
