@@ -219,20 +219,22 @@ final class ReactAgent
 
         $conditionalMap = static fn (array $map): array => array_filter($map, static fn (mixed $v): bool => $v !== null);
 
+        // `StateGraph::addEdge()` refuses an unknown node (upstream defers that to compile), so the nodes an edge
+        // names are added before the edge.
         $entrypoint = self::NODE_AGENT;
         $inputSchema = null;
         if ($preModelHook !== null) {
-            $workflow
-                ->addNode(self::NODE_PRE_MODEL_HOOK, $preModelHook)
-                ->addEdge(self::NODE_PRE_MODEL_HOOK, self::NODE_AGENT);
+            $workflow->addNode(self::NODE_PRE_MODEL_HOOK, $preModelHook);
             $entrypoint = self::NODE_PRE_MODEL_HOOK;
 
             $inputSchema = new AnnotationRoot($workflow->schemaDefinition + AgentState::preHookAnnotation()->spec);
         }
 
-        $workflow
-            ->addNode(self::NODE_AGENT, $callModel, $inputSchema !== null ? ['input' => $inputSchema] : [])
-            ->addEdge(Constants::START, $entrypoint);
+        $workflow->addNode(self::NODE_AGENT, $callModel, $inputSchema !== null ? ['input' => $inputSchema] : []);
+        if ($preModelHook !== null) {
+            $workflow->addEdge(self::NODE_PRE_MODEL_HOOK, self::NODE_AGENT);
+        }
+        $workflow->addEdge(Constants::START, $entrypoint);
 
         if ($postModelHook !== null) {
             $workflow
