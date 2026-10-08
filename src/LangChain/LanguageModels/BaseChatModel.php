@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels;
 
+use LangChain\Caches\BaseCache;
+use LangChain\Caches\InMemoryCache;
 use LangChain\LanguageModels\Outputs\ChatGeneration;
 use LangChain\LanguageModels\Outputs\ChatGenerationChunk;
 use LangChain\LanguageModels\Outputs\ChatResult;
@@ -51,6 +53,30 @@ abstract class BaseChatModel extends BaseLanguageModel
      * transcript is comparable across providers.
      */
     public ?string $outputVersion = null;
+
+    /**
+     * Where finished generations are remembered, keyed by prompt and by the
+     * serialized model parameters. Null disables caching.
+     *
+     * Set with `['cache' => true]` (the process-wide {@see InMemoryCache::global()})
+     * or `['cache' => $someBaseCache]`.
+     */
+    public ?BaseCache $cache = null;
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    public function __construct(array $params = [])
+    {
+        parent::__construct($params);
+
+        $cache = $params['cache'] ?? null;
+        if ($cache instanceof BaseCache) {
+            $this->cache = $cache;
+        } elseif ($cache) {
+            $this->cache = InMemoryCache::global();
+        }
+    }
 
     /**
      * The trace namespace: `['langchain', 'chat_models']`.
@@ -369,7 +395,32 @@ abstract class BaseChatModel extends BaseLanguageModel
             // prompt 1, while the run's own end event went to the right one.
             $thisRunManager = $runManagers[$index] ?? $runManager;
 
+            $prompt = null;
+            $llmKey = null;
+
             try {
+                if ($this->cache !== null) {
+                    $prompt = self::convertInputToPromptValue($messages)->toStringValue();
+                    $llmKey = $this->serializedCacheKeyParametersForCall($options);
+                    $cached = $this->cache->lookup($prompt, $llmKey);
+
+                    if (is_array($cached)) {
+                        // A hit skips the model but not the run: the run manager
+                        // still sees a token, an end event flagged `cached`, so a
+                        // trace shows one run per call whether or not it was served
+                        // from the cache. Cached prompts contribute no llmOutput —
+                        // nothing was spent on them.
+                        $hits = $this->hydrateCachedGenerations($cached);
+                        if ($hits !== []) {
+                            $thisRunManager?->handleLLMNewToken($hits[0]->text);
+                        }
+                        $thisRunManager?->handleLLMEnd(new LLMResult([$hits]), ['cached' => true]);
+                        $generations[] = $hits;
+
+                        continue;
+                    }
+                }
+
                 $result = $this->dispatchGenerate($messages, $options, $thisRunManager, $config);
             } catch (\Throwable $e) {
                 // Without this the trace shows a run that started and never
@@ -410,6 +461,10 @@ abstract class BaseChatModel extends BaseLanguageModel
             $generations[] = $result->generations;
             $llmOutputs[] = $result->llmOutput;
 
+            if ($this->cache !== null && $prompt !== null && $llmKey !== null) {
+                $this->cache->update($prompt, $llmKey, $result->generations);
+            }
+
             // Each prompt ends its own run with its OWN llmOutput. The combined
             // output is only what the returned LLMResult carries: token counts
             // are per-prompt facts, and a run told about the batch total instead
@@ -418,6 +473,39 @@ abstract class BaseChatModel extends BaseLanguageModel
         }
 
         return new LLMResult($generations, $this->combineLLMOutput($llmOutputs), $runIds);
+    }
+
+    /**
+     * Copies of cached generations, safe to hand to a caller.
+     *
+     * Copied because the cache holds the very objects an earlier caller received;
+     * mutating those here (zeroing the token counts, below) would corrupt that
+     * caller's result. As upstream does on a hit, the token usage is reset to
+     * zero — a cached answer spent no tokens — and `tokenUsage` is emptied.
+     *
+     * @param array<int, Generation> $cached
+     * @return list<Generation>
+     */
+    private function hydrateCachedGenerations(array $cached): array
+    {
+        $hydrated = [];
+        foreach ($cached as $generation) {
+            $copy = clone $generation;
+            if ($copy instanceof ChatGeneration) {
+                $copy->message = clone $copy->message;
+                if ($copy->message instanceof AIMessage && isset($copy->message->response_metadata['usage_metadata'])) {
+                    $copy->message->response_metadata['usage_metadata'] = [
+                        'input_tokens' => 0,
+                        'output_tokens' => 0,
+                        'total_tokens' => 0,
+                    ];
+                }
+            }
+            $copy->generationInfo = array_merge($copy->generationInfo, ['tokenUsage' => []]);
+            $hydrated[] = $copy;
+        }
+
+        return $hydrated;
     }
 
     /**
