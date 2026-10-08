@@ -17,25 +17,13 @@ use PHPUnit\Framework\TestCase;
  * `langchain/src/agents/tests/graph.test.ts`: the shape of the graph `createAgent` builds for two middleware
  * with every interesting mix of hooks and `canJumpTo` lists, with and without a tool.
  *
- * Upstream snapshots the Mermaid drawing of each graph (and writes a markdown matrix of them). This port has no
- * graph drawing yet (WP-06), so each case asserts the same information the drawing carries: the nodes, the
- * plain edges and, for every conditional edge, the set of nodes it can reach. The expectation is derived by
- * the rules below, written out per hook rather than by building a graph:
- *
- *  - the entry is the first beforeAgent node, else the first beforeModel node, else the model node; tools (and
- *    every beforeModel loop) come back to the first beforeModel node, else the model node;
- *  - the exit is the last afterAgent node, else END;
- *  - a hook without `canJumpTo` is a plain edge to the next node; with `canJumpTo` it is a conditional edge to
- *    the next node and the allowed targets (`tools` only if a tool exists);
- *  - `beforeAgent` and the model's own edges send `end` to the exit; `beforeModel` sends it to END;
- *  - afterModel and afterAgent run in reverse, and the first of each (the last to run) leaves the loop.
+ * Upstream snapshots the Mermaid drawing of each graph. The expectation here is that snapshot itself, parsed
+ * into GraphSnapshots.json: the nodes, the plain edges and, for every conditional edge, the nodes it can reach.
+ * Each case compares the agent's builder against the snapshot with the matching label.
  */
 #[CoversClass(ReactAgent::class)]
 final class GraphTest extends TestCase
 {
-    private const MODEL = 'model_request';
-    private const TOOLS = 'tools';
-
     /**
      * Upstream's strategic matrix. Keys: aBeforeAgent, aAfterAgent, aBefore, aAfter and the same for b.
      * A missing key means the hook is not defined; an empty list means no jump is allowed.
@@ -140,107 +128,7 @@ final class GraphTest extends TestCase
             'middleware' => $middlewareList,
         ]);
 
-        // Expected nodes.
-        $expectedNodes = [self::MODEL, ...($hasTool ? [self::TOOLS] : [])];
-        foreach ($kinds as $list) {
-            foreach ($list as [$node]) {
-                $expectedNodes[] = $node;
-            }
-        }
-
-        // Expected edges.
-        $names = static fn (array $list): array => array_map(static fn (array $entry): string => $entry[0], $list);
-        $beforeAgent = $kinds['beforeAgent'];
-        $beforeModel = $kinds['beforeModel'];
-        $afterModel = $kinds['afterModel'];
-        $afterAgent = $kinds['afterAgent'];
-
-        $entry = $names($beforeAgent)[0] ?? $names($beforeModel)[0] ?? self::MODEL;
-        $loopEntry = $names($beforeModel)[0] ?? self::MODEL;
-        $exit = $afterAgent === [] ? Constants::END : $names($afterAgent)[\count($afterAgent) - 1];
-
-        $edges = [[Constants::START, $entry]];
-        $conditional = [];
-
-        // A target label as the node it is, for a hook whose `end` goes to $endsAt.
-        $targets = static function (array $allowed, string $endsAt) use ($hasTool): array {
-            $out = [];
-            foreach ($allowed as $label) {
-                $node = ['model' => self::MODEL, 'tools' => self::TOOLS, 'end' => $endsAt][$label];
-                if ($node === self::TOOLS && !$hasTool) {
-                    continue;
-                }
-                $out[] = $node;
-            }
-
-            return $out;
-        };
-        $destinations = static fn (array $list): array => array_values(array_unique($list));
-
-        // beforeAgent: forward, `end` goes to the exit.
-        foreach ($beforeAgent as $i => [$node, $allowed]) {
-            $next = $beforeAgent[$i + 1][0] ?? $loopEntry;
-            if ($allowed === []) {
-                $edges[] = [$node, $next];
-            } else {
-                $conditional[$node] = $destinations([$next, ...$targets($allowed, $exit)]);
-            }
-        }
-        // beforeModel: forward, `end` goes to END.
-        foreach ($beforeModel as $i => [$node, $allowed]) {
-            $next = $beforeModel[$i + 1][0] ?? self::MODEL;
-            if ($allowed === []) {
-                $edges[] = [$node, $next];
-            } else {
-                $conditional[$node] = $destinations([$next, ...$targets($allowed, Constants::END)]);
-            }
-        }
-        // The model node.
-        if ($afterModel !== []) {
-            $edges[] = [self::MODEL, $afterModel[\count($afterModel) - 1][0]];
-        } else {
-            $paths = [...($hasTool ? [self::TOOLS] : []), $exit];
-            if (\count($paths) === 1) {
-                $edges[] = [self::MODEL, $paths[0]];
-            } else {
-                $conditional[self::MODEL] = $paths;
-            }
-        }
-        // afterModel: reverse; the first one (the last to run) leaves the loop.
-        for ($i = \count($afterModel) - 1; $i > 0; $i--) {
-            [$node, $allowed] = $afterModel[$i];
-            $next = $afterModel[$i - 1][0];
-            if ($allowed === []) {
-                $edges[] = [$node, $next];
-            } else {
-                $conditional[$node] = $destinations([$next, ...$targets($allowed, Constants::END)]);
-            }
-        }
-        if ($afterModel !== []) {
-            $conditional[$afterModel[0][0]] = [...($hasTool ? [self::TOOLS] : []), self::MODEL, $exit];
-        }
-        // afterAgent: reverse; the first one (the last to run) ends the run.
-        for ($i = \count($afterAgent) - 1; $i > 0; $i--) {
-            [$node, $allowed] = $afterAgent[$i];
-            $next = $afterAgent[$i - 1][0];
-            if ($allowed === []) {
-                $edges[] = [$node, $next];
-            } else {
-                $conditional[$node] = $destinations([$next, ...$targets($allowed, Constants::END)]);
-            }
-        }
-        if ($afterAgent !== []) {
-            [$node, $allowed] = $afterAgent[0];
-            if ($allowed === []) {
-                $edges[] = [$node, Constants::END];
-            } else {
-                $conditional[$node] = $destinations([Constants::END, ...$targets($allowed, Constants::END)]);
-            }
-        }
-        // Tools come back to the loop entry.
-        if ($hasTool) {
-            $edges[] = [self::TOOLS, $loopEntry];
-        }
+        $expected = self::snapshot($case, $hasTool);
 
         // What the builder holds.
         $builder = $agent->builder;
@@ -253,11 +141,50 @@ final class GraphTest extends TestCase
             $actualConditional[$source] = array_values(array_unique(array_values($branch->ends ?? [])));
         }
 
-        self::assertEqualsCanonicalizing($expectedNodes, $actualNodes);
-        self::assertEqualsCanonicalizing($edges, $actualEdges);
-        self::assertEqualsCanonicalizing(array_keys($conditional), array_keys($actualConditional));
-        foreach ($conditional as $source => $expectedDestinations) {
-            self::assertEqualsCanonicalizing($expectedDestinations, $actualConditional[$source], 'destinations of ' . $source);
+        $normalise = static fn (string $name): string => str_replace('.', '_', $name);
+        $edges = array_map(static fn (array $edge): array => [$normalise($edge[0]), $normalise($edge[1])], $actualEdges);
+        $conditional = [];
+        foreach ($actualConditional as $source => $destinations) {
+            $conditional[$normalise($source)] = array_map($normalise, $destinations);
         }
+
+        self::assertEqualsCanonicalizing($expected['nodes'], array_map($normalise, $actualNodes));
+        self::assertEqualsCanonicalizing($expected['edges'], $edges);
+        self::assertEqualsCanonicalizing(array_keys($expected['conditional']), array_keys($conditional));
+        foreach ($expected['conditional'] as $source => $destinations) {
+            self::assertEqualsCanonicalizing($destinations, $conditional[$source], 'destinations of ' . $source);
+        }
+    }
+
+    /**
+     * Upstream's snapshot for a case, from the parsed Mermaid in GraphSnapshots.json (nodes, `-->` edges and
+     * `-.->` conditional destinations; `.` already `_`, START/END as `__start__`/`__end__`).
+     *
+     * @param array<string, list<string>> $case
+     * @return array{nodes: list<string>, edges: list<array{0: string, 1: string}>, conditional: array<string, list<string>>}
+     */
+    private static function snapshot(array $case, bool $hasTool): array
+    {
+        static $snapshots = null;
+        $snapshots ??= json_decode((string) file_get_contents(__DIR__ . '/GraphSnapshots.json'), true, 512, JSON_THROW_ON_ERROR);
+
+        $part = static function (string $side) use ($case): string {
+            $out = [];
+            foreach (['BeforeAgent' => 'beforeAgent', 'AfterAgent' => 'afterAgent', 'Before' => 'before', 'After' => 'after'] as $key => $title) {
+                $value = $case[strtolower($side) . $key] ?? null;
+                $rendered = $value === null ? 'undefined' : ($value === [] ? '[]' : "[ '" . implode("', '", $value) . "' ]");
+                $out[] = $side . ' ' . $title . ': ' . $rendered;
+            }
+
+            return implode(', ', $out);
+        };
+        $label = $part('A') . ' | ' . $part('B') . ' | tools: ' . ($hasTool ? 'true' : 'false');
+        self::assertArrayHasKey($label, $snapshots, 'upstream snapshot exists');
+
+        $snapshot = $snapshots[$label];
+        $drop = static fn (array $nodes): array => array_values(array_filter($nodes, static fn (string $node): bool => $node !== Constants::START && $node !== Constants::END));
+        $snapshot['nodes'] = $drop($snapshot['nodes']);
+
+        return $snapshot;
     }
 }
