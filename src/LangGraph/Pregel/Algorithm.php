@@ -988,6 +988,17 @@ final class Algorithm
             metadata: $metadata,
             tags: [],
         );
+        // A graph-wide resume value answers ONE interrupt. Upstream builds a task's scratchpad
+        // lazily from the shared pending writes, and the interrupt that takes the value deletes
+        // it from them - so a task called afterwards no longer sees it. Scratchpads here are
+        // built from a per-run index, so the call task inherits what its caller has left
+        // instead; without this every task in a workflow would be answered by the same resume.
+        $parentPad = $config->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
+        $ownPad = $task->config->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
+        if ($parentPad instanceof PregelScratchpad && $ownPad instanceof PregelScratchpad) {
+            $ownPad->nullResume = $parentPad->nullResume;
+        }
+
         self::applyTimeout($task, $proc);
 
         return $task;

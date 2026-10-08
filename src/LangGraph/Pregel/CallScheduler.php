@@ -65,9 +65,18 @@ final class CallScheduler
         }
 
         if ($next->writes === []) {
+            $childPad = $next->config?->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
+            $hadResume = $childPad instanceof PregelScratchpad && $childPad->nullResume !== null;
+
             $this->loop->emitDebug('task', $this->loop->debugTaskPayload($next, true));
             $error = $this->runWithRetry($next);
             $this->commit($next, $error);
+
+            // The graph-wide resume value is spent once an interrupt took it; tell the caller so
+            // the tasks it calls next (and its own interrupts) do not take it again.
+            if ($hadResume && $childPad->nullResume === null) {
+                $scratchpad->nullResume = null;
+            }
 
             if ($error !== null) {
                 return Promise::rejected($error);
