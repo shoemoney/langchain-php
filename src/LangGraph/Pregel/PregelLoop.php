@@ -16,6 +16,7 @@ use LangGraph\Pregel\Checkpoint\BaseCheckpointSaver;
 use LangGraph\Pregel\Checkpoint\Checkpoint;
 use LangGraph\Pregel\Checkpoint\CheckpointFunctions;
 use LangGraph\Pregel\Checkpoint\CheckpointTuple;
+use LangGraph\Pregel\Messages\TracedNode;
 use LangGraph\Store\AsyncBatchedStore;
 use LangGraph\Store\BaseStore;
 
@@ -435,6 +436,9 @@ class PregelLoop
                 updatedChannels: $this->updatedChannels,
             ),
         );
+        foreach ($nextTasks as $nextTask) {
+            $this->traceTask($nextTask);
+        }
         $this->tasks = $nextTasks;
         $taskList = array_values($this->tasks);
 
@@ -1195,6 +1199,24 @@ class PregelLoop
         return $out;
     }
 
+    /**
+     * Whether task runnables report chain events to the callback manager.
+     *
+     * Set by {@see Pregel::stream()} when a `messages` or `tools` handler is
+     * attached. Those handlers learn which messages a node returned from the
+     * node's chain-end event, which this port's runnables do not fire on their
+     * own; see {@see TracedNode}.
+     */
+    public bool $traceNodes = false;
+
+    /** Wrap a task's runnable so its run is visible to callback handlers. */
+    private function traceTask(PregelExecutableTask $task): void
+    {
+        if ($this->traceNodes && $task->proc !== null && !$task->proc instanceof TracedNode) {
+            $task->proc = new TracedNode($task->proc);
+        }
+    }
+
     /** The config of the checkpoint preceding the current one. */
     public ?RunnableConfig $prevCheckpointConfig = null;
 
@@ -1390,6 +1412,7 @@ class PregelLoop
             return null;
         }
 
+        $this->traceTask($pushed);
         $this->tasks[$pushed->id] = $pushed;
         if ($this->skipDoneTasks) {
             $this->matchWrites([$pushed->id => $pushed]);
