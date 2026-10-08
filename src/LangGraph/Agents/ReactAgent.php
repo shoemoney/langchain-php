@@ -488,7 +488,7 @@ final class ReactAgent
      *
      * @param RunnableConfig|array<string, mixed>|null $config
      */
-    private function getGraphConfig(RunnableConfig|array|null $config = null): RunnableConfig
+    private function configForRun(RunnableConfig|array|null $config = null): RunnableConfig
     {
         return self::mergeConfigs($this->defaultConfig, $config);
     }
@@ -845,7 +845,7 @@ final class ReactAgent
      */
     public function invoke(mixed $state, RunnableConfig|array|null $config = null): mixed
     {
-        $mergedConfig = $this->getGraphConfig($config);
+        $mergedConfig = $this->configForRun($config);
         $initializedState = $this->initializeMiddlewareStates($state, $mergedConfig);
 
         return $this->compiled->invoke($initializedState, $mergedConfig);
@@ -860,7 +860,7 @@ final class ReactAgent
      */
     public function stream(mixed $state, RunnableConfig|array|null $config = null): \Generator
     {
-        $mergedConfig = $this->getGraphConfig($config);
+        $mergedConfig = $this->configForRun($config);
         $initializedState = $this->initializeMiddlewareStates($state, $mergedConfig);
 
         return $this->compiled->stream($initializedState, $mergedConfig);
@@ -880,7 +880,7 @@ final class ReactAgent
             throw new \InvalidArgumentException('streamEvents version "v3" is not available: there is no stream transformer protocol in this port.');
         }
 
-        $mergedConfig = $this->getGraphConfig($config);
+        $mergedConfig = $this->configForRun($config);
         $initializedState = $this->initializeMiddlewareStates($state, $mergedConfig);
 
         return $this->compiled->streamEvents($initializedState, $mergedConfig, $version, $streamOptions);
