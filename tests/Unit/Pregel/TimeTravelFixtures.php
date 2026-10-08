@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\Pregel;
 
 use LangChain\Runnables\RunnableConfig;
-use LangGraph\Pregel\Constants;
 use LangGraph\State\Annotation;
 use LangGraph\State\AnnotationRoot;
-use LangGraph\State\StateGraph;
 
 /**
  * Helpers shared by the time-travel, update-state and subgraph tests.
@@ -146,10 +144,5 @@ trait TimeTravelFixtures
 
             return $returns;
         };
-    }
-
-    private static function startEdge(StateGraph $graph, string $node): StateGraph
-    {
-        return $graph->addEdge(Constants::START, $node);
     }
 }

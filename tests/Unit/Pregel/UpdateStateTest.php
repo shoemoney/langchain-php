@@ -13,7 +13,6 @@ use LangGraph\Errors\GraphValueError;
 use LangGraph\Errors\InvalidUpdateError;
 use LangGraph\Pregel\Constants;
 use LangGraph\Pregel\Pregel;
-use LangGraph\State\Annotation;
 use LangGraph\State\StateGraph;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;

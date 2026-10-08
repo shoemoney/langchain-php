@@ -300,20 +300,88 @@ final class ValidateTest extends TestCase
         }
     }
 
-    // ---- the compiled graph is a valid graph --------------------------------
+    // ---- every shape the builders emit is a valid graph ---------------------------------------
 
-    public function testACompiledStateGraphPassesValidation(): void
+    /**
+     * Graph shapes `StateGraph::compile()` produces. `validateGraph` is stricter than `compile()`
+     * (which checks nothing about subscriptions), so a builder output that failed it would mean the
+     * strictness was wrong for this port, not that the graph was.
+     *
+     * @return iterable<string, array{0: \Closure(): \LangGraph\Pregel\Pregel}>
+     */
+    public static function compiledGraphs(): iterable
     {
-        // The end-to-end check: validateGraph is stricter than compile(), so a graph the
-        // builder emits must satisfy it or the strictness would have broken every caller.
+        $schema = static fn (): \LangGraph\State\AnnotationRoot => \LangGraph\State\Annotation::root([
+            'value' => \LangGraph\State\Annotation::last(),
+        ]);
+        $node = static fn (): array => ['value' => 1];
+
+        yield 'linear' => [static fn () => (new StateGraph($schema()))
+            ->addNode('a', $node)->addNode('b', $node)
+            ->addEdge(Constants::START, 'a')->addEdge('a', 'b')->addEdge('b', Constants::END)
+            ->compile()];
+
+        yield 'interrupt lists' => [static fn () => (new StateGraph($schema()))
+            ->addNode('a', $node)->addNode('b', $node)
+            ->addEdge(Constants::START, 'a')->addEdge('a', 'b')
+            ->compile(['interruptBefore' => ['b'], 'interruptAfter' => ['a']])];
+
+        yield 'interrupt all' => [static fn () => (new StateGraph($schema()))
+            ->addNode('a', $node)
+            ->addEdge(Constants::START, 'a')
+            ->compile(['interruptBefore' => ['*']])];
+
+        yield 'conditional edges' => [static fn () => (new StateGraph($schema()))
+            ->addNode('a', $node)->addNode('b', $node)->addNode('c', $node)
+            ->addEdge(Constants::START, 'a')
+            ->addConditionalEdges('a', static fn (): string => 'b', ['b', 'c'])
+            ->compile()];
+
+        yield 'fan out with Send' => [static fn () => (new StateGraph($schema()))
+            ->addNode('a', $node)->addNode('worker', $node)
+            ->addEdge(Constants::START, 'a')
+            ->addConditionalEdges('a', static fn (): array => [new \LangGraph\Pregel\Send('worker', [])], ['worker'])
+            ->compile()];
+
+        yield 'subgraph as a node' => [static fn () => (new StateGraph($schema()))
+            ->addNode('child', (new StateGraph($schema()))->addNode('x', $node)->addEdge(Constants::START, 'x')->compile())
+            ->addEdge(Constants::START, 'child')
+            ->compile(['checkpointer' => new \LangGraph\Checkpoint\MemorySaver()])];
+    }
+
+    /**
+     * @param \Closure(): \LangGraph\Pregel\Pregel $build
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('compiledGraphs')]
+    public function testACompiledStateGraphPassesValidation(\Closure $build): void
+    {
+        $graph = $build();
+
+        self::assertSame($graph, $graph->validate());
+    }
+
+    public function testAHandAssembledGraphWithAMissingChannelFailsValidateOnThePregel(): void
+    {
+        $graph = new \LangGraph\Pregel\Pregel(
+            nodes: ['n' => new PregelNode(channels: ['in'], triggers: ['in'])],
+            channels: ['in' => new LastValue()],
+            inputChannels: 'in',
+            outputChannels: 'ghost',
+        );
+
+        $this->expectException(GraphValidationError::class);
+        $this->expectExceptionMessage("Output channel 'ghost' not in channels");
+        $graph->validate();
+    }
+
+    public function testAnEndToEndRunStillWorksOnAValidatedGraph(): void
+    {
         $graph = (new StateGraph(['value' => 'string']))
             ->addNode('a', static fn (): array => ['value' => 'a'])
             ->addEdge(Constants::START, 'a')
             ->addEdge('a', Constants::END)
             ->compile();
 
-        $graph->validate();
-
-        self::assertSame(['value' => 'a'], $graph->invoke(['value' => 'x']));
+        self::assertSame(['value' => 'a'], $graph->validate()->invoke(['value' => 'x']));
     }
 }
