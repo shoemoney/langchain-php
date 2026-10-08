@@ -34,8 +34,8 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **8974 passing, 20836 assertions** |
-| Size | 353 src files / 57,047 lines · 263 test files / 56,409 lines |
+| Tests | **8974 passing, 20837 assertions** |
+| Size | 353 src files / 57,046 lines · 263 test files / 56,407 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
@@ -258,6 +258,15 @@ there is marked done **only if its tests exist and pass**.
 - **langgraph-checkpoint**: BaseCheckpointSaver, MemorySaver, **SqliteSaver**,
   and the `serde` layer (`JsonPlusSerializer` + `_default` replacer + `_reviver`
   + `LcConstructorLoader`)
+- **Wave 1 (13 work packages, 8974 tests)** — each verified and reviewed; scope is bounded, see the NOT-ported list:
+  - **WP-04 graph base**: `Graph\{Graph,CompiledGraph,Branch,MessageGraph}`. `StateGraph` extends `Graph`, `CompiledStateGraph` extends `CompiledGraph` (which extends `Pregel`). `Branch` is the single conditional-edge evaluator (`RunnableBranchWriter` delegates to it). `Graph::compile` computes `triggerToNodes` itself, because Pregel silently schedules nothing without it. `CompiledGraph::attach*` are static (Pregel's arrays are readonly). A whole-value `__root__` state (MessageGraph) is now supported.
+  - **WP-08a streaming remainder**: `messages` and `tools` stream modes via `Pregel\Messages\{StreamMessagesHandler,StreamProtocolMessagesHandler,StreamToolsHandler,TracedNode}` and `Pregel\Debug`. `Pregel::HANDLER_STREAM_MODES` is new; `SUPPORTED_STREAM_MODES` is deliberately unchanged (pinned by tests). Chunks are `[mode, payload]`. Layering guard over-matches core `Outputs` (handlers use FQCNs inline).
+  - **WP-15 (PARTIAL)**: `Runnable::streamEvents` (v1/v2) and `streamLog`; handlers queue events and the entry point drains after each generator step. `RunnableInterface::CHANNEL_DEFAULT` added (fixed a latent `RunnablePick` fatal). Gaps are in PORT_STATUS.
+  - **WP-12a (PARTIAL) / WP-12b**: `Env`, `JsonSchema`, `FunctionCalling`, `MathUtils`, `NamespaceUtils`, `Uuid`; `Utils\JsonPatch` is the single JSON Patch implementation (`OutputParsers\JsonPatch` is a delegating alias); `AsyncCaller` (retry/429/Retry-After, injectable sleeper), `ContextVariables`, `AsyncLocalStorage` (synchronous static stack, not Fiber-safe; runnables do not read it yet). Known defect for the `PartialJsonParser` owner: truncated literals and a lone `-` throw; a partial `\u` escape keeps its backslash (pinned in `JsonUtilsTest::testKnownDivergencesFromUpstream`).
+  - **WP-02 prebuilt**: `ToolNode`, `toolsCondition`, `AgentName`, `CommandPassthroughTool` (adapter so a `Command` returned by a tool is not JSON-encoded). `ToolNode` rethrows only `GraphInterrupt`/`NodeInterrupt`. **`createReactAgent` is not ported.**
+  - **WP-09a/09b savers**: `Checkpoint\Postgres\*` (PDO; spec passed against real Postgres, env-gated on `LANGGRAPH_PG_DSN`) and `Checkpoint\Redis\*` behind `RedisClientInterface` (the suite runs against an in-memory fake; a real server only when `LANGGRAPH_REDIS_URL` is set, and that run deletes `checkpoint:*` keys in that database). Pregel needs a saver extending `LangGraph\Pregel\Checkpoint\BaseCheckpointSaver`. A skipped test breaks the done script and `sync_docs.py` (they need a plain `OK (N tests` line), so env gating switches backends instead of skipping. `ext-redis` is not in composer.json `suggest` yet.
+  - **WP-14**: `LangChain\StructuredQuery\*` (IR, translators). **WP-16a**: OpenAI Responses API INPUT and tool converters only (`formatToolChoice()` returns `?array`; null means omit). **WP-18a**: Anthropic `outputVersion: 'v1'`, `streamChatModelEvents()`, `AnthropicToolsOutputParser`, `Profiles`. **WP-19c**: `ChatOllama` (NDJSON, not SSE; an empty tool-arg map must encode as `{}`) and `OllamaEmbeddings`.
+  - **WP-23a SDK core**: `LangGraph\Sdk\*` assistants/threads/store/crons over `MethodHttpClient` (the shared `HttpClient` is POST-only). `getGraph` is spelled `getAssistantGraph` until WP-06 retires the Pregel `getGraph` OPEN row. **No runs client, no streaming** (WP-23b).
 
 ---
 
@@ -265,7 +274,7 @@ there is marked done **only if its tests exist and pass**.
 
 Ordered by what unblocks real usage first.
 
-### Ported but not yet wired (3 classes, zero referrers)
+### Ported but not yet wired (1 class has zero src referrers; 1 has test-only referrers)
 
 Measured by `reference_counts()` in `.loop/advisory.py`, which counts code
 references and ignores comments — not the "test files" column, which is a
@@ -273,39 +282,40 @@ directory count and under-reports shared abstractions.
 
 | Class | Waiting on |
 |---|---|
-| `LangChain\Tools\BaseToolkit` | `ToolNode` — item 1 above. Load-bearing the moment that lands. |
-| `LangChain\Utils\Testing\FakeTool` | The test-support surface; upstream's `@langchain/core/utils/testing` double. |
+| `LangChain\Utils\Testing\FakeTool` | Test-support only: referenced by `ToolNodeTest` since WP-02, no `src/` referrer (by design; upstream's `@langchain/core/utils/testing` double). |
 | `LangChain\Utils\Observable` | Port of upstream's `Observable`/`EventSource` pair; nothing in the port consumes an observable yet. |
 
-All three are faithful ports of something upstream **has** — unlike `pipeTo()`,
+`LangChain\Tools\BaseToolkit` left this list in WP-02: `ToolNode` flattens toolkits (verified by grep, `src/LangGraph/Prebuilt/ToolNode.php`).
+
+Both are faithful ports of something upstream **has** — unlike `pipeTo()`,
 which was both uncalled *and* invented and was removed. Do not delete these
 because nothing calls them today; that is the reasoning that removes a port
 rather than completing it.
 
-1. **Prebuilt agents — `createReactAgent`, `ToolNode`.** ⬜ **Do this first.**
-   Everything they depend on now exists, including a real provider. This is the
-   payoff step.
-2. **Finish the provider clients.** 🟡 `ChatOpenAI` (Chat Completions) and
-   `ChatAnthropic` are ported and tested. Outstanding: the OpenAI **Responses
-   API** (`converters/responses.ts`, 1,868 lines — a different event protocol,
-   not a flag), `azure/`, model `profiles`, the hosted tools, Anthropic's
-   citation output parsers. Every other provider is an HTTP wrapper over these
-   two.
-3. `langgraph` client SDK (REST) — the `client`/`runs`/`threads`/`stores` HTTP
-   surface. ⬜
+1. **Prebuilt agents — `createReactAgent`.** 🟡 `ToolNode`, `toolsCondition` and
+   `agentName` landed in WP-02; `createReactAgent` (WP-03) has not.
+2. **Finish the provider clients.** 🟡 `ChatOpenAI` (Chat Completions),
+   `ChatAnthropic` and `ChatOllama` are ported and tested. Outstanding: the OpenAI
+   **Responses API OUTPUT side** (only the input and tool converters landed, WP-16a),
+   `azure/`, OpenAI `profiles`, the hosted tools (WP-16b/17), Anthropic
+   `extract_generated_files` and prompt caching helpers. Every other provider is an
+   HTTP wrapper over these.
+3. `langgraph` client SDK — 🟡 core landed (assistants/threads/store/crons, WP-23a).
+   The **runs** client and all streaming (`joinStream`, `stream()`, `streamWithRetry`,
+   signals) are WP-23b.
 4. Vector stores, concrete embeddings, retrievers, memory, document loaders. ⬜
    Interfaces and seams exist (the `Embeddings` interface and the LangGraph
    store/cache are ported); no concrete backends.
-5. Postgres / Redis / MongoDB checkpoint savers. ⬜ `BaseCheckpointSaver` is
-   the seam they plug into, and the shared validation spec already runs against
-   two savers — a third should be cheap.
-6. `langgraph/graph` — the low-level `Graph` builder, `MessageGraph`, drawing.
-   `StateGraph` is done; this is the layer under it. (`MessagesReducer` and
-   `MessagesAnnotation` landed in Wave 0 / WP-00.)
+5. MongoDB checkpoint saver. ⬜ Postgres (spec-verified, env-gated in CI) and Redis
+   (fake-verified; real server env-gated on `LANGGRAPH_REDIS_URL`) landed in Wave 1.
+6. `langgraph/graph` — 🟡 `Graph`, `CompiledGraph`, `Branch`, `MessageGraph` landed
+   (WP-04). Open: `StateGraph` parity (WP-05) and drawing / `getGraph` (WP-06).
 7. `langgraph/func` — the `entrypoint`/`task` API. ⬜
-8. `utils`: `env`, `json_patch`, `function_calling`, `standard_schema`,
-   `tiktoken`. ⬜ (langgraph's own `utils`/`hash` landed in Wave 0 / WP-00.)
-9. `structured_query`, `indexing`, `example_selectors`, `load/import_map`. ⬜
+8. `utils`: 🟡 `env`, `json_patch`, `function_calling` landed (WP-12a is partial, see
+   PORT_STATUS); `standard_schema` and `tiktoken` ⬜.
+9. `indexing`, `example_selectors`, `load/import_map`. ⬜ (`structured_query` landed, WP-14.)
+10. `streamEvents` v3 protocol layer, the `custom`/`checkpoints`/`tasks` stream modes
+    (WP-08b), and the Wave 1 partials (WP-12a, WP-15). 🟡
 
 ### Deliberately out of scope
 
@@ -335,23 +345,37 @@ Each is pinned by a test, documented rather than papered over. See the
   JS uses `AsyncLocalStorage`.
 - `Hash` refuses a non-zero XXH3 seed (PHP's native `xxh128` seeds differently
   from upstream); LangGraph never passes one.
+- Wave 1 divergences (full list in `PORT_STATUS.md`): `messages` chunks arrive per
+  superstep, not per token; `streamEvents` event order follows generator pulls and nested
+  `stream()` overriders are untraced; `AsyncCaller`/SDK `maxConcurrency` is stored but
+  calls are serial; `AsyncLocalStorage` is not Fiber-isolated; `PartialJsonParser` throws on
+  truncated literals.
 - Serde: `undefined` is read (→ `null`) but never written; `RegExp` records stay
   inert; an `Error` revives as `\RuntimeException` (message only); an empty map
   serialises as `[]`.
+
+## Open observations
+
+Unresolved, recorded so they are not re-discovered:
+
+- **One nondeterministic hang.** During Wave 1 landing a single full-suite run hung at test
+  ~1853/6325 (about `ProviderClientRegressionTest::testAnthropicStreamingFailureBecomesAnAnthropicException`)
+  until composer's 300s timeout. It did not reproduce in 3 full runs, 15 isolated runs, or any
+  later run. Cause unknown; investigate if it recurs.
+- **Slow retry tests.** That test and its OpenAI twin take about 3.4s each because a retryable
+  429 hits the real `usleep` backoff. The backoff method is overridable but these tests do not
+  override it.
 
 ---
 
 ## Where to start
 
-Recommended order, and why. Wave 0 (WP-00: utils/hash, messages reducer, interrupt parity incl. `checkpointer: false`, abstract `CheckpointerSpecCase`) has landed; `Pregel`/`CompiledStateGraph` carry a `checkpointerDisabled` flag set by `StateGraph::compile`. Next is WP-01 per `.loop/COMPLETION_PLAN.md`.
+Recommended order, and why. Wave 0 (WP-00: utils/hash, messages reducer, interrupt parity incl. `checkpointer: false`, abstract `CheckpointerSpecCase`) has landed; `Pregel`/`CompiledStateGraph` carry a `checkpointerDisabled` flag set by `StateGraph::compile`. Wave 1 (13 work packages) has since landed. **Next is Wave 2 of `.loop/COMPLETION_PLAN.md`**: WP-03 `createReactAgent`, WP-05 `StateGraph` parity, WP-08b, WP-09c, WP-13a/b, WP-16b, WP-21a, WP-23b, then WP-07.
 
-1. **`createReactAgent` + `ToolNode`.** The visible payoff, and every
-   dependency now exists. `ToolNode` needs `BaseToolkit` and `ToolRuntime`,
-   which are ported but currently unreferenced by anything — the orphan audit
-   flags them, and building the agent is what wires them.
-2. **Postgres/Redis savers.** Cheapest real coverage per effort — the
-   validation spec already runs against two implementations.
-3. **The OpenAI Responses API**, if a model that needs it matters.
+1. **`createReactAgent` (WP-03).** The visible payoff; `ToolNode` and every other
+   dependency now exist.
+2. **`StateGraph` parity (WP-05)**, then the rest of Wave 2 in the order above.
+3. **The OpenAI Responses API output side (WP-16b)**, if a model that needs it matters.
 4. Then work down the NOT-ported list.
 
 When porting a subsystem: read the upstream TS, port the **tests** with it,

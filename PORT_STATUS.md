@@ -45,6 +45,7 @@ composer test
 | `load/serializable` | ✅ | Byte-compatible payload shape |
 | `runnables` | ✅ | `Runnable`, Sequence, Lambda, Parallel, Branch, Binding, WithFallbacks, Each, **Assign**, **Passthrough**. There is no `Runnable::map()` — upstream has no such method, and the one this port had returned an empty map while discarding the runnable it was called on. |
 | `runnables` config | ✅ | `RunnableConfig` |
+| `runnables` streamEvents / streamLog | 🟡 | WP-15 (partial): `Runnable::streamEvents` (v1, v2, text/event-stream) and `streamLog`, with `EventStreamCallbackHandler`, `LogStreamCallbackHandler`, `RunLog`, `RunLogPatch`, `RootEventFilter`, `StreamEvent`. Chain runs are opened only by the base `stream()` and the root entry point; nested runnables that override `stream()` and steps reached through `invoke()` are untraced; `RunnableParallel` children untraced; no custom events, retriever runnable, `signal`/`timeout`. See the non-exact table |
 | `documents` (`Document`) | ✅ | |
 | `prompt_values` | ✅ | `StringPromptValue`, `ChatPromptValue` |
 | `text_splitters` | ✅ | Character, RecursiveCharacter, Markdown, Latex, 16 language tables |
@@ -53,17 +54,18 @@ composer test
 | `output_parsers` | ✅ | incl. **openai_tools**: `JsonOutputToolsParser`, `JsonOutputKeyToolsParser` |
 | `tools` | ✅ | `StructuredTool`, `Tool`, `DynamicTool`, `DynamicStructuredTool`, `tool()`, `BaseToolkit`, `ToolRuntime`, `ToolException`. Schema is **JSON Schema**, not Zod — see below. |
 | `tracers` / `callbacks` | ✅ | `BaseCallbackHandler` + method-bag handlers, `CallbackManager` and the four run managers, `BaseTracer`, `ConsoleCallbackHandler`, `RunCollectorCallbackHandler`, `Run`. No LangSmith HTTP transport. |
-| `embeddings` / `vectorstores` | 🟡 | `Embeddings` + `EmbeddingsInterface` ported (no `AsyncCaller`, WP-12b); vector stores ⬜, no concrete backend yet |
-| `utils` (env, json patch, function_calling, standard_schema, tiktoken) | ⬜ | |
-| `structured_query`, `indexing`, `example_selectors` | ⬜ | |
-| `utils/function_calling`, `utils/standard_schema`, `utils/tiktoken`, `utils/env` | ⬜ | Zod has no PHP analogue; the port uses JSON Schema throughout (see below) |
+| `embeddings` / `vectorstores` | 🟡 | `Embeddings` + `EmbeddingsInterface` ported; `OllamaEmbeddings` (WP-19c) is the first concrete embeddings class. `AsyncCaller` now exists (WP-12b) but the embeddings do not retry through it. Vector stores ⬜, no concrete backend yet |
+| `utils` (env, json patch, function_calling, math, namespace, uuid, async caller, context) | 🟡 | WP-12a/12b: `Env`, `JsonSchema`, `FunctionCalling`, `MathUtils`, `NamespaceUtils`, `Uuid`, `JsonPatch`/`JsonPatchError`, `AsyncCaller`, `ContextVariables`, `AsyncLocalStorage`. WP-12a is **partial**: `PartialJsonParser` throws on truncated literals and a lone `-`, and keeps the backslash of a partial `\u` escape (pinned in `JsonUtilsTest::testKnownDivergencesFromUpstream`). Still ⬜: `standard_schema`, `tiktoken`, the `StoreUtils` cosine-similarity dedupe against `MathUtils` |
+| `structured_query` | ✅ | `LangChain\StructuredQuery\*` (WP-14): IR, visitors, basic and functional translators, utils; 144 tests |
+| `indexing`, `example_selectors` | ⬜ | |
+| `utils/standard_schema`, `utils/tiktoken` | ⬜ | Zod has no PHP analogue; the port uses JSON Schema throughout (see below). `utils/function_calling` and `utils/env` landed in WP-12a (see the `utils` row) |
 | `load/import_map`, `load/import_constants` | ⬜ | |
 
 ## langchain (main package)
 
 | Subsystem | Status | Notes |
 |---|---|---|
-| Provider integrations | 🟡 | **`ChatOpenAI`** (Chat Completions) and **`ChatAnthropic`** ported + tested. Not done: OpenAI **Responses API** + `azure/`, `converters/responses`, model `profiles`, the hosted tools (web_search/computer_use/shell/…); Anthropic `output_parsers` (citations), `extract_generated_files`, prompt caching helpers; every other provider. |
+| Provider integrations | 🟡 | **`ChatOpenAI`** (Chat Completions), **`ChatAnthropic`** (now with `outputVersion: 'v1'` standard content, `streamChatModelEvents()`, `AnthropicToolsOutputParser`, `Profiles`) and **`ChatOllama`** + `OllamaEmbeddings` (native NDJSON protocol) ported + tested. OpenAI Responses API is **input side only** (request converters and tool converters, WP-16a). Not done: Responses OUTPUT side, `azure/`, hosted tools (web_search/computer_use/shell/…) — WP-16b/17; OpenAI model `profiles`; Anthropic `extract_generated_files` and prompt caching helpers; every other provider. |
 | `utils/http` | ✅ | `HttpClient` seam, `GuzzleHttpClient`, `HttpResponse`, `HttpException`, `SseParser` |
 | `tests/Integration` | ✅ | The `integration` testsuite was declared in `phpunit.xml` and scripted in `composer.json` while `tests/Integration/` did not exist and CI ran only `--testsuite unit` — configuration that looked like coverage and was not. It now holds real boundary-crossing tests (a full Guzzle stack + PSR-7 streams driving both provider clients) and CI runs it. |
 
@@ -84,11 +86,11 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 |---|---|---|
 | `channels` | ✅ | `BaseChannel`, LastValue, LastValueAfterFinish, AnyValue, Ephemeral, NamedBarrier, BinaryOperatorAggregate, Topic, Untracked, Overwrite + registry |
 | `errors` | ✅ | Full set: `BaseLangGraphError`, `EmptyChannelError`, `InvalidUpdateError`, `GraphBubbleUp`, `GraphRecursionError`, `GraphValueError`, `GraphDrained`, `GraphInterrupt`, `NodeInterrupt`, `EmptyInputError`, `NodeError`, `ParentCommand` + type guards |
-| `state` | ✅ | `Annotation`/`AnnotationRoot`, `StateGraph`, `CompiledStateGraph` |
-| `pregel` | ✅ | **The core.** `Algorithm` (applyWrites, prepareNextTasks, prepareSingleTask, procInput, localRead/Write, scratchpad, shouldInterrupt, candidateNodes), `PregelLoop` as a `\Generator`, `PregelRunner`, `IO`, `PregelNode`, `ChannelRead`/`ChannelWrite`, `Send`/`Command`, retry policy, `MemorySaver`, `interrupt()` |
-| `graph` | 🟡 | `MessagesReducer`, `MessagesAnnotation`, `RemoveMessage` handling and `pushMessage` ported with their upstream tests (`LangGraph\Graph\*`). Still open: `Graph` (the low-level builder), `MessageGraph`, drawing |
+| `state` | ✅ | `Annotation`/`AnnotationRoot`, `StateGraph` (now extends `Graph\Graph`), `CompiledStateGraph` (extends `Graph\CompiledGraph`). `StateGraph` parity items (addSequence, validation, node error handlers) are WP-05 |
+| `pregel` | ✅ | **The core.** `Algorithm` (applyWrites, prepareNextTasks, prepareSingleTask, procInput, localRead/Write, scratchpad, shouldInterrupt, candidateNodes), `PregelLoop` as a `\Generator`, `PregelRunner`, `IO`, `PregelNode`, `ChannelRead`/`ChannelWrite`, `Send`/`Command`, retry policy, `MemorySaver`, `interrupt()`. WP-08a: `messages` and `tools` stream modes (`Pregel\Messages\*`, `Pregel\Debug`); chunks are `[mode, payload]`. Not ported: `custom`/`checkpoints`/`tasks` modes, the streamEvents v3 protocol layer (WP-08b) |
+| `graph` | 🟡 | `MessagesReducer`, `MessagesAnnotation`, `pushMessage`, and (WP-04) the low-level `Graph`, `CompiledGraph`, `Branch` and `MessageGraph`. Still open: `StateGraph` parity (WP-05) and drawing / `getGraph` (WP-06) |
 | `func` | ⬜ | `entrypoint`/`task` |
-| `prebuilt` | ⬜ | `createReactAgent`, `ToolNode` — **the next big item**; `bindTools`, `ToolNode`'s `BaseToolkit`/`ToolRuntime`, and both provider clients now exist |
+| `prebuilt` | 🟡 | WP-02: `ToolNode`, `toolsCondition`, `AgentName` (add/remove/withAgentName), `CommandPassthroughTool`. **`createReactAgent` is not ported** (WP-03) |
 | `interrupt` | ✅ | Options parity: replayed resume values, interrupt id from the namespace hash, response schema, nested-subgraph resume, multiple interrupts per node; `checkpointer: false` on a subgraph now opts it out of its parent's saver (`Pregel::$checkpointerDisabled`) |
 | `constants`, `hash`, `utils` | ✅ | `Constants`; `LangGraph\Utils\Hash` (XXH3-128, checked against a Node run of upstream's `hash.ts`); `LangGraph\Utils\{Utils,RunnableCallable}` (`patchConfigurable`, `prefixGenerator`, `gatherIterator`) |
 
@@ -101,15 +103,17 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 | `MemorySaver` | ✅ | Serialises on write, so it doubles as the serde's integration test |
 | `serde` (`Serialization`, `JsonPlusSerializer`) | ✅ | The `lc:2` envelope: constructor records, `DeltaSnapshot`, `Send` packets, `undefined`, byte strings, LangChain `lc:1` objects, circular-reference replacement, and an inert-by-default reviver |
 | `sqlite` saver | ✅ | PDO, WAL, `checkpoints`/`writes` schema, `before`/`limit`/metadata-filter in SQL |
-| `postgres` / `redis` / `mongodb` savers | ⬜ | |
+| `postgres` saver | ✅ | WP-09a: `LangGraph\Checkpoint\Postgres\{PostgresSaver,Sql,Migrations}` over PDO. The shared saver spec passed against a real Postgres 17; in CI it is **env-gated** on `LANGGRAPH_PG_DSN` (without it, tests probe a local fallback and skip if nothing answers) |
+| `redis` saver | 🟡 | WP-09b: `RedisSaver`, `ShallowRedisSaver`, `RedisUtils`, `PhpRedisClient`, `TtlConfig` behind a `RedisClientInterface` seam. The default suite runs against an **in-memory fake**; a real Redis Stack is exercised only when `LANGGRAPH_REDIS_URL` is set (run once by hand during review, not in CI). `fromCluster` not ported |
+| `mongodb` saver | ⬜ | |
 | LangGraph store + cache (`store/{base,memory,batch,utils}`, `cache/{base,memory}`, Embeddings seam) | ✅ | `LangGraph\Store\*`, `LangGraph\Cache\*`, `LangChain\Embeddings\*`; 117 new tests (store/namespace/cache/utils/vector converted; memory-pollution skipped, JS-only) | InMemoryStore with filters, namespaces listing, vector search; InMemoryCache with TTL; store + cache threaded through Pregel, PregelLoop (cache read/write via BaseCache), StateGraph::compile(['store','cache']) and task configs (configurable `__pregel_store`) |
 
 ## langgraph (client SDK)
 
 | Subsystem | Status | Notes |
 |---|---|---|
-| `client` (REST) | ⬜ | |
-| `runs`, `threads`, `stores`, `assistants` clients | ⬜ | |
+| `client` (REST) | 🟡 | WP-23a: `LangGraph\Sdk\{Client,BaseClient,Schema}` over a `MethodHttpClient` seam. Runs client, `joinStream`/`stream()`, `streamWithRetry`, signals: ⬜ (WP-23b) |
+| `threads`, `assistants`, `store`, `crons` clients | 🟡 | WP-23a: `AssistantsClient` (`getGraph` is spelled `getAssistantGraph`), `ThreadsClient` (no `joinStream`/`stream()`), `StoreClient`, `CronsClient`; 149 tests. **`runs` client ⬜** (WP-23b) |
 | `sdk-react` / `vue` / `svelte` / `angular` | ⛔ | Browser UI bindings. No PHP analogue exists; porting them would mean inventing a frontend. |
 | `langgraph-cli` / `langgraph-api` | ⛔ | Python toolchain and codegen server. Not a TypeScript SDK. |
 
@@ -545,6 +549,18 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 
 ---
 | **`AsyncBatchedStore` forwards every call at once as a one-operation batch** | Upstream coalesces concurrent calls into one batch; with synchronous execution results are identical but the batch count differs, so upstream's "should batch concurrent calls" assertion became a forwarding test. |
+| **WP-04 `Graph` base: bare falsy branch answers mean "go nowhere"** | `Branch::destinations` treats `null`/`false`/`''`/`[]` as no destination (upstream throws for a bare null) to preserve existing `StateGraph` behaviour. `StateGraph::compile` does not call `Graph::validate()`; `Graph::validate` raises `GraphValueError` with `UNREACHABLE_NODE`; `console.warn` sites go to `Notice::record`. |
+| **WP-08a `messages` stream: chunks arrive per superstep, not per token** | `PregelRunner` is synchronous, so messages chunks surface after each superstep (before that step's updates). Envelope is `[mode, payload]`, not `[namespace, mode, payload]`; v3 is selected via `options['version']`; `usage_metadata` is read from `kwargs`; `StreamProtocolMessagesHandler` never emits `message-finish.usage`. |
+| **WP-15 `streamEvents`/`streamLog` are partial** | Event order across runs follows single-threaded generator pulls, not async interleaving. Chain runs open only in the base `stream()` and at the root; nested overriders and `invoke()`-reached steps are untraced; `RunnableParallel` children untraced; a root sequence reports only the last step's chunks; no `signal`/`timeout`; no `dispatchCustomEvent` from a lambda; no retriever runnable; `undefined` and `null` collapse; `RunLogPatchApplier` supports add/replace/remove only. |
+| **WP-12a `PartialJsonParser` gaps** | Truncated literals (`[t`, `nul`) and a lone `-` throw where upstream yields true/false/null/-0; a string cut inside a `\u` escape keeps its backslash. `Uuid` v1 pins the clock on a regression where upstream drops the node. `Env` reports runtime `php` and false for browser/Deno/Node. |
+| **WP-12b concurrency, abort and ambient state** | `AsyncCaller` `maxConcurrency` is stored but calls are serial; the abort signal is a cooperative callable; `AsyncLocalStorage` is a process-global synchronous stack, not Fiber-isolated, and runnables do not yet read it; `JsonPatch` never mutates the caller document; duplex `observe` and `AsyncCaller::fetch` are not ported. |
+| **WP-14 structured query value semantics** | `Utils::isFilterEmpty` treats `[]` as the empty filter; `strcmp` orders UTF-8 bytes where JS orders UTF-16 units; the abstract-property visitors are plain public arrays; the `"constructor" in Comparators` prototype quirk is not reproduced. |
+| **WP-09a/09b savers: SQL and Redis adaptations** | Postgres uses `?` placeholders and base64 inside JSON aggregates (PDO limits) and falls back to the checkpoint's own `channelVersions` when `put()` gets none. Redis: sequential blob writes, `list()` returns a list, `checkpoint_ts` is a monotonic microsecond clock, the metadata filter always runs after the search, index-error matching is case-insensitive, bytes are stored base64. |
+| **WP-16a Responses input converters only** | No output-side converters, azure, or hosted tools; the summary fold and `toResponseInputItems` are reimplementations; `formatToolChoice()` returns `null` for string choices (omit `tool_choice`). |
+| **WP-18a Anthropic v1 content and stream events** | Opt-in `outputVersion: 'v1'`; `stream()` chunks are not converted, only `streamChatModelEvents()` yields standard blocks (plain arrays, no `ChatModelStream`); abort signals not ported; Zod interop replaced by JSON Schema; the tools parser falls back to `AIMessage::toolCalls`. |
+| **WP-19c ChatOllama** | Terminal metadata chunk is folded into the aggregate but not yielded by `stream()`; usage lives at `response_metadata['usage_metadata']`; tool-call `index` is always 0; `handleLLMNewToken` only for non-empty tokens; no Standard Schema invalid-output checks, `AbortSignal`, or embeddings retry. |
+| **WP-23a SDK core: serial, cooperative, no runs** | `maxConcurrency` stored but unused; `AbortSignal` never aborts an in-flight request; read de-duplication only coalesces callers inside Fibers; per-request `timeoutMs=null` cannot disable the transport timeout; no `runs` client, `UiClient`, or streaming (WP-23b). |
+| **WP-02 `ToolNode` callbacks** | A nested `RunnableLambda` opens no chain run in this port, so the nested-callback test expects 1 start where upstream expects 2. `ToolMessage` has no `status` field, so status travels in `additional_kwargs['status']`. |
 | **Store namespace sort approximates JS `localeCompare`** | Case-insensitive then lowercase-first; ICU is not guaranteed in PHP, so punctuation ordering may differ. |
 | **Store `compareValues` compares arrays by value** | JS compares by reference; int and float are one number, as in JS. |
 | **Store and cache calls are synchronous** | No `Promise.all`; `embedDocuments`/`embedQuery` run in order. |

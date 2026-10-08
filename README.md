@@ -75,17 +75,15 @@ it is in JS.
 ## Quick start
 
 ```php
-use LangChain\Messages\HumanMessage;
-use LangChain\OpenAI\ChatOpenAI;
+use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
 use LangChain\Prompts\ChatPromptTemplate;
-use LangChain\Runnables\RunnableInterface;
 
 $prompt = ChatPromptTemplate::fromMessages([
     ['system', 'You are a helpful assistant.'],
     ['human', '{question}'],
 ]);
 
-$model = new ChatOpenAI(model: 'gpt-4o-mini');
+$model = new ChatOpenAI(['model' => 'gpt-4o-mini']);
 
 $chain = $prompt->pipe($model);
 
@@ -97,10 +95,23 @@ echo $response->content;
 
 ## Port status
 
-Coverage is tracked per subsystem in [`PORT_STATUS.md`](./PORT_STATUS.md), which
-is regenerated as the port progresses. The test suite is the source of truth:
-every ported module ships with its converted tests, and `composer test` must be
-green for a subsystem to be called complete.
+Coverage is tracked per subsystem in [`PORT_STATUS.md`](./PORT_STATUS.md). The test
+suite is the source of truth: every ported module ships with its converted tests, and
+`composer test` must be green for a subsystem to be called complete. **The SDK port is not
+complete**; the table summarises, `PORT_STATUS.md` has the evidence and the known
+non-exact behaviours.
+
+| Area | State | Notes |
+|---|---|---|
+| Messages, runnables (LCEL), prompts, output parsers, tools, tracers | Ported | `streamEvents`/`streamLog` are partial |
+| Chat models | Partial | `ChatOpenAI` (Chat Completions), `ChatAnthropic`, `ChatOllama`; OpenAI Responses API is input side only |
+| Structured query, text splitters, embeddings seam | Ported | `OllamaEmbeddings` is the only concrete embeddings class; no vector stores |
+| Pregel engine, channels, `StateGraph`, `Graph`, `MessageGraph` | Ported | `StateGraph` parity and drawing still open |
+| Prebuilt | Partial | `ToolNode`, `toolsCondition`; `createReactAgent` not yet |
+| Checkpointers | Partial | Memory, SQLite, Postgres (env-gated in CI), Redis (tested against a fake client); no MongoDB |
+| Store and cache | Ported | In-memory store and cache |
+| LangGraph client SDK | Partial | assistants, threads, store, crons; no runs client or streaming |
+| UI bindings (`sdk-react` etc.) | Out of scope | Browser-only |
 
 ---
 
@@ -109,23 +120,39 @@ green for a subsystem to be called complete.
 ```
 src/
   LangChain/
-    Utils/         Promise, Await, Observable, env, json, context
-    Messages/      BaseMessage + Human/AI/System/Tool/Function, content blocks
-    Schema/        Document, PromptValue
-    Runnables/     Runnable, Sequence, Parallel, Branch, Lambda, Binding, Assign, Passthrough
-    Prompts/       Prompt templates, chat prompt templates
-    LanguageModels/ BaseChatModel, BaseLLM
-    OutputParsers/ String, JSON, structured
-    Tools/         StructuredTool, DynamicTool, ToolNode
-    Tracers/       Callback managers, LangSmith-compatible tracer
-    DocumentLoaders/, TextSplitters/, VectorStores/, Embeddings/
+    Embeddings/      Embeddings interface, OllamaEmbeddings
+    LanguageModels/  BaseChatModel, BaseLLM, Outputs/
+      Chat/          OpenAI/, Anthropic/, Ollama/
+    Load/            Serializable
+    Messages/        BaseMessage + Human/AI/System/Tool/Function, content blocks
+    OutputParsers/   String, JSON, structured, OpenAITools/
+    Prompts/         Prompt templates, chat prompt templates
+    Runnables/       Runnable, Sequence, Parallel, Branch, Lambda, Binding, Assign, Passthrough
+    Schema/          Document, PromptValue
+    StructuredQuery/ Query IR, visitors, translators
+    TextSplitters/   Character, Recursive, Markdown, Latex, language tables
+    Tools/           StructuredTool, DynamicTool, BaseToolkit, ToolRuntime
+    Tracers/         Callback managers, tracers, event-stream and log-stream handlers
+    Utils/           Promise, Await, Observable, env, JSON patch, AsyncCaller, ...
+      Http/          HttpClient seam, Guzzle client, SSE parser
+      Testing/       Fakes
   LangGraph/
-    Channels/      BaseChannel, LastValue, BinaryOperatorAggregate, Topic, ...
-    State/         StateGraph, CompiledStateGraph
-    Pregel/        algo, loop, read, write, checkpoint, runner
-    Checkpoint/    BaseCheckpointSaver, MemorySaver, SqliteSaver
-    Prebuilt/      createReactAgent, ToolNode
-    Func/          entrypoint API
+    Cache/           BaseCache, InMemoryCache
+    Channels/        BaseChannel, LastValue, BinaryOperatorAggregate, Topic, ...
+    Checkpoint/      BaseCheckpointSaver, MemorySaver, SqliteSaver
+      Postgres/      PostgresSaver
+      Redis/         RedisSaver, ShallowRedisSaver
+      Serde/         JsonPlusSerializer
+    Errors/          Interrupts, recursion and update errors
+    Graph/           Graph, CompiledGraph, Branch, MessageGraph, messages reducer
+    Prebuilt/        ToolNode, toolsCondition, agentName
+    Pregel/          algo, loop, read, write, runner, retry
+      Checkpoint/    Engine-side saver contract
+      Messages/      messages / tools stream handlers
+    Sdk/             LangGraph API client (assistants, threads, store, crons)
+    State/           Annotation, StateGraph, CompiledStateGraph
+    Store/           BaseStore, InMemoryStore
+    Utils/           Hash, helpers
 ```
 
 ---
