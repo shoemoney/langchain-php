@@ -587,7 +587,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **5537** |
+| **Total so far** | | **8974** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
@@ -665,7 +665,7 @@ camelCase AND snake_case spellings, and with code separated from prose:
 
 | --- | --- | --- | --- |
 | `withListeners` | 0 | `with_listener`, `listeners`, `configFactor`, `config_factor` all **0** | **CONFIRMED absent** — 401's `grep -rn configFactor src/ -> 0` reproduces |
-| `streamEvents` | 0 | `streamEvents` 2, `streamEvent` 7 — all a docblock stating it is *not* a `streamEvents` entry point, plus `handleChatModelStreamEvent` (a LangSmith callback) and `preferChatModelStreamEvents` (a handler flag) | **CONFIRMED absent** |
+| `streamEvents` | 0 | `streamEvents` 2, `streamEvent` 7 — all a docblock stating it is *not* a `streamEvents` entry point, plus `handleChatModelStreamEvent` (a LangSmith callback) and `preferChatModelStreamEvents` (a handler flag) | **CONFIRMED absent** — superseded 2026-10-08: ADDED by WP-15 |
 | `getGraph` | 0 | `toDot` 1 — a docblock citing langsmith's `convertToDottedOrderFormat`, not graph DOT | **CONFIRMED absent** |
 
 **The three method names are genuinely missing. What was missing was the METHOD, and that is the part worth
@@ -686,7 +686,7 @@ reports on purpose — each says what is missing and what it would need, not why
 | `pick(keys)` | `pipe(new RunnablePick(keys))`; `pipe()` already exists | one small class | **ADDED** — `RunnablePick` |
 | `withRetry({stopAfterAttempt, onFailedAttempt})` | `class RunnableRetry extends RunnableBinding` + attempt counting | one subclass | **ADDED** — `RunnableRetry` |
 | `withListeners({onStart,onEnd,onError})` | `configFactories` — a per-call config callback. The port's `RunnableBinding` holds a STATIC config array and there is no factory concept (`grep -rn configFactor src/` → 0) | needs a new concept on a class four paths depend on | **OPEN** |
-| `streamEvents` | taps a registered `streamEventsHandler` off the run manager and drives `tapOutputIterable` (`base.ts:534-539`) — needs both a handler class and a tap mechanism on the callback manager | largest runnable-level item | **OPEN** |
+| `streamEvents` | taps a registered `streamEventsHandler` off the run manager and drives `tapOutputIterable` (`base.ts:534-539`) — needs both a handler class and a tap mechanism on the callback manager | largest runnable-level item | **ADDED** — `Runnable::streamEvents` (v2) + `Runnable::streamLog`, with `EventStreamCallbackHandler` / `LogStreamCallbackHandler` (WP-15, 2026-10-08) |
 | `getGraph()` | `new Graph()` (`:587`) — a graph-diagram (DOT) subsystem | out of scope for a runtime port | **OPEN — proposed for the documented-unported list** |
 | `assign(mapping)` | `pipe(new RunnableMap(...))` | **NOT A GAP — corrected at 446.** The port already ships `public static function assign(array $mapping): RunnableAssign` on `RunnablePassthrough` (`RunnablePassthrough.php:55`), which is the faithful equivalent of upstream's `static assign` (`passthrough.ts:143`) and is covered by 9 assertions in `RunnablePassthroughTest`. Upstream ALSO has the instance `Runnable.assign()` at `base.ts:636`, and 446 implemented it — which produced a load-time `Fatal error: Cannot make non static method Runnable::assign() static in RunnablePassthrough`. TypeScript permits a static and an instance method of the same name in a hierarchy; **PHP does not**, and `RunnablePassthrough extends Runnable`. Since the static form is already faithful and covered, the instance form is not portable and the addition was reverted | **NOT ABSENT** — reachable as `RunnablePassthrough::assign()` |
 
