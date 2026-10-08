@@ -11,6 +11,9 @@ use LangGraph\Cache\BaseCache;
 use LangGraph\Channels\ChannelRegistry;
 use LangGraph\Errors\EmptyInputError;
 use LangGraph\Pregel\Checkpoint\BaseCheckpointSaver;
+use LangGraph\Pregel\Messages\StreamMessagesHandler;
+use LangGraph\Pregel\Messages\StreamProtocolMessagesHandler;
+use LangGraph\Pregel\Messages\StreamToolsHandler;
 use LangGraph\Pregel\Retry\RetryPolicy;
 use LangGraph\Store\BaseStore;
 
@@ -154,6 +157,15 @@ class Pregel extends Runnable
 
         $modes = $this->resolveStreamModes();
 
+        // `messages` and `tools` are not produced by the loop: they are callbacks
+        // fired from inside nodes. Their handlers push into the loop once it
+        // exists, which is why the loop is captured by reference.
+        $loop = null;
+        $handlers = $this->streamHandlers($modes, $loop, $config);
+        if ($handlers !== []) {
+            $config = $config->with(['callbacks' => array_merge($config->callbacks, $handlers)]);
+        }
+
         $loop = PregelLoop::initialize([
             'input' => $validInput,
             'config' => $config,
@@ -172,23 +184,38 @@ class Pregel extends Runnable
         ]);
 
         $loop->streamModes = $modes;
+        $loop->traceNodes = $handlers !== [];
 
         return $loop->run($this->inputChannels);
     }
 
     /**
-     * The stream modes this port can actually produce.
+     * The stream modes the loop itself produces.
      *
      * Upstream's `StreamMode` union (`pregel/types.ts`) declares eight — `values`,
-     * `updates`, `debug`, `messages`, `checkpoints`, `tasks`, `custom`, `tools`. Only
-     * the first two are emitted here, because the other six require mode payloads
-     * this port does not build. That is ported-subsystem scope, not a patch, and it
-     * is named here so the gap is a declared constant rather than something a caller
-     * discovers by receiving an empty stream.
+     * `updates`, `debug`, `messages`, `checkpoints`, `tasks`, `custom`, `tools`. The loop
+     * emits three; `messages` and `tools` come from callback handlers
+     * ({@see self::HANDLER_STREAM_MODES}); `checkpoints`, `tasks` and `custom` need payloads
+     * this port does not build. That is ported-subsystem scope, not a patch, and it is named
+     * here so the gap is a declared constant rather than something a caller discovers by
+     * receiving an empty stream.
      *
      * @var list<string>
      */
     public const SUPPORTED_STREAM_MODES = ['updates', 'values', 'debug'];
+
+    /**
+     * Modes produced by a callback handler rather than by the loop.
+     *
+     * `messages` (token and node-output messages, {@see StreamMessagesHandler})
+     * and `tools` (tool lifecycle events, {@see StreamToolsHandler}). Kept apart
+     * from {@see self::SUPPORTED_STREAM_MODES} because that constant is the set
+     * the LOOP emits and is pinned as such; {@see self::resolveStreamModes()}
+     * accepts the union.
+     *
+     * @var list<string>
+     */
+    public const HANDLER_STREAM_MODES = ['messages', 'tools'];
 
     /**
      * Validate the configured modes and normalise to a list.
@@ -207,21 +234,60 @@ class Pregel extends Runnable
     {
         $modes = array_values(array_map(strval(...), (array) $this->streamMode));
 
-        $unsupported = array_values(array_diff($modes, self::SUPPORTED_STREAM_MODES));
+        $supported = array_merge(self::SUPPORTED_STREAM_MODES, self::HANDLER_STREAM_MODES);
+        $unsupported = array_values(array_diff($modes, $supported));
         if ($unsupported !== []) {
             throw new \InvalidArgumentException(sprintf(
                 'Unsupported stream mode(s): %s. This port emits %s; the remaining upstream modes '
                 . '(%s) are not implemented. Requesting one would otherwise produce an empty stream '
                 . 'with no error.',
                 implode(', ', $unsupported),
-                implode(', ', self::SUPPORTED_STREAM_MODES),
+                implode(', ', $supported),
                 implode(', ', array_diff([
                     'values', 'updates', 'debug', 'messages', 'checkpoints', 'tasks', 'custom', 'tools',
-                ], self::SUPPORTED_STREAM_MODES)),
+                ], $supported)),
             ));
         }
 
         return $modes;
+    }
+
+    /**
+     * The callback handlers that produce the `messages` and `tools` modes.
+     *
+     * Port of the "set up messages stream mode" and "set up tools stream mode"
+     * blocks of `_streamIterator`. Each handler gets a sink that narrows
+     * upstream's `[namespace, mode, payload]` chunk to this port's
+     * `[mode, payload]` envelope: the namespace is dropped because `stream()`
+     * does not surface subgraph chunks, and the payload keeps its shape, so a
+     * `messages` chunk is `['messages', [message, metadata]]`.
+     *
+     * `$config->options['version'] === 'v3'` selects the protocol-event handler,
+     * as `options.version` does upstream.
+     *
+     * @param list<string> $modes
+     * @return list<object>
+     */
+    private function streamHandlers(array $modes, ?PregelLoop &$loop, RunnableConfig $config): array
+    {
+        $handlers = [];
+
+        if (in_array('messages', $modes, true)) {
+            $sink = static function (array $chunk) use (&$loop): void {
+                $loop?->emit([$chunk[2]], 'messages');
+            };
+            $handlers[] = ($config->options['version'] ?? null) === 'v3'
+                ? new StreamProtocolMessagesHandler($sink)
+                : new StreamMessagesHandler($sink);
+        }
+
+        if (in_array('tools', $modes, true)) {
+            $handlers[] = new StreamToolsHandler(static function (array $chunk) use (&$loop): void {
+                $loop?->emit([$chunk[2]], 'tools');
+            });
+        }
+
+        return $handlers;
     }
 
     /**
