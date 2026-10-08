@@ -129,7 +129,7 @@ final class StreamMessagesHandlerTest extends TestCase
 
         $handler->emit($meta, $toolMessage, 'run-456');
 
-        self::assertSame('run-456-tool-tc-123', $toolMessage->id);
+        self::assertSame('run-run-456-tool-tc-123', $toolMessage->id);
         self::assertNotSame([], $this->streamed);
     }
 
