@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Prebuilt\Supervisor;
 
-use LangChain\LanguageModels\BaseChatModel;
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableInterface;
 use LangGraph\Pregel\Constants;
@@ -98,7 +97,8 @@ final class Supervisor
         $allTools = [...array_values($params['tools'] ?? []), ...$handoffTools];
 
         $supervisorLlm = $llm;
-        if ($llm instanceof BaseChatModel) {
+        // A chat model with `bindTools()`; duck-typed because LangGraph must not import a provider namespace.
+        if ($llm instanceof RunnableInterface && method_exists($llm, 'bindTools')) {
             $supervisorLlm = in_array($llm->getName(), self::PROVIDERS_WITH_PARALLEL_TOOL_CALLS_PARAM, true)
                 ? $llm->bindTools($allTools, ['parallel_tool_calls' => false])
                 : $llm->bindTools($allTools);
