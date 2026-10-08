@@ -83,13 +83,13 @@ final class AssistantsClientTest extends TestCase
         ], $http->lastRequestBody());
     }
 
-    public function testGetGraphSendsXrayAsAQueryParameter(): void
+    public function testGetAssistantGraphSendsXrayAsAQueryParameter(): void
     {
         $t = new RecordingTransport([FakeHttpClient::json(200, ['nodes' => [], 'edges' => []])]);
         $client = new AssistantsClient(['apiKey' => null], $t);
 
-        $graph = $client->getGraph('asst_1', ['xray' => 2]);
-        $client->getGraph('asst_1');
+        $graph = $client->getAssistantGraph('asst_1', ['xray' => 2]);
+        $client->getAssistantGraph('asst_1');
 
         $this->assertSame(['nodes' => [], 'edges' => []], $graph);
         $this->assertSame('GET', $t->requests[0]['method']);

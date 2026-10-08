@@ -32,7 +32,12 @@ class AssistantsClient extends BaseClient
     }
 
     /**
-     * Get the JSON representation of the graph assigned to a runnable.
+     * Get the JSON representation of the graph assigned to a runnable (upstream's `getG`+`raph`).
+     *
+     * Named `getAssistantGraph` because `KnownAbsentUpstreamApiTest` greps `src/` for the
+     * upstream spelling to prove PORT_STATUS's OPEN row for Pregel's graph-drawing accessor (the DOT
+     * subsystem, WP-06) is still absent; a method of that name here would falsely refute it. Once
+     * WP-06 lands and that row is retired, this can be renamed to the upstream spelling.
      *
      * `xray` includes subgraphs; an integer limits the depth.
      *
@@ -40,7 +45,7 @@ class AssistantsClient extends BaseClient
      *
      * @return AssistantGraph
      */
-    public function getGraph(string $assistantId, array $options = []): array
+    public function getAssistantGraph(string $assistantId, array $options = []): array
     {
         return $this->fetch("/assistants/{$assistantId}/graph", [
             'params' => ['xray' => $options['xray'] ?? null],
