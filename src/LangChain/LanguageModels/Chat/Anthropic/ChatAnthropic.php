@@ -8,6 +8,8 @@ use LangChain\LanguageModels\Chat\NormalisesProviderOptions;
 use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageInputs;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageOutputs;
+use LangChain\LanguageModels\Chat\Anthropic\Utils\Standard;
+use LangChain\LanguageModels\Chat\Anthropic\Utils\StreamEvents;
 use LangChain\LanguageModels\Outputs\ChatGeneration;
 use LangChain\LanguageModels\Outputs\ChatGenerationChunk;
 use LangChain\LanguageModels\Outputs\ChatResult;
@@ -153,6 +155,7 @@ class ChatAnthropic extends BaseChatModel
         $this->timeout = isset($fields['timeout']) ? (float) $fields['timeout'] : $this->timeout;
         $this->maxRetries = (int) ($fields['maxRetries'] ?? $this->maxRetries);
         $this->httpClient = $fields['httpClient'] ?? $this->httpClient;
+        $this->outputVersion = isset($fields['outputVersion']) ? (string) $fields['outputVersion'] : $this->outputVersion;
 
         if ($this->apiKey === null) {
             $env = getenv('ANTHROPIC_API_KEY');
@@ -241,6 +244,12 @@ class ChatAnthropic extends BaseChatModel
                     (string) ($choice['name'] ?? ''),
                 ));
             }
+        }
+
+        // Forwarded as a top-level request field (automatic prompt caching), call options only.
+        $cacheControl = $options['cache_control'] ?? $options['cacheControl'] ?? null;
+        if (is_array($cacheControl)) {
+            $params['cache_control'] = $cacheControl;
         }
 
         if (($extra['streaming'] ?? false) === true) {
@@ -383,6 +392,10 @@ class ChatAnthropic extends BaseChatModel
         $payload = $this->post($params);
         $message = MessageOutputs::responseToMessage($payload);
 
+        if ($this->outputVersion === 'v1') {
+            $message = $this->toStandardMessage($message);
+        }
+
         $generationInfo = array_filter(
             ['stop_reason' => $payload['stop_reason'] ?? null],
             static fn (mixed $v): bool => $v !== null,
@@ -422,6 +435,46 @@ class ChatAnthropic extends BaseChatModel
         // could not represent was sent as an EMPTY BODY and came back as an
         // opaque 400 from the provider — local data loss disguised as a remote
         // API error. The cast is exactly what hid it.
+        foreach ($this->rawEventStream($params) as $event) {
+            yield from $this->consume([$event], $runManager);
+        }
+    }
+
+    /**
+     * The conversion `_streamChatModelEvents`: the same request as a plain
+     * stream, but the raw Anthropic events come back as typed
+     * `ChatModelStreamEvent` arrays (see {@see StreamEvents}).
+     *
+     * @param list<BaseMessage>    $messages
+     * @param array<string, mixed> $options
+     *
+     * @return \Generator<int, array<string, mixed>>
+     */
+    public function streamChatModelEvents(array $messages, array $options = []): \Generator
+    {
+        $params = $this->invocationParams($options, ['streaming' => true]);
+        $converted = MessageInputs::convert($messages);
+        if (isset($converted['system'])) {
+            $params['system'] = $converted['system'];
+        }
+        $params['messages'] = $converted['messages'];
+
+        yield from StreamEvents::convertAnthropicStream(
+            $this->rawEventStream($params),
+            ['streamUsage' => $this->streamUsage ?? $options['streamUsage'] ?? true],
+        );
+    }
+
+    /**
+     * Open the stream and yield each decoded SSE event, retrying request
+     * establishment (never after the first byte) as documented on the class.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return \Generator<int, array<string, mixed>>
+     */
+    private function rawEventStream(array $params): \Generator
+    {
         $body = Js::encode($params);
         $attempt = 0;
 
@@ -432,45 +485,28 @@ class ChatAnthropic extends BaseChatModel
             try {
                 $raw = $this->http()->postStream($this->url(), $this->headers(), $body, [], $this->timeout);
 
-                // The drain lives inside the `try`: `postStream()` is a generator
-                // function, so calling it runs none of its body and a `try`
-                // around the call alone never sees a connect failure or a
-                // non-2xx status.
                 foreach ($raw as $bytes) {
                     if ($bytes !== '') {
                         $delivered = true;
                     }
 
-                    yield from $this->consume($this->decode($parser->feed($bytes)), $runManager);
+                    yield from $this->decode($parser->feed($bytes));
                 }
 
-                yield from $this->consume($this->decode($parser->flush()), $runManager);
+                yield from $this->decode($parser->flush());
 
                 return;
             } catch (AnthropicException $e) {
                 throw $e;
             } catch (HttpException $e) {
-                // Retry establishment only. Once a byte is out the stream is
-                // committed — reconnecting would repeat tokens the caller has
-                // already been handed.
                 $retryable = !$delivered && ($e->status === 0 || $e->status === 429 || $e->status >= 500);
 
                 if (!($retryable && $attempt++ < $this->maxRetries)) {
-                    // `previous` attached for the same reason as on the eager
-                    // path: "status 0" does not say the connection was
-                    // *refused*, and a transport failure is exactly when the
-                    // cause is wanted.
                     throw AnthropicException::fromResponse($e->body, $e->status, $this->url(), previous: $e);
                 }
 
                 $this->backoff($attempt);
             } catch (\Throwable $e) {
-                // `HttpClient` is a public interface, so a third-party transport
-                // may raise anything. Letting a bare exception from one escape
-                // means a caller catching `AnthropicException` — the only type
-                // these clients document — silently misses it. Retrying is
-                // deliberately NOT attempted: only a status says whether the
-                // failure was transient.
                 throw new AnthropicException(
                     'The HTTP transport raised ' . $e::class . ': ' . $e->getMessage(),
                     0,
@@ -482,20 +518,30 @@ class ChatAnthropic extends BaseChatModel
     }
 
     /**
-     * Decode `data:` payloads into events.
-     *
-     * The SSE parser yields the raw payload text; the event *type* lives inside
-     * that JSON rather than in the `event:` field, so decoding here is enough
-     * to drive the state machine without tracking two parallel framings.
-     *
-     * A payload that is not JSON is fatal rather than skipped: a stream that has
-     * silently dropped an event is a stream that has silently dropped part of
-     * the answer, and the only evidence is the malformed payload itself.
-     *
-     * @param \Generator<int, string> $payloads
-     *
-     * @return \Generator<int, array<string, mixed>>
+     * `outputVersion: 'v1'`: re-express a response's content as standard blocks.
      */
+    private function toStandardMessage(\LangChain\Messages\AIMessage $message): \LangChain\Messages\AIMessage
+    {
+        return new \LangChain\Messages\AIMessage([
+            'content' => Standard::toStandardContent($message->content, $message->toolCalls),
+            'tool_calls' => $message->toolCalls,
+            'invalid_tool_calls' => $message->invalidToolCalls,
+            'additional_kwargs' => $message->additional_kwargs,
+            'response_metadata' => ['output_version' => 'v1'] + $message->response_metadata,
+            'id' => $message->id,
+        ]);
+    }
+
+    /**
+     * The capability profile for this model (`[]` when unknown).
+     *
+     * @return array<string, int|bool>
+     */
+    public function profile(): array
+    {
+        return Profiles::for($this->model);
+    }
+
     private function decode(\Generator $payloads): \Generator
     {
         foreach ($payloads as $payload) {
@@ -533,7 +579,7 @@ class ChatAnthropic extends BaseChatModel
      *
      * @return \Generator<int, ChatGenerationChunk>
      */
-    private function consume(\Generator $events, ?CallbackManagerForLLMRun $runManager): \Generator
+    private function consume(iterable $events, ?CallbackManagerForLLMRun $runManager): \Generator
     {
         foreach ($events as $event) {
             // `message_start` and `message_delta` carry usage, which is the
