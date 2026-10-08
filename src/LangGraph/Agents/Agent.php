@@ -29,7 +29,7 @@ namespace LangGraph\Agents;
  *    JSON Schema array; a state schema with a reducer is an `AnnotationRoot`);
  *  - `middleware`: middleware made with {@see Middleware::create()}, outermost first;
  *  - `checkpointer`, `store`: persistence (a saver / `true` for a subgraph, and a `BaseStore`);
- *  - `responseFormat`: structured output (WP-21c);
+ *  - `responseFormat`: structured output (a schema, or a strategy from `Responses\ResponseFormats`);
  *  - `name`, `description`: the agent's name (stamped on its AI messages) and description;
  *  - `includeAgentName`: `"inline"` to put the agent name into the message text the model sees;
  *  - `signal`: an abort signal (a callable returning `true`/a throwable once aborted, or an object with `aborted`);

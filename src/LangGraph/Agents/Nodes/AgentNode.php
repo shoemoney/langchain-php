@@ -13,7 +13,13 @@ use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableInterface;
 use LangChain\Tools\StructuredTool;
 use LangGraph\Agents\Errors\MiddlewareError;
+use LangGraph\Agents\Errors\MultipleStructuredOutputsError;
+use LangGraph\Agents\Errors\StructuredOutputParsingError;
 use LangGraph\Agents\Middleware\Utils as MiddlewareUtils;
+use LangGraph\Agents\Model;
+use LangGraph\Agents\Responses\ProviderStrategy;
+use LangGraph\Agents\Responses\ResponseFormats;
+use LangGraph\Agents\Responses\ToolStrategy;
 use LangGraph\Agents\RunnableCallable;
 use LangGraph\Agents\Runtime;
 use LangGraph\Agents\Utils as AgentUtils;
@@ -38,8 +44,7 @@ use LangGraph\Pregel\Command;
  *  - `shouldReturnDirect`: names of the tools whose result ends the run (a list of names, or a name-keyed map);
  *  - `includeAgentName`: `"inline"` to fold the agent name into message text for the model;
  *  - `name`: the agent name, stamped on every AI message (defaults to `model`);
- *  - `responseFormat`: structured output configuration. The strategies behind it (`toolStrategy`,
- *    `providerStrategy`) are WP-21c, so setting one raises when the model is called;
+ *  - `responseFormat`: structured output configuration (a schema, a strategy from {@see ResponseFormats}, or a list);
  *  - `middleware`: the agent's middleware (used to know whether a `wrapToolCall` exists);
  *  - `signal`: an abort signal (callable returning true/throwable once aborted, or an object with `aborted`);
  *  - `wrapModelCallHookMiddleware`: the middleware that define `wrapModelCall`, in order. An entry may also be
@@ -187,13 +192,8 @@ final class AgentNode extends RunnableCallable
             // Check if the LLM already has bound tools and throw if it does.
             AgentUtils::validateLLMHasNoBoundTools($request['model'] ?? null);
 
-            if (($request['responseFormat'] ?? null) !== null) {
-                throw new \LogicException(
-                    'Structured responses (responseFormat) are not available yet: toolStrategy/providerStrategy belong to WP-21c.',
-                );
-            }
-
-            $modelWithTools = $this->bindTools($request['model'], $request);
+            $structuredResponseFormat = $this->getResponseFormat($request['model'], $request['responseFormat'] ?? null);
+            $modelWithTools = $this->bindTools($request['model'], $request, $structuredResponseFormat);
 
             // Prepend the system message to the messages if it is not empty.
             $messages = [
@@ -209,7 +209,52 @@ final class AgentNode extends RunnableCallable
 
             $lastAiMessage = $response;
 
-            return $response;
+            // The user asked for a native schema output: try to parse the response and return the structured response if valid.
+            if ($structuredResponseFormat !== null && $structuredResponseFormat['type'] === 'native') {
+                $strategy = $structuredResponseFormat['strategy'];
+                $structuredResponse = $response instanceof AIMessage ? $strategy->parse($response) : null;
+                if ($structuredResponse !== null) {
+                    return ['structuredResponse' => $structuredResponse, 'messages' => [$response]];
+                }
+
+                // A terminal response (no tool calls) that fails the schema is an error, not a silent exit with no
+                // structured response. With tool calls the loop continues and a later step gets another chance.
+                if (self::toolCallsOfResponse($response) === []) {
+                    $schemaTitle = \is_string($strategy->schema['title'] ?? null) ? $strategy->schema['title'] : 'providerStrategy';
+
+                    throw new StructuredOutputParsingError($schemaTitle, ['Model output did not satisfy the provided response schema.']);
+                }
+
+                return $response;
+            }
+
+            if ($structuredResponseFormat === null || self::toolCallsOfResponse($response) === []) {
+                return $response;
+            }
+
+            $toolCalls = array_values(array_filter(
+                self::toolCallsOfResponse($response),
+                static fn (array $call): bool => isset($structuredResponseFormat['tools'][$call['name'] ?? '']),
+            ));
+
+            // No structured tool calls: the response is returned as is.
+            if ($toolCalls === []) {
+                return $response;
+            }
+
+            // Several structured tool calls is not defined/supported.
+            if (\count($toolCalls) > 1) {
+                return $this->handleMultipleStructuredOutputs($response, $toolCalls, $structuredResponseFormat);
+            }
+
+            $toolStrategy = $structuredResponseFormat['tools'][$toolCalls[0]['name']];
+
+            return $this->handleSingleStructuredOutput(
+                $response,
+                $toolCalls[0],
+                $structuredResponseFormat,
+                $toolStrategy->options['toolMessageContent'] ?? null,
+            );
         };
 
         $wrapperMiddleware = (array) ($this->options['wrapModelCallHookMiddleware'] ?? []);
@@ -456,13 +501,54 @@ final class AgentNode extends RunnableCallable
      *
      * @param array<string, mixed> $preparedOptions the request
      */
-    private function bindTools(RunnableInterface $model, array $preparedOptions): RunnableInterface
+    private function bindTools(RunnableInterface $model, array $preparedOptions, ?array $structuredResponseFormat = null): RunnableInterface
     {
-        $allTools = array_values((array) ($preparedOptions['tools'] ?? $this->options['toolClasses'] ?? []));
+        $structuredTools = array_values($structuredResponseFormat['tools'] ?? []);
 
-        $options = (array) ($preparedOptions['modelSettings'] ?? []);
+        // The request's tools if provided, otherwise the agent's, plus the tools that carry the structured output.
+        $allTools = [
+            ...array_values((array) ($preparedOptions['tools'] ?? $this->options['toolClasses'] ?? [])),
+            ...array_map(static fn (ToolStrategy $strategy): array => $strategy->tool, $structuredTools),
+        ];
+
+        // With structured tools the tool choice is "any", so the model has to call one of them.
         $toolChoice = $preparedOptions['toolChoice'] ?? null;
-        if ($toolChoice !== null && $toolChoice !== '') {
+        if ($toolChoice === null || $toolChoice === '') {
+            $toolChoice = $structuredTools !== [] ? 'any' : null;
+        }
+
+        $modelSettings = (array) ($preparedOptions['modelSettings'] ?? []);
+        $options = [];
+
+        // The user asked for a native schema output.
+        if ($structuredResponseFormat !== null && $structuredResponseFormat['type'] === 'native') {
+            $strategy = $structuredResponseFormat['strategy'];
+            $resolvedStrict = $modelSettings['strict'] ?? $strategy->strict;
+
+            $options = [
+                // OpenAI-style options: ChatOpenAI, ChatXAI and other OpenAI-compatible providers.
+                'response_format' => [
+                    'type' => 'json_schema',
+                    'json_schema' => [
+                        'name' => $strategy->schema['name'] ?? 'extract',
+                        ...(\is_string($strategy->schema['description'] ?? null) ? ['description' => $strategy->schema['description']] : []),
+                        'schema' => $strategy->schema,
+                        'strict' => $resolvedStrict,
+                    ],
+                ],
+                // Anthropic-style options.
+                'outputConfig' => ['format' => ['type' => 'json_schema', 'schema' => $strategy->schema]],
+                // Google-style options.
+                'responseSchema' => $strategy->schema,
+                // For LangSmith structured output tracing.
+                'ls_structured_output_format' => ['kwargs' => ['method' => 'json_schema'], 'schema' => $strategy->schema],
+            ];
+            // Don't force strict on tools: it makes Anthropic's combined grammar "too complex for compilation",
+            // and only OpenAI Chat Completions needs it (re-applied there). An explicit override is in modelSettings.
+        }
+
+        $options = [...$options, ...$modelSettings];
+        if ($toolChoice !== null) {
             $options['tool_choice'] = $toolChoice;
         }
 
@@ -472,6 +558,145 @@ final class AgentNode extends RunnableCallable
         return ($this->options['includeAgentName'] ?? null) === 'inline'
             ? WithAgentName::withAgentName($modelWithTools, 'inline')
             : $modelWithTools;
+    }
+
+    /**
+     * The response format primitives for the given model and the response format the user provided.
+     *
+     * A tool selection yields a name-keyed map of tool strategies; a native schema (or a model that supports JSON
+     * schema output) yields a single provider strategy.
+     *
+     * @return array{type: 'tool', tools: array<string, ToolStrategy>}|array{type: 'native', strategy: ProviderStrategy}|null
+     */
+    private function getResponseFormat(mixed $model, mixed $responseFormat): ?array
+    {
+        if ($responseFormat === null || $responseFormat === false) {
+            return null;
+        }
+
+        $resolvedModel = $model;
+        if (Model::isConfigurableModel($model)) {
+            $resolvedModel = $model->getModelInstance();
+        }
+
+        $strategies = ResponseFormats::transformResponseFormat($responseFormat, null, $resolvedModel);
+
+        if ($strategies === []) {
+            return null;
+        }
+
+        // Either a list of provider strategies or a list of tool strategies.
+        $isProviderStrategy = true;
+        foreach ($strategies as $strategy) {
+            $isProviderStrategy = $isProviderStrategy && $strategy instanceof ProviderStrategy;
+        }
+
+        if (!$isProviderStrategy) {
+            $tools = [];
+            foreach ($strategies as $strategy) {
+                if ($strategy instanceof ToolStrategy) {
+                    $tools[$strategy->name()] = $strategy;
+                }
+            }
+
+            return ['type' => 'tool', 'tools' => $tools];
+        }
+
+        // There can only be one provider strategy.
+        return ['type' => 'native', 'strategy' => $strategies[0]];
+    }
+
+    /**
+     * The model returned several structured outputs: hand the error to the strategy's `handleError`.
+     *
+     * @param list<array<string, mixed>> $toolCalls
+     * @param array{type: 'tool', tools: array<string, ToolStrategy>} $responseFormat
+     */
+    private function handleMultipleStructuredOutputs(AIMessage|AIMessageChunk $response, array $toolCalls, array $responseFormat): Command
+    {
+        $error = new MultipleStructuredOutputsError(array_map(static fn (array $call): string => (string) $call['name'], $toolCalls));
+
+        return $this->handleToolStrategyError($error, $response, $toolCalls[0], $responseFormat);
+    }
+
+    /**
+     * The model returned a single structured output: parse it into the structured response and a message to the LLM.
+     *
+     * @param array<string, mixed> $toolCall
+     * @param array{type: 'tool', tools: array<string, ToolStrategy>} $responseFormat
+     * @return array{structuredResponse: mixed, messages: list<BaseMessage>}|Command
+     */
+    private function handleSingleStructuredOutput(
+        AIMessage|AIMessageChunk $response,
+        array $toolCall,
+        array $responseFormat,
+        ?string $lastMessage = null,
+    ): array|Command {
+        $tool = $responseFormat['tools'][$toolCall['name']];
+
+        try {
+            $structuredResponse = $tool->parse((array) ($toolCall['args'] ?? []));
+
+            return [
+                'structuredResponse' => $structuredResponse,
+                'messages' => [
+                    $response,
+                    new ToolMessage([
+                        'tool_call_id' => $toolCall['id'] ?? '',
+                        'content' => json_encode($structuredResponse, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE),
+                        'name' => $toolCall['name'],
+                    ]),
+                    new AIMessage($lastMessage ?? 'Returning structured response: ' . json_encode($structuredResponse, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)),
+                ],
+            ];
+        } catch (StructuredOutputParsingError $error) {
+            return $this->handleToolStrategyError($error, $response, $toolCall, $responseFormat);
+        }
+    }
+
+    /**
+     * Decide, from the first tool strategy's `handleError`, whether a structured output error is retried or raised.
+     *
+     * `false` raises the error; `true`/unset retries with the error message; a string retries with that string; a
+     * callable retries with the string it returns for the error. A retry is a Command back to the model node.
+     *
+     * @param array<string, mixed> $toolCall
+     * @param array{type: 'tool', tools: array<string, ToolStrategy>} $responseFormat
+     */
+    private function handleToolStrategyError(
+        StructuredOutputParsingError|MultipleStructuredOutputsError $error,
+        AIMessage|AIMessageChunk $response,
+        array $toolCall,
+        array $responseFormat,
+    ): Command {
+        // The `handleError` of the first tool strategy is enough: all entries built from one list share it.
+        $first = $responseFormat['tools'] === [] ? null : $responseFormat['tools'][array_key_first($responseFormat['tools'])];
+        $errorHandler = $first?->options['handleError'] ?? null;
+
+        $toolCallId = $toolCall['id'] ?? null;
+        if ($toolCallId === null || $toolCallId === '') {
+            throw new \Exception('Tool call ID is required to handle tool output errors. Please provide a tool call ID.');
+        }
+
+        // Default behavior is to retry; only an explicit `false` throws.
+        if ($errorHandler === false) {
+            throw $error;
+        }
+
+        $content = $error->getMessage();
+        if (\is_string($errorHandler)) {
+            $content = $errorHandler;
+        } elseif ($errorHandler instanceof \Closure || (\is_callable($errorHandler) && !\is_array($errorHandler))) {
+            $content = $errorHandler($error);
+            if (!\is_string($content)) {
+                throw new \Exception('Error handler must return a string.');
+            }
+        }
+
+        return new Command(
+            update: ['messages' => [$response, new ToolMessage(['content' => $content, 'tool_call_id' => $toolCallId])]],
+            goto: self::AGENT_NODE_NAME,
+        );
     }
 
     /**
@@ -522,6 +747,16 @@ final class AgentNode extends RunnableCallable
         return self::isAiMessage($response)
             || Command::isCommand($response)
             || (\is_array($response) && \array_key_exists('structuredResponse', $response) && \array_key_exists('messages', $response));
+    }
+
+    /**
+     * The tool calls of a model response (none when it is not an AI message).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function toolCallsOfResponse(mixed $response): array
+    {
+        return self::isAiMessage($response) ? self::toolCallsOf($response) : [];
     }
 
     /**

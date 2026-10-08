@@ -55,7 +55,6 @@ use LangGraph\State\StateGraph;
  *  - a graph run reports chain callbacks (`handleChainStart`/`End`) only through `streamEvents`;
  *  - `version: "v3"` event streaming and stream transformers have no PHP counterpart (there is no transformer
  *    protocol), so `streamTransformers` are accepted and ignored;
- *  - structured responses (`responseFormat`) belong to WP-21c;
  *  - config passed as a {@see RunnableConfig} object overwrites the defaults field by field (an object cannot say
  *    which fields it set), so pass a config array (`['recursionLimit' => 100]`) to override only some.
  */
