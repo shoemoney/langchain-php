@@ -6,6 +6,7 @@ namespace LangGraph\Prebuilt\Swarm;
 
 use LangGraph\Graph\MessagesReducer;
 use LangGraph\Pregel\Constants;
+use LangGraph\Prebuilt\Supervisor\ParentCommandBridge;
 use LangGraph\State\Annotation;
 use LangGraph\State\AnnotationRoot;
 use LangGraph\State\StateGraph;
@@ -100,7 +101,7 @@ final class Swarm
         self::addActiveAgentRouter($builder, ['routeTo' => $agentNames, 'defaultActiveAgent' => $params['defaultActiveAgent']]);
 
         foreach ($agents as $agent) {
-            $builder->addNode($agent->name, $agent, [
+            $builder->addNode($agent->name, ParentCommandBridge::wrap($agent), [
                 'ends' => Handoff::getHandoffDestinations($agent),
                 'subgraphs' => [$agent],
             ]);
