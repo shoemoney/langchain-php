@@ -6,7 +6,6 @@ namespace LangChain\Tests\Unit\Agents;
 
 use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
-use LangChain\Runnables\RunnableConfig;
 use LangChain\Tests\Unit\Agents\Support\AgentAssertions;
 use LangChain\Tests\Unit\Agents\Support\FakeToolCallingModel;
 use LangChain\Tools\Schema;

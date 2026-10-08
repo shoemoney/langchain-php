@@ -6,8 +6,6 @@ namespace LangChain\Tests\Unit\Agents;
 
 use LangChain\LanguageModels\Outputs\ChatResult;
 use LangChain\Messages\AIMessage;
-use LangChain\Messages\BaseMessage;
-use LangChain\Messages\HumanMessage;
 use LangChain\Messages\SystemMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Tests\Unit\Agents\Support\AgentAssertions;

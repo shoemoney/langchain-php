@@ -8,7 +8,6 @@ use LangChain\Messages\AIMessage;
 use LangChain\Messages\AIMessageChunk;
 use LangChain\Messages\ToolMessage;
 use LangChain\Runnables\RunnableConfig;
-use LangChain\Runnables\RunnableInterface;
 use LangGraph\Agents\Middleware\Utils as MiddlewareUtils;
 use LangGraph\Agents\Nodes\AfterAgentNode;
 use LangGraph\Agents\Nodes\AfterModelNode;
