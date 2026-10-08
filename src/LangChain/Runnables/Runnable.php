@@ -6,6 +6,7 @@ namespace LangChain\Runnables;
 
 use LangChain\LanguageModels\BaseLangChain;
 use LangChain\OutputParsers\BaseLLMOutputParser;
+use LangChain\Runnables\Graph\Graph;
 use LangChain\Prompts\BasePromptTemplate;
 use LangChain\Tracers\BaseCallbackHandler;
 use LangChain\Tracers\CallbackManager;
@@ -50,6 +51,67 @@ abstract class Runnable implements RunnableInterface
         $parts = explode('\\', static::class);
 
         return end($parts);
+    }
+
+    /**
+     * A drawable graph of this runnable.
+     *
+     * Port of `Runnable.getGraph`: an input node, this runnable, an output node. A
+     * {@see RunnableSequence} overrides it upstream; here the sequence case lives in this method
+     * because the sequence class is outside this change's reach, with identical results.
+     */
+    public function getGraph(?RunnableConfig $config = null): Graph
+    {
+        if ($this instanceof RunnableSequence) {
+            return $this->sequenceGraph($config);
+        }
+
+        return Graph::ofRunnable($this);
+    }
+
+    /**
+     * The graph of any runnable, including implementers of the interface that are not a {@see Runnable}.
+     */
+    public static function graphOf(RunnableInterface $runnable, ?RunnableConfig $config = null): Graph
+    {
+        return $runnable instanceof self ? $runnable->getGraph($config) : Graph::ofRunnable($runnable);
+    }
+
+    /**
+     * Port of `RunnableSequence.getGraph`: each step's graph, minus the inner input/output nodes, chained.
+     */
+    private function sequenceGraph(?RunnableConfig $config): Graph
+    {
+        /** @var RunnableSequence $this */
+        $graph = new Graph();
+        $currentLastNode = null;
+        $lastIndex = count($this->steps) - 1;
+
+        foreach ($this->steps as $index => $step) {
+            $stepGraph = self::graphOf($step, $config);
+
+            if ($index !== 0) {
+                $stepGraph->trimFirstNode();
+            }
+            if ($index !== $lastIndex) {
+                $stepGraph->trimLastNode();
+            }
+
+            $graph->extend($stepGraph);
+
+            $stepFirstNode = $stepGraph->firstNode();
+            if ($stepFirstNode === null) {
+                throw new \RuntimeException('Runnable ' . $step->getName() . ' has no first node');
+            }
+
+            if ($currentLastNode !== null) {
+                $graph->addEdge($currentLastNode, $stepFirstNode);
+            }
+
+            $currentLastNode = $stepGraph->lastNode();
+        }
+
+        return $graph;
     }
 
     abstract public function invoke(mixed $input, ?RunnableConfig $config = null): mixed;
