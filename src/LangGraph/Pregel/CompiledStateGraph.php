@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
+use LangGraph\Cache\BaseCache;
 use LangGraph\State\StateGraph;
+use LangGraph\Store\BaseStore;
 
 /**
  * A {@see Pregel} graph whose state is declared as a set of channels.
@@ -36,6 +38,8 @@ class CompiledStateGraph extends Pregel
         array $triggerToNodes = [],
         public readonly ?StateGraph $builder = null,
         bool $checkpointerDisabled = false,
+        ?BaseStore $store = null,
+        ?BaseCache $cache = null,
     ) {
         parent::__construct(
             nodes: $nodes,
@@ -52,6 +56,8 @@ class CompiledStateGraph extends Pregel
             interruptAfter: $interruptAfter,
             description: $description,
             checkpointerDisabled: $checkpointerDisabled,
+            store: $store,
+            cache: $cache,
         );
     }
 }

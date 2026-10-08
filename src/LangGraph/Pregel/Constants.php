@@ -79,6 +79,12 @@ final class Constants
 
     public const CONFIG_KEY_DURABILITY = '__pregel_durability';
 
+    /** The long-term {@see \LangGraph\Store\BaseStore} a task reads and writes. */
+    public const CONFIG_KEY_STORE = '__pregel_store';
+
+    /** A per-call {@see \LangGraph\Cache\BaseCache} that overrides the graph's own. */
+    public const CONFIG_KEY_CACHE = '__pregel_cache';
+
     public const CONFIG_KEY_CHECKPOINT_ID = 'checkpoint_id';
 
     public const CONFIG_KEY_CHECKPOINT_NS = 'checkpoint_ns';
@@ -164,6 +170,8 @@ final class Constants
             self::CONFIG_KEY_READ,
             self::CONFIG_KEY_CHECKPOINTER,
             self::CONFIG_KEY_DURABILITY,
+            self::CONFIG_KEY_STORE,
+            self::CONFIG_KEY_CACHE,
             self::CONFIG_KEY_STREAM,
             self::CONFIG_KEY_RESUMING,
             self::CONFIG_KEY_TASK_ID,

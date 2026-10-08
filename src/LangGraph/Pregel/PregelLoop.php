@@ -7,6 +7,7 @@ namespace LangGraph\Pregel;
 use LangChain\Runnables\RunnableConfig;
 use LangGraph\Channels\BaseChannel;
 use LangGraph\Channels\ChannelRegistry;
+use LangGraph\Cache\BaseCache;
 use LangGraph\Errors\EmptyInputError;
 use LangGraph\Errors\GraphInterrupt;
 use LangGraph\Errors\GraphRecursionError;
@@ -15,6 +16,8 @@ use LangGraph\Pregel\Checkpoint\BaseCheckpointSaver;
 use LangGraph\Pregel\Checkpoint\Checkpoint;
 use LangGraph\Pregel\Checkpoint\CheckpointFunctions;
 use LangGraph\Pregel\Checkpoint\CheckpointTuple;
+use LangGraph\Store\AsyncBatchedStore;
+use LangGraph\Store\BaseStore;
 
 /**
  * The superstep loop, expressed as a PHP generator.
@@ -83,6 +86,8 @@ class PregelLoop
         public array $tasks = [],
         public array $toInterrupt = [],
         public ?array $updatedChannels = null,
+        public ?AsyncBatchedStore $store = null,
+        public ?BaseCache $cache = null,
     ) {
     }
 
@@ -203,6 +208,16 @@ class PregelLoop
         $stop = $step + $config->recursionLimit + 1;
         $checkpointPreviousVersions = $checkpoint->channelVersions;
 
+        // The store reaches every task through the config, so a subgraph run as a node inherits it
+        // (upstream `config.store ?? this.store`). It is added to the loop's own copy of the config
+        // only: the checkpointer config above and the caller's config never carry it.
+        $store = ($params['store'] ?? null) instanceof BaseStore ? new AsyncBatchedStore($params['store']) : null;
+        if ($store !== null) {
+            $store->start();
+            $config = clone $config;
+            $config->configurable[Constants::CONFIG_KEY_STORE] = $store;
+        }
+
         $loop = new self(
             input: $params['input'] ?? null,
             config: $config,
@@ -226,6 +241,8 @@ class PregelLoop
             debug: (bool) ($params['debug'] ?? false),
             triggerToNodes: $params['triggerToNodes'] ?? [],
             status: ['status' => 'pending'],
+            store: $store,
+            cache: $params['cache'] ?? null,
         );
         $loop->hasPersistedParent = $hasPersistedParent;
 
@@ -732,6 +749,39 @@ class PregelLoop
         if ($this->tasks !== []) {
             $this->outputWrites($taskId, $writesCopy);
         }
+
+        $this->cacheTaskWrites($taskId, $writesCopy);
+    }
+
+    /**
+     * Remember a finished task's writes under its cache key.
+     *
+     * Port of the tail of `putWrites`. Only a task that declared a cache policy
+     * has a key, and only a successful one is cached: a task that errored or
+     * interrupted must run again.
+     *
+     * @param list<array{0: string, 1: mixed}> $writes
+     */
+    private function cacheTaskWrites(string $taskId, array $writes): void
+    {
+        if ($this->cache === null || $this->tasks === []) {
+            return;
+        }
+
+        $task = $this->tasks[$taskId] ?? null;
+        if ($task === null || $task->cacheKey === null) {
+            return;
+        }
+
+        if ($writes[0][0] === Constants::ERROR || $writes[0][0] === Constants::INTERRUPT) {
+            return;
+        }
+
+        $this->cache->set([[
+            'key' => [$task->cacheKey['ns'], $task->cacheKey['key']],
+            'value' => $task->writes,
+            'ttl' => $task->cacheKey['ttl'],
+        ]]);
     }
 
     /**
@@ -828,40 +878,44 @@ class PregelLoop
     }
 
     /**
+     * Fill cacheable tasks from the node cache.
+     *
+     * Port of `_matchCachedWrites`. A task is looked up only when it has a cache
+     * key and no writes yet; a hit copies the cached writes onto the task, which
+     * then never runs.
+     *
      * @return list<PregelExecutableTask> Tasks whose writes came from the cache.
      */
     public function matchCachedWrites(): array
     {
-        $matched = [];
+        if ($this->cache === null) {
+            return [];
+        }
+
+        $keys = [];
+        $keyMap = [];
         foreach ($this->tasks as $task) {
             if ($task->cacheKey !== null && $task->writes === []) {
-                $key = self::serializeCacheKey($task->cacheKey['ns'], $task->cacheKey['key']);
-                if (isset($this->writeCache[$key])) {
-                    $task->writes = $this->writeCache[$key];
-                    $matched[] = $task;
-                }
+                $fullKey = [$task->cacheKey['ns'], $task->cacheKey['key']];
+                $keys[] = $fullKey;
+                $keyMap[self::serializeCacheKey($fullKey[0], $fullKey[1])] = $task;
+            }
+        }
+
+        if ($keys === []) {
+            return [];
+        }
+
+        $matched = [];
+        foreach ($this->cache->get($keys) as $hit) {
+            $task = $keyMap[self::serializeCacheKey($hit['key'][0], $hit['key'][1])] ?? null;
+            if ($task !== null) {
+                array_push($task->writes, ...$hit['value']);
+                $matched[] = $task;
             }
         }
 
         return $matched;
-    }
-
-    /** @var array<string, list<array{0: string, 1: mixed}>> */
-    private array $writeCache = [];
-
-    /**
-     * Seed the node-output cache.
-     *
-     * Port of the `cache` option on `Pregel`. Keyed by the task's cache key, so
-     * a repeated node with identical input skips execution entirely.
-     *
-     * @param array<string, list<array{0: string, 1: mixed}>> $entries
-     */
-    public function setWriteCache(array $entries): void
-    {
-        foreach ($entries as $key => $writes) {
-            $this->writeCache[$key] = $writes;
-        }
     }
 
     /**

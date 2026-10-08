@@ -967,6 +967,14 @@ final class Algorithm
             'checkpoint_id' => null,
             'checkpoint_ns' => $taskCheckpointNamespace,
         ]);
+
+        // Store injection (upstream `store: extra.store ?? config.store`): the loop publishes its
+        // store on the config it runs under, and every task, subgraph included, receives it here.
+        // It is spelled out rather than left to the merge above so the handoff is visible.
+        if (($configurable[Constants::CONFIG_KEY_STORE] ?? null) !== null) {
+            $taskConfig->configurable[Constants::CONFIG_KEY_STORE] = $configurable[Constants::CONFIG_KEY_STORE];
+        }
+
         return $taskConfig;
     }
 
