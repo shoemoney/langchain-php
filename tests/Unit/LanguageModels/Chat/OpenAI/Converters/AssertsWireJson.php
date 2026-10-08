@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\LanguageModels\Chat\OpenAI\Converters;
 
 use LangChain\Utils\Js;
+use LangChain\Utils\Notice;
 
 /**
  * Compare converter output as the JSON the API would read, not as PHP arrays.
@@ -22,25 +23,17 @@ trait AssertsWireJson
     }
 
     /**
-     * Run a callable and collect the E_USER_WARNINGs it raises (the port's `console.warn`).
+     * Run a callable and collect the notices it records (the port's `console.warn`).
      *
      * @return list<string>
      */
     protected static function captureWarnings(callable $fn): array
     {
-        $warnings = [];
-        set_error_handler(static function (int $no, string $msg) use (&$warnings): bool {
-            $warnings[] = $msg;
+        Notice::clear();
+        $fn();
+        $notices = Notice::notices();
+        Notice::clear();
 
-            return true;
-        }, E_USER_WARNING);
-
-        try {
-            $fn();
-        } finally {
-            restore_error_handler();
-        }
-
-        return $warnings;
+        return $notices;
     }
 }

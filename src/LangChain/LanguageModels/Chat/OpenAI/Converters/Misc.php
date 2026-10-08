@@ -6,6 +6,7 @@ namespace LangChain\LanguageModels\Chat\OpenAI\Converters;
 
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\ChatMessage;
+use LangChain\Utils\Notice;
 
 /**
  * Small helpers the Responses converters share.
@@ -14,9 +15,9 @@ use LangChain\Messages\ChatMessage;
  * side of `converters/responses.ts` calls: prompt-cache breakpoints, the
  * reasoning-model test, filename lookup and the message-to-role map.
  *
- * `console.warn` has no PHP counterpart that tests can observe, so a warning is
- * an `E_USER_WARNING`. A caller who wants silence installs an error handler;
- * the default is loud, which is what an unsupported role deserves.
+ * `console.warn` is recorded with {@see Notice::record()}: an `E_USER_WARNING`
+ * would fail any suite that runs with `failOnWarning`, for a condition upstream
+ * only logs.
  */
 final class Misc
 {
@@ -153,7 +154,7 @@ final class Misc
 
     public static function warn(string $message): void
     {
-        trigger_error($message, E_USER_WARNING);
+        Notice::record($message);
     }
 
     /**
