@@ -163,7 +163,7 @@ final class ToolNodeCommandsTest extends TestCase
         self::assertSame('2', $sends[1]->args['messages'][0]->toolCallId);
     }
 
-    public function testAToolReturningABareSendIsRoutedAsACommandWithThatGoto(): void
+    public function testAToolReturningABareSendIsEncodedIntoASuccessToolMessage(): void
     {
         $fanOut = tool(
             static fn (): Send => new Send('worker', ['n' => 1]),
@@ -172,8 +172,11 @@ final class ToolNodeCommandsTest extends TestCase
 
         $result = (new ToolNode([$fanOut]))->invoke([self::ai(self::call('fan_out', [], 'f1'))]);
 
-        self::assertInstanceOf(Command::class, $result[0]);
-        self::assertSame('worker', $result[0]->gotoList()[0]->node);
+        self::assertInstanceOf(ToolMessage::class, $result[0]);
+        self::assertSame('f1', $result[0]->toolCallId);
+        self::assertSame('fan_out', $result[0]->name);
+        self::assertStringContainsString('worker', (string) $result[0]->content);
+        self::assertStringContainsString('"n":1', (string) $result[0]->content);
     }
 
     public function testAParentCommandFromAToolReachesTheEngineThroughAGraph(): void

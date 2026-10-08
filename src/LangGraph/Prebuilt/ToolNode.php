@@ -93,9 +93,6 @@ class ToolNode extends RunnableCallable
                 $output = $capture->invoke($toolCall, $toolConfig);
                 if ($capture->didCapture) {
                     $raw = $capture->captured;
-                    if ($raw instanceof Send) {
-                        return new Command(goto: [$raw]);
-                    }
                     if (Command::isCommand($raw)) {
                         return Command::fromMixed($raw);
                     }
@@ -105,15 +102,16 @@ class ToolNode extends RunnableCallable
                 }
             } else {
                 $output = $tool->invoke($toolCall, $toolConfig);
-                if ($output instanceof Send) {
-                    return new Command(goto: [$output]);
-                }
                 if (Command::isCommand($output)) {
                     return Command::fromMixed($output);
                 }
             }
 
             if ($output instanceof ToolMessage) {
+                if (!$tool instanceof StructuredTool) {
+                    return $output;
+                }
+
                 return self::describe($output, $toolName, 'success', $call);
             }
 
