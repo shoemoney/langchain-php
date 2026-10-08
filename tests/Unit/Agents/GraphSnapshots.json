@@ -1,0 +1,2108 @@
+{
+ "A beforeAgent: [ 'tools' ], A afterAgent: [ 'end' ], A before: [ 'model' ], A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareA_after_agent",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "MiddlewareA_before_model"
+   ],
+   "MiddlewareA_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "MiddlewareA_after_agent"
+   ],
+   "MiddlewareA_after_agent": [
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: [ 'tools' ], A afterAgent: [ 'end' ], A before: [ 'model' ], A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareA_after_agent",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "MiddlewareA_before_model",
+    "tools"
+   ],
+   "MiddlewareA_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "MiddlewareA_after_agent"
+   ],
+   "MiddlewareA_after_agent": [
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: [ 'tools' ], A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: [ 'model' ], B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "MiddlewareB_before_agent",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "MiddlewareB_before_agent"
+   ],
+   "MiddlewareB_before_agent": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: [ 'tools' ], A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: [ 'model' ], B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "MiddlewareB_before_agent",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "MiddlewareB_before_agent",
+    "tools"
+   ],
+   "MiddlewareB_before_agent": [
+    "model_request"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: [ 'tools' ], A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: [ 'tools' ], A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "model_request",
+    "tools"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: [ 'tools', 'model', 'end' ], A afterAgent: [ 'tools', 'model', 'end' ], A before: [ 'tools' ], A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareA_after_agent",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "MiddlewareA_before_model",
+    "model_request",
+    "MiddlewareA_after_agent"
+   ],
+   "MiddlewareA_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "MiddlewareA_after_agent"
+   ],
+   "MiddlewareA_after_agent": [
+    "__end__",
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: [ 'tools', 'model', 'end' ], A afterAgent: [ 'tools', 'model', 'end' ], A before: [ 'tools' ], A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_agent",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareA_after_agent",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_agent"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_agent": [
+    "MiddlewareA_before_model",
+    "tools",
+    "model_request",
+    "MiddlewareA_after_agent"
+   ],
+   "MiddlewareA_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "MiddlewareA_after_agent"
+   ],
+   "MiddlewareA_after_agent": [
+    "__end__",
+    "tools",
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: [ 'model' ], A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_agent",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_agent"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_agent": [
+    "__end__",
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: [ 'model' ], A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_agent",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "model_request": [
+    "tools",
+    "MiddlewareA_after_agent"
+   ],
+   "MiddlewareA_after_agent": [
+    "__end__",
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: [ 'tools' ], A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: [ 'model' ], B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_agent",
+   "MiddlewareB_after_agent",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_agent"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_after_agent": [
+    "MiddlewareA_after_agent",
+    "model_request"
+   ],
+   "MiddlewareA_after_agent": [
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: [ 'tools' ], A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: [ 'model' ], B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_agent",
+   "MiddlewareB_after_agent",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "model_request": [
+    "tools",
+    "MiddlewareB_after_agent"
+   ],
+   "MiddlewareB_after_agent": [
+    "MiddlewareA_after_agent",
+    "model_request"
+   ],
+   "MiddlewareA_after_agent": [
+    "__end__",
+    "tools"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'end' ], A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'end' ], B after: [ 'model' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'end' ], A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'end' ], B after: [ 'model' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request",
+    "__end__"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model' ], A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model' ], A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "model_request"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "model_request"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model', 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'model', 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "tools"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: [ 'model', 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: [ 'tools' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: [ 'model', 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: [ 'tools' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "tools"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "tools"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "tools"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'model' ], B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "tools",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model' ], A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: [ 'model' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "model_request"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model' ], A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: [ 'model' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "tools",
+    "model_request"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model', 'end' ], A after: [ 'tools', 'model', 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools', 'model', 'end' ], B after: [ 'tools', 'model', 'end' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model', 'end' ], A after: [ 'tools', 'model', 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools', 'model', 'end' ], B after: [ 'tools', 'model', 'end' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "MiddlewareB_before_model",
+    "tools",
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_before_model": [
+    "model_request",
+    "tools",
+    "__end__"
+   ],
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "tools",
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model', 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'tools', 'model', 'end' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request",
+    "__end__"
+   ],
+   "MiddlewareB_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [ 'tools', 'model', 'end' ], A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'tools', 'model', 'end' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_before_model": [
+    "model_request",
+    "tools",
+    "__end__"
+   ],
+   "MiddlewareB_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [], A after: [] | B beforeAgent: undefined, B afterAgent: undefined, B before: [], B after: [] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "MiddlewareA_before_model",
+    "MiddlewareB_before_model"
+   ],
+   [
+    "MiddlewareB_after_model",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "MiddlewareB_before_model",
+    "model_request"
+   ],
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: [], A after: [] | B beforeAgent: undefined, B afterAgent: undefined, B before: [], B after: [] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_before_model",
+   "MiddlewareA_after_model",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "MiddlewareA_before_model",
+    "MiddlewareB_before_model"
+   ],
+   [
+    "MiddlewareB_after_model",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "MiddlewareB_before_model",
+    "model_request"
+   ],
+   [
+    "__start__",
+    "MiddlewareA_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareA_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'tools' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'tools' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "tools"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'end' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'tools' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'tools' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "tools"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'model' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: [ 'model' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_after_model": [
+    "MiddlewareA_after_model",
+    "model_request"
+   ],
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'tools' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'tools', 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: [ 'tools', 'model' ] | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareA_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "MiddlewareA_after_model"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareA_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: [ 'model' ] | tools: false": {
+  "nodes": [
+   "__start__",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareB_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_before_model": [
+    "model_request"
+   ],
+   "MiddlewareB_after_model": [
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: [ 'tools' ], B after: [ 'model' ] | tools: true": {
+  "nodes": [
+   "__start__",
+   "MiddlewareB_before_model",
+   "MiddlewareB_after_model",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "MiddlewareB_before_model"
+   ],
+   [
+    "model_request",
+    "MiddlewareB_after_model"
+   ],
+   [
+    "tools",
+    "MiddlewareB_before_model"
+   ]
+  ],
+  "conditional": {
+   "MiddlewareB_before_model": [
+    "model_request",
+    "tools"
+   ],
+   "MiddlewareB_after_model": [
+    "tools",
+    "model_request",
+    "__end__"
+   ]
+  }
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: false": {
+  "nodes": [
+   "__start__",
+   "model_request",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "model_request",
+    "__end__"
+   ]
+  ],
+  "conditional": {}
+ },
+ "A beforeAgent: undefined, A afterAgent: undefined, A before: undefined, A after: undefined | B beforeAgent: undefined, B afterAgent: undefined, B before: undefined, B after: undefined | tools: true": {
+  "nodes": [
+   "__start__",
+   "model_request",
+   "tools",
+   "__end__"
+  ],
+  "edges": [
+   [
+    "__start__",
+    "model_request"
+   ],
+   [
+    "tools",
+    "model_request"
+   ]
+  ],
+  "conditional": {
+   "model_request": [
+    "tools",
+    "__end__"
+   ]
+  }
+ }
+}
