@@ -47,8 +47,11 @@ final class Subgraph
      */
     public static function findSubgraphPregel(RunnableInterface $candidate): ?object
     {
+        // An index loop, not `foreach`: a by-value foreach walks a snapshot, so steps appended while
+        // iterating (the nested sequences' steps) would never be visited.
         $candidates = [$candidate];
-        foreach ($candidates as $current) {
+        for ($i = 0; $i < count($candidates); $i++) {
+            $current = $candidates[$i];
             if (self::isPregelLike($current)) {
                 return $current;
             }

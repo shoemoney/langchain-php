@@ -12,6 +12,7 @@ use LangGraph\Channels\EphemeralValue;
 use LangGraph\Channels\LastValue;
 use LangGraph\Channels\LastValueAfterFinish;
 use LangGraph\Channels\NamedBarrierValue;
+use LangGraph\Channels\Overwrite;
 use LangGraph\Errors\Guard;
 use LangGraph\Errors\InvalidUpdateError;
 use LangGraph\Errors\NodeError;
@@ -1129,6 +1130,27 @@ class StateGraph extends Graph
      */
     private function getUpdates(mixed $input, string $nodeKey, array $outputKeys): ?array
     {
+        $updates = $this->collectUpdates($input, $nodeKey, $outputKeys);
+        if ($updates === null) {
+            return null;
+        }
+
+        // `Overwrite` travels to a channel in its wire form, `['__overwrite__' => value]`, which is the
+        // shape the reducing channels recognise.
+        return array_map(
+            static fn (array $tuple): array => $tuple[1] instanceof Overwrite
+                ? [$tuple[0], $tuple[1]->toArray()]
+                : $tuple,
+            $updates,
+        );
+    }
+
+    /**
+     * @param  list<string> $outputKeys
+     * @return list<array{0: string, 1: mixed}>|null
+     */
+    private function collectUpdates(mixed $input, string $nodeKey, array $outputKeys): ?array
+    {
         if ($input === null || $input === []) {
             return null;
         }
@@ -1159,7 +1181,7 @@ class StateGraph extends Graph
                         }
                     }
                 } else {
-                    foreach ($this->getUpdates($item, $nodeKey, $outputKeys) ?? [] as $tuple) {
+                    foreach ($this->collectUpdates($item, $nodeKey, $outputKeys) ?? [] as $tuple) {
                         $updates[] = $tuple;
                     }
                 }
