@@ -71,6 +71,28 @@ final class AgentAssertions
         );
     }
 
+    /**
+     * Run an agent through `stream()` and collect the interrupts it raised.
+     *
+     * `invoke()` returns the state a paused run stopped in; the interrupts themselves ride the `updates` stream
+     * (upstream's `invoke()` also adds them to the result as `__interrupt__`).
+     *
+     * @param array<string, mixed>|\LangGraph\Pregel\Command $input
+     * @param array<string, mixed>                              $config
+     * @return list<array{id: string|null, value: mixed}>
+     */
+    public static function interrupts(\LangGraph\Agents\ReactAgent $agent, array|\LangGraph\Pregel\Command $input, array $config): array
+    {
+        $interrupts = [];
+        foreach ($agent->stream($input, $config) as [$mode, $chunk]) {
+            if ($mode === 'updates' && isset($chunk['__interrupt__'])) {
+                $interrupts = [...$interrupts, ...$chunk['__interrupt__']];
+            }
+        }
+
+        return $interrupts;
+    }
+
     /** @param class-string $class */
     public static function ofType(array $messages, string $class): array
     {
