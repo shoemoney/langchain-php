@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Prebuilt;
 
-use LangChain\LanguageModels\BaseChatModel;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\AIMessageChunk;
 use LangChain\Messages\BaseMessage;
@@ -158,7 +157,7 @@ final class ReactAgent
 
             $model = $isDynamicLlm ? $llm($state, $config) : self::getModel($llm);
 
-            if (!$model instanceof BaseChatModel) {
+            if (!self::isChatModel($model)) {
                 throw new \Exception(sprintf('Expected `llm` to be a ChatModel with .withStructuredOutput() method, got %s', get_debug_type($model)));
             }
 
@@ -496,7 +495,7 @@ final class ReactAgent
             $model = $model->bound;
         }
 
-        if (!$model instanceof BaseChatModel) {
+        if (!self::isChatModel($model)) {
             throw new \Exception(sprintf(
                 'Expected `llm` to be a ChatModel or RunnableBinding (e.g. llm.bind_tools(...)) with invoke() and generate() methods, got %s',
                 get_debug_type($model),
@@ -510,6 +509,18 @@ final class ReactAgent
     private static function isDynamicModel(mixed $llm): bool
     {
         return !$llm instanceof RunnableInterface && is_callable($llm);
+    }
+
+    /**
+     * Port of `_isBaseChatModel`, which upstream does by duck-typing (`"invoke" in model && "_modelType" in model`):
+     * a runnable that reports itself a chat model. It is a duck test here too, so this layer names no class from
+     * `LangChain\LanguageModels` (the graph engine depends on abstractions the runnables define, not on the model tree).
+     */
+    private static function isChatModel(mixed $model): bool
+    {
+        return $model instanceof RunnableInterface
+            && method_exists($model, 'modelType')
+            && $model->modelType() === 'chat';
     }
 
     private static function isClientTool(mixed $tool): bool
@@ -542,7 +553,7 @@ final class ReactAgent
     /** Whether `$step` is something a model can hide behind. */
     private static function isModelStep(mixed $step): bool
     {
-        return $step instanceof RunnableBinding || $step instanceof BaseChatModel || $step instanceof ConfigurableModelInterface;
+        return $step instanceof RunnableBinding || self::isChatModel($step) || $step instanceof ConfigurableModelInterface;
     }
 
     private static function modelStepIndex(RunnableSequence $sequence): ?int
@@ -589,7 +600,7 @@ final class ReactAgent
             return self::boundToolsOf($model->bound);
         }
 
-        if ($model instanceof BaseChatModel) {
+        if (self::isChatModel($model)) {
             $tools = $model->kwargs()['tools'] ?? null;
 
             return is_array($tools) ? array_values($tools) : null;
@@ -601,7 +612,7 @@ final class ReactAgent
     /** @param list<mixed> $toolClasses */
     private static function simpleBindTools(RunnableInterface $llm, array $toolClasses): ?RunnableInterface
     {
-        if ($llm instanceof BaseChatModel && $llm->supportsToolBinding()) {
+        if (self::isChatModel($llm) && $llm->supportsToolBinding()) {
             return $llm->bindTools($toolClasses);
         }
 
