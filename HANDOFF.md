@@ -34,8 +34,8 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **4450 passing, 9998 assertions** |
-| Size | 237 src files / 36,221 lines · 164 test files / 33,989 lines |
+| Tests | **5283 passing, 11003 assertions** |
+| Size | 245 src files / 36,964 lines · 174 test files / 35,922 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
@@ -298,10 +298,11 @@ rather than completing it.
    the seam they plug into, and the shared validation spec already runs against
    two savers — a third should be cheap.
 6. `langgraph/graph` — the low-level `Graph` builder, `MessageGraph`, drawing.
-   `StateGraph` is done; this is the layer under it.
+   `StateGraph` is done; this is the layer under it. (`MessagesReducer` and
+   `MessagesAnnotation` landed in Wave 0 / WP-00.)
 7. `langgraph/func` — the `entrypoint`/`task` API. ⬜
 8. `utils`: `env`, `json_patch`, `function_calling`, `standard_schema`,
-   `tiktoken`. ⬜
+   `tiktoken`. ⬜ (langgraph's own `utils`/`hash` landed in Wave 0 / WP-00.)
 9. `structured_query`, `indexing`, `example_selectors`, `load/import_map`. ⬜
 
 ### Deliberately out of scope
@@ -330,6 +331,8 @@ Each is pinned by a test, documented rather than papered over. See the
   UTF-8 encoding and `json_encode` refuses it outright.
 - `interrupt()` reaches task config through a static restored in `finally`;
   JS uses `AsyncLocalStorage`.
+- `Hash` refuses a non-zero XXH3 seed (PHP's native `xxh128` seeds differently
+  from upstream); LangGraph never passes one.
 - Serde: `undefined` is read (→ `null`) but never written; `RegExp` records stay
   inert; an `Error` revives as `\RuntimeException` (message only); an empty map
   serialises as `[]`.
@@ -338,7 +341,7 @@ Each is pinned by a test, documented rather than papered over. See the
 
 ## Where to start
 
-Recommended order, and why:
+Recommended order, and why. Wave 0 (WP-00: utils/hash, messages reducer, interrupt parity incl. `checkpointer: false`, abstract `CheckpointerSpecCase`) has landed; `Pregel`/`CompiledStateGraph` carry a `checkpointerDisabled` flag set by `StateGraph::compile`. Next is WP-01 per `.loop/COMPLETION_PLAN.md`.
 
 1. **`createReactAgent` + `ToolNode`.** The visible payoff, and every
    dependency now exists. `ToolNode` needs `BaseToolkit` and `ToolRuntime`,

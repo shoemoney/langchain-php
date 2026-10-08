@@ -86,11 +86,11 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 | `errors` | ✅ | Full set: `BaseLangGraphError`, `EmptyChannelError`, `InvalidUpdateError`, `GraphBubbleUp`, `GraphRecursionError`, `GraphValueError`, `GraphDrained`, `GraphInterrupt`, `NodeInterrupt`, `EmptyInputError`, `NodeError`, `ParentCommand` + type guards |
 | `state` | ✅ | `Annotation`/`AnnotationRoot`, `StateGraph`, `CompiledStateGraph` |
 | `pregel` | ✅ | **The core.** `Algorithm` (applyWrites, prepareNextTasks, prepareSingleTask, procInput, localRead/Write, scratchpad, shouldInterrupt, candidateNodes), `PregelLoop` as a `\Generator`, `PregelRunner`, `IO`, `PregelNode`, `ChannelRead`/`ChannelWrite`, `Send`/`Command`, retry policy, `MemorySaver`, `interrupt()` |
-| `graph` | ⬜ | `Graph` (the low-level builder), `MessageGraph`, drawing |
+| `graph` | 🟡 | `MessagesReducer`, `MessagesAnnotation`, `RemoveMessage` handling and `pushMessage` ported with their upstream tests (`LangGraph\Graph\*`). Still open: `Graph` (the low-level builder), `MessageGraph`, drawing |
 | `func` | ⬜ | `entrypoint`/`task` |
 | `prebuilt` | ⬜ | `createReactAgent`, `ToolNode` — **the next big item**; `bindTools`, `ToolNode`'s `BaseToolkit`/`ToolRuntime`, and both provider clients now exist |
-| `interrupt` | 🟡 | `GraphInterrupt`/`NodeInterrupt`/`interrupt()` exist and are thrown by the loop; the resume-with-values path is unported |
-| `constants`, `hash`, `utils` | 🟡 | `Constants` ported; `hash` and `utils` not |
+| `interrupt` | ✅ | Options parity: replayed resume values, interrupt id from the namespace hash, response schema, nested-subgraph resume, multiple interrupts per node; `checkpointer: false` on a subgraph now opts it out of its parent's saver (`Pregel::$checkpointerDisabled`) |
+| `constants`, `hash`, `utils` | ✅ | `Constants`; `LangGraph\Utils\Hash` (XXH3-128, checked against a Node run of upstream's `hash.ts`); `LangGraph\Utils\{Utils,RunnableCallable}` (`patchConfigurable`, `prefixGenerator`, `gatherIterator`) |
 
 ## langgraph-checkpoint
 
@@ -434,6 +434,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | `stream()` is a `\Generator` yielding `[mode, payload]` | The TS loop is an `AsyncGenerator` that `invoke()` awaits and `stream()` yields outward. PHP has one primitive for both, so `invoke()` and `stream()` are the *same* generator and cannot disagree. | `PregelLoop::run()`, `Pregel::stream()` |
 | `interrupt()` reaches the task config through a static | A node body is `fn (array $state) => ...` with no `$config`, and PHP has no `AsyncLocalStorage`. Safe because the engine is synchronous and nested tasks run inside the parent's call stack; the previous value is always restored, including on throw. | `PregelScratchpad::withConfig()` |
 | `_putCheckpoint`'s `exiting` flag is explicit | The TS tests object *identity* (`this.checkpointMetadata === inputMetadata`) to mean "save on the way out". PHP arrays have no identity, so the one caller that means it says so. A false positive would overwrite successive supersteps onto one row and destroy the thread's history. | `PregelLoop::putCheckpoint()` |
+| **`Hash` refuses a non-zero XXH3 seed** | Upstream threads the seed through its own secret handling, which differs from the reference algorithm; PHP's native `xxh128` follows the reference, so seeded digests diverge for inputs of 4+ bytes. Nothing in LangGraph passes a seed, so a seed is refused rather than returning a digest upstream would not. Unseeded digests match byte for byte (lengths 0-600). | `LangGraph\Utils\Hash` |
 | `PregelNode` does not extend `RunnableBinding` | The TS one does, but a `RunnableBinding` requires a bound runnable, and the engine creates nodes with none: `__start__` only publishes input, branch nodes only route. | `PregelNode` |
 | `getWriters()` collapses consecutive `ChannelWrite`s only by *class*, not by the TS `instanceof` symbol | Equivalent here because every writer in this port is a PHP class; there is no cross-realm instance. | `PregelNode::getWriters()` |
 | `TextSplitter` default length function counts UTF-16 code units, not code points | `String.length` in JS is UTF-16; `mb_strlen` diverged on 34/400 emoji cases | `TextSplitters\TextLength::utf16CodeUnits()` |
@@ -578,7 +579,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **4450** |
+| **Total so far** | | **5283** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
