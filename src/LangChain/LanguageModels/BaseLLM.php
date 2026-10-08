@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels;
 
+use LangChain\Caches\BaseCache;
+use LangChain\Caches\InMemoryCache;
+use LangChain\LanguageModels\Outputs\Generation;
 use LangChain\LanguageModels\Outputs\GenerationChunk;
 use LangChain\LanguageModels\Outputs\LLMResult;
 use LangChain\Runnables\RunnableConfig;
@@ -26,6 +29,30 @@ use LangChain\Tracers\Serialized;
  */
 abstract class BaseLLM extends BaseLanguageModel
 {
+    /**
+     * Where finished generations are remembered, keyed by prompt and by the
+     * serialized model parameters. Null disables caching.
+     *
+     * Set with `['cache' => true]` (the process-wide {@see InMemoryCache::global()})
+     * or `['cache' => $someBaseCache]`.
+     */
+    public ?BaseCache $cache = null;
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    public function __construct(array $params = [])
+    {
+        parent::__construct($params);
+
+        $cache = $params['cache'] ?? null;
+        if ($cache instanceof BaseCache) {
+            $this->cache = $cache;
+        } elseif ($cache) {
+            $this->cache = InMemoryCache::global();
+        }
+    }
+
     /** @return list<string> */
     public static function lcNamespace(): array
     {
@@ -108,6 +135,66 @@ abstract class BaseLLM extends BaseLanguageModel
             [],
             $config?->runName,
         );
+        if ($this->cache === null) {
+            return $this->generateUncached($prompts, $options, $runManagers);
+        }
+
+        $llmKey = $this->serializedCacheKeyParametersForCall($options);
+        $generations = [];
+        $missing = [];
+        foreach ($prompts as $index => $prompt) {
+            $cached = $this->cache->lookup($prompt, $llmKey);
+            if (!is_array($cached)) {
+                $missing[] = $index;
+
+                continue;
+            }
+
+            // A hit skips the model but not the run: the run manager still sees
+            // a token and an end event flagged `cached`.
+            $hits = $this->hydrateCachedGenerations($cached);
+            $manager = $runManagers[$index] ?? null;
+            if ($hits !== []) {
+                $manager?->handleLLMNewToken($hits[0]->text);
+            }
+            $manager?->handleLLMEnd(new LLMResult([$hits]), ['cached' => true]);
+            $generations[$index] = $hits;
+        }
+
+        $llmOutput = [];
+        if ($missing !== []) {
+            $fresh = $this->generateUncached(
+                array_map(static fn (int $i): string => $prompts[$i], $missing),
+                $options,
+                $runManagers === null ? null : array_map(static fn (int $i): ?CallbackManagerForLLMRun => $runManagers[$i] ?? null, $missing),
+            );
+            foreach ($fresh->generations as $position => $genList) {
+                $promptIndex = $missing[$position];
+                $generations[$promptIndex] = $genList;
+                $this->cache->update($prompts[$promptIndex], $llmKey, $genList);
+            }
+            $llmOutput = $fresh->llmOutput;
+        }
+
+        ksort($generations);
+
+        return new LLMResult(
+            array_values($generations),
+            $llmOutput,
+            array_map(static fn (object $m): string => $m->runId, $runManagers ?? []),
+        );
+    }
+
+    /**
+     * Run the model for prompts that have no cached answer, ending each prompt's
+     * own run.
+     *
+     * @param list<string>                         $prompts
+     * @param array<string, mixed>                 $options
+     * @param list<CallbackManagerForLLMRun|null>|null $runManagers one per prompt
+     */
+    private function generateUncached(array $prompts, array $options, ?array $runManagers): LLMResult
+    {
         $runManager = $runManagers[0] ?? null;
 
         // See BaseChatModel::dispatchGenerate for why the handler — not the
@@ -117,13 +204,33 @@ abstract class BaseLLM extends BaseLanguageModel
         }
 
         $output = $this->generatePrompts($prompts, $options, $runManager);
-        $output->runIds = array_map(static fn (object $m): string => $m->runId, $runManagers ?? []);
+        $output->runIds = array_map(static fn (object $m): string => $m->runId, array_filter($runManagers ?? []));
 
         foreach ($this->flattenLLMResult($output) as $index => $result) {
             ($runManagers[$index] ?? null)?->handleLLMEnd($result);
         }
 
         return $output;
+    }
+
+    /**
+     * Copies of cached generations, safe to hand to a caller: the cache holds
+     * the very objects an earlier caller received. As upstream does on a hit,
+     * `tokenUsage` is emptied — a cached answer spent no tokens.
+     *
+     * @param array<int, Generation> $cached
+     * @return list<Generation>
+     */
+    private function hydrateCachedGenerations(array $cached): array
+    {
+        $hydrated = [];
+        foreach ($cached as $generation) {
+            $copy = clone $generation;
+            $copy->generationInfo = array_merge($copy->generationInfo, ['tokenUsage' => []]);
+            $hydrated[] = $copy;
+        }
+
+        return $hydrated;
     }
 
     /**
