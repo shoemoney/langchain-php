@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\Utils;
 
 use LangChain\OutputParsers\JsonOutputParser;
-use LangChain\OutputParsers\JsonPatch as OutputParsersJsonPatch;
 use LangChain\Utils\JsonPatch;
 use LangChain\Utils\JsonPatchError;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -20,7 +19,7 @@ use PHPUnit\Framework\TestCase;
  */
 #[CoversClass(JsonPatch::class)]
 #[CoversClass(JsonPatchError::class)]
-#[CoversClass(OutputParsersJsonPatch::class)]
+#[CoversClass(\LangChain\OutputParsers\JsonPatch::class)]
 final class JsonPatchTest extends TestCase
 {
     /**
@@ -465,10 +464,10 @@ final class JsonPatchTest extends TestCase
         $prev = ['a' => 1];
         $next = ['a' => 2, 'b' => 3];
 
-        $this->assertSame(JsonPatch::compare($prev, $next), OutputParsersJsonPatch::compare($prev, $next));
-        $this->assertSame(JsonPatch::deepEquals($prev, $next), OutputParsersJsonPatch::deepEquals($prev, $next));
-        $this->assertSame(JsonPatch::isFalsy([]), OutputParsersJsonPatch::isFalsy([]));
-        $this->assertSame('a~1b', OutputParsersJsonPatch::escapePathComponent('a/b'));
+        $this->assertSame(JsonPatch::compare($prev, $next), \LangChain\OutputParsers\JsonPatch::compare($prev, $next));
+        $this->assertSame(JsonPatch::deepEquals($prev, $next), \LangChain\OutputParsers\JsonPatch::deepEquals($prev, $next));
+        $this->assertSame(JsonPatch::isFalsy([]), \LangChain\OutputParsers\JsonPatch::isFalsy([]));
+        $this->assertSame('a~1b', \LangChain\OutputParsers\JsonPatch::escapePathComponent('a/b'));
     }
 
     public function testNothingOutsideTheAliasStillDefinesItsOwnDiff(): void
