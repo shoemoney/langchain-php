@@ -536,8 +536,11 @@ class Pregel extends Runnable
             return null;
         }
 
+        // An index loop, not `foreach`: the queue grows while it is walked, and PHP's `foreach`
+        // iterates a snapshot, so steps appended below would never be visited.
         $candidates = [$candidate];
-        foreach ($candidates as $current) {
+        for ($i = 0; $i < count($candidates); $i++) {
+            $current = $candidates[$i];
             if ($current instanceof TracedNode) {
                 $current = $current->inner;
             }
