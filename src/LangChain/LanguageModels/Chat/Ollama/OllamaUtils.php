@@ -7,6 +7,7 @@ namespace LangChain\LanguageModels\Chat\Ollama;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\AIMessageChunk;
 use LangChain\Messages\BaseMessage;
+use LangChain\Messages\ChatMessage;
 use LangChain\Messages\SystemMessage;
 use LangChain\Messages\ToolMessage;
 use Ramsey\Uuid\Uuid;
@@ -82,7 +83,7 @@ final class OllamaUtils
         foreach ($messages as $message) {
             $type = $message->type;
 
-            if ($type === 'human' || $type === 'generic' || $type === BaseMessage::ROLE_CHAT) {
+            if ($type === 'human' || $message instanceof ChatMessage) {
                 array_push($out, ...self::convertHumanGenericMessagesToOllama($message));
             } elseif ($type === 'ai') {
                 array_push($out, ...self::convertAIMessagesToOllama($message));

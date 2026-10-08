@@ -287,7 +287,7 @@ class ChatOllama extends BaseChatModel
      *
      * @return array<string, mixed>
      */
-    public function invocationParams(array $options = [], array $extra = []): array
+    public function invocationParams(array $options = []): array
     {
         $bound = $this->kwargs;
 
