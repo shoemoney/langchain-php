@@ -133,8 +133,7 @@ class StreamMessagesHandler extends BaseCallbackHandler
         }
 
         if ($messageId !== $message->id) {
-            $message->id = $messageId;
-            $message->kwargs['id'] = $messageId;
+            self::assignMessageId($message, $messageId);
         }
 
         if ($message->id !== null) {
@@ -142,6 +141,27 @@ class StreamMessagesHandler extends BaseCallbackHandler
         }
 
         ($this->streamFn)([$meta[0], 'messages', [$message, $meta[1]]]);
+    }
+
+    /**
+     * Set a message's id and the id recorded in its constructor kwargs.
+     *
+     * Upstream writes both `message.id` and `message.lc_kwargs.id`. The kwargs
+     * are what serialization and checkpointing read, so updating only the
+     * property would stream one id and persist another. PHP exposes the kwargs
+     * read-only, so the write goes through a closure bound to the message's
+     * own scope.
+     */
+    public static function assignMessageId(BaseMessage $message, ?string $id): void
+    {
+        $message->id = $id;
+        \Closure::bind(
+            static function (BaseMessage $m) use ($id): void {
+                $m->kwargs['id'] = $id;
+            },
+            null,
+            BaseMessage::class,
+        )($message);
     }
 
     /**

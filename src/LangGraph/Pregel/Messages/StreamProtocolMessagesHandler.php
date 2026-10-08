@@ -84,8 +84,7 @@ class StreamProtocolMessagesHandler extends BaseCallbackHandler
         }
 
         if ($messageId !== $message->id) {
-            $message->id = $messageId;
-            $message->kwargs['id'] = $messageId;
+            StreamMessagesHandler::assignMessageId($message, $messageId);
         }
 
         if ($message->id !== null) {
