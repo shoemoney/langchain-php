@@ -1,4 +1,6 @@
-# langchain-php
+# 🐘🦜 langchain-php
+
+![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white) ![License](https://img.shields.io/badge/license-MIT-green) ![Status](https://img.shields.io/badge/status-active%20port%20(not%20complete)-orange)
 
 A **faithful PHP port** of the [LangChain JS](https://github.com/langchain-ai/langchainjs) and
 [LangGraph JS](https://github.com/langchain-ai/langgraphjs) SDKs.
@@ -91,6 +93,59 @@ $response = $chain->invoke(['question' => 'Why is the sky blue?']);
 echo $response->content;
 ```
 
+### 🦾 A ReAct agent (`createReactAgent`)
+
+`ReactAgent::create(array $params)` takes the keys of upstream's `CreateReactAgentParams`
+(`llm`, `tools`, `prompt`, `checkpointer`, `interruptBefore`, `version`, ...) and returns a
+`CompiledStateGraph`. This runs offline against the scripted fake model:
+
+```php
+use LangChain\Messages\AIMessage;
+use LangChain\Utils\Testing\FakeToolCallingChatModel;
+use LangGraph\Prebuilt\ReactAgent;
+
+$agent = ReactAgent::create([
+    'llm' => new FakeToolCallingChatModel(['responses' => [new AIMessage('hi there')], 'sleep' => 0]),
+    'tools' => [],
+]);
+
+$result = $agent->invoke(['messages' => 'hello']);
+echo end($result['messages'])->content; // hi there
+```
+
+### ⚙️ The functional API (`entrypoint` / `task`)
+
+A task call returns a settled `Promise`; `Await::sync()` unwraps it. Tasks run sequentially
+and eagerly (see [non-exact behaviours](./PORT_STATUS.md)).
+
+```php
+use LangChain\Runnables\RunnableConfig;
+use LangChain\Utils\Await;
+use LangGraph\Checkpoint\MemorySaver;
+use LangGraph\Func\Func;
+
+$double = Func::task('double', fn (int $n): int => $n * 2);
+
+$app = Func::entrypoint(
+    ['name' => 'app', 'checkpointer' => new MemorySaver()],
+    fn (array $nums): array => array_map(fn ($n) => Await::sync($double($n)), $nums),
+);
+
+$app->invoke([1, 2, 3], new RunnableConfig(configurable: ['thread_id' => 't1'])); // [2, 4, 6]
+```
+
+### 🔎 An in-memory vector store
+
+`MemoryVectorStore` takes any `LangChain\Embeddings\Embeddings`; `OllamaEmbeddings` is the only
+concrete one shipped. There are no other vector-store backends yet.
+
+```php
+use LangChain\VectorStores\MemoryVectorStore;
+
+$store = MemoryVectorStore::fromTexts(['aaa', 'bbb', 'abab'], [[], [], []], $embeddings);
+$docs  = $store->similaritySearch('aa', 2);
+```
+
 ---
 
 ## Port status
@@ -103,56 +158,96 @@ non-exact behaviours.
 
 | Area | State | Notes |
 |---|---|---|
-| Messages, runnables (LCEL), prompts, output parsers, tools, tracers | Ported | `streamEvents`/`streamLog` are partial |
-| Chat models | Partial | `ChatOpenAI` (Chat Completions), `ChatAnthropic`, `ChatOllama`; OpenAI Responses API is input side only |
-| Structured query, text splitters, embeddings seam | Ported | `OllamaEmbeddings` is the only concrete embeddings class; no vector stores |
-| Pregel engine, channels, `StateGraph`, `Graph`, `MessageGraph` | Ported | `StateGraph` parity and drawing still open |
-| Prebuilt | Partial | `ToolNode`, `toolsCondition`; `createReactAgent` not yet |
-| Checkpointers | Partial | Memory, SQLite, Postgres (env-gated in CI), Redis (tested against a fake client); no MongoDB |
-| Store and cache | Ported | In-memory store and cache |
-| LangGraph client SDK | Partial | assistants, threads, store, crons; no runs client or streaming |
-| UI bindings (`sdk-react` etc.) | Out of scope | Browser-only |
+| 🧱 Messages, runnables (LCEL), prompts, output parsers, tools, tracers | ✅ Ported | `streamEvents`/`streamLog` are partial |
+| 💬 Chat models | 🟡 Partial | `ChatOpenAI` (Chat Completions and the Responses API, as a facade over `BaseChatOpenAI` / `ChatOpenAICompletions` / `ChatOpenAIResponses`), `ChatAnthropic`, `ChatOllama`. Streamed OpenAI custom-tool calls do not fold end to end; no Azure, no OpenAI hosted tools, no other providers |
+| 📚 Retrieval | 🟡 Partial | Base layer only: `VectorStores` (`MemoryVectorStore`), `Retrievers`, `ExampleSelectors`, `Indexing` (`RecordManager`, `Index::index`), `DocumentLoaders`. `FewShot*` prompt templates are not ported; `OllamaEmbeddings` is the only concrete embeddings class; no concrete backends, retrievers or loaders |
+| 🗄️ Stores, caches, chat history, memory, storage | ✅ Ported | `LangChain\{Stores,Caches,ChatHistory,Memory,Storage}`; models accept a `cache` option. `BaseMemory` only, no concrete memory classes |
+| 🔥 Structured query, text splitters, embeddings seam | ✅ Ported | |
+| 🕸️ Pregel engine, channels, `Graph`, `MessageGraph` | ✅ Ported | Superstep concurrency is sequential; timeouts cannot preempt; `sync` and `async` durability are identical |
+| 🧭 `StateGraph` | 🟡 Parity with non-exact items | `addSequence`, input/output schemas, node policies, `errorHandler`, `setNodeDefaults`, `validate`. The handler runs inline, `timeout` is not enforced, `GraphCallbackHandler` events are not ported; drawing / `getGraph` is open |
+| ⚙️ Functional API | 🟡 Partial | `Func::entrypoint`, `Func::task`, `Func::getPreviousState`; sequential, no `custom` stream mode |
+| 🦾 Prebuilt | 🟡 Partial | `ToolNode`, `toolsCondition`, `ReactAgent::create`, `HumanInterrupt`. A known engine defect breaks resume for a v2 agent making exactly two tool calls (`Topic::fromCheckpoint`, see HANDOFF) |
+| 🤖 Agents (`LangGraph\Agents`) | 🟡 Foundations only | State, errors, runtime, createAgent-flavoured `ToolNode`. **`createAgent` and middleware are not ported** |
+| 💾 Checkpointers | 🟡 Partial | Memory, SQLite, Postgres (env-gated in CI), Redis (tested against a fake client), MongoDB (tested against a fake collection only, **never run against a real server**) |
+| 🧠 LangGraph store and cache | ✅ Ported | In-memory store and cache |
+| 🌐 LangGraph client SDK | 🟡 Partial | assistants, threads, store, crons, runs, `joinStream` and stream retry. `ThreadsClient::stream()` (the v2 protocol) is not ported; a signal is a polled callable, not an `AbortSignal` |
+| 🖼️ UI bindings (`sdk-react` etc.) | ⛔ Out of scope | Browser-only |
+
+<details>
+<summary>🚫 Not ported yet</summary>
+
+- `createAgent`, middleware, structured-response transformers
+- Supervisor / Swarm, `RemoteGraph`
+- Graph drawing (`getGraph`)
+- Azure, OpenAI hosted tools, and every provider beyond OpenAI, Anthropic and Ollama
+- Concrete vector-store backends, retrievers and document loaders
+- `custom` / `checkpoints` / `tasks` stream modes
+
+</details>
 
 ---
 
-## Architecture
+## 🏗️ Architecture
+
+`src/LangGraph` builds on `src/LangChain`, never the other way round; a layering test enforces it.
+
+```mermaid
+flowchart LR
+    LC["📦 LangChain<br/>core + provider clients"] --> LG["🕸️ LangGraph<br/>Pregel, graphs, agents"]
+    LG --> SDK["🌐 Sdk<br/>REST client"]
+    LC -. "no imports of LangGraph" .- LG
+```
 
 ```
 src/
   LangChain/
-    Embeddings/      Embeddings interface, OllamaEmbeddings
-    LanguageModels/  BaseChatModel, BaseLLM, Outputs/
-      Chat/          OpenAI/, Anthropic/, Ollama/
-    Load/            Serializable
-    Messages/        BaseMessage + Human/AI/System/Tool/Function, content blocks
-    OutputParsers/   String, JSON, structured, OpenAITools/
-    Prompts/         Prompt templates, chat prompt templates
-    Runnables/       Runnable, Sequence, Parallel, Branch, Lambda, Binding, Assign, Passthrough
-    Schema/          Document, PromptValue
-    StructuredQuery/ Query IR, visitors, translators
-    TextSplitters/   Character, Recursive, Markdown, Latex, language tables
-    Tools/           StructuredTool, DynamicTool, BaseToolkit, ToolRuntime
-    Tracers/         Callback managers, tracers, event-stream and log-stream handlers
-    Utils/           Promise, Await, Observable, env, JSON patch, AsyncCaller, ...
+    Caches/           BaseCache, InMemoryCache
+    ChatHistory/      BaseChatMessageHistory, BaseListChatMessageHistory, InMemoryChatMessageHistory
+    DocumentLoaders/  DocumentLoader, BaseDocumentLoader
+    Embeddings/       Embeddings interface, OllamaEmbeddings
+    ExampleSelectors/ Length-based and semantic-similarity selectors, prompt selectors
+    Indexing/         RecordManager, InMemoryRecordManager, HashedDocument, Index
+    LanguageModels/   BaseChatModel, BaseLLM, Outputs/
+      Chat/          OpenAI/ (ChatOpenAI facade, Completions, Responses), Anthropic/, Ollama/
+    Load/             Serializable
+    Memory/           BaseMemory
+    Messages/         BaseMessage + Human/AI/System/Tool/Function, content blocks
+    OutputParsers/    String, JSON, structured, OpenAITools/
+    Prompts/          Prompt templates, chat prompt templates
+    Retrievers/       BaseRetriever, BaseDocumentCompressor
+    Runnables/        Runnable, Sequence, Parallel, Branch, Lambda, Binding, Assign, Passthrough
+    Schema/           Document, PromptValue
+    Storage/          LocalFileStore, EncoderBackedStore, InMemoryStore
+    Stores/           BaseStore, InMemoryStore
+    StructuredQuery/  Query IR, visitors, translators
+    TextSplitters/    Character, Recursive, Markdown, Latex, language tables
+    Tools/            StructuredTool, DynamicTool, BaseToolkit, ToolRuntime
+    Tracers/          Callback managers, tracers, event-stream and log-stream handlers
+    Utils/            Promise, Await, Observable, env, JSON patch, AsyncCaller, ...
       Http/          HttpClient seam, Guzzle client, SSE parser
-      Testing/       Fakes
+      Testing/       Fakes (incl. FakeToolCallingChatModel)
+    VectorStores/     VectorStore, MemoryVectorStore, VectorStoreRetriever
   LangGraph/
-    Cache/           BaseCache, InMemoryCache
-    Channels/        BaseChannel, LastValue, BinaryOperatorAggregate, Topic, ...
-    Checkpoint/      BaseCheckpointSaver, MemorySaver, SqliteSaver
+    Agents/           createAgent foundations: AgentState, Runtime, Errors/, Nodes/ToolNode
+    Cache/            BaseCache, InMemoryCache
+    Channels/         BaseChannel, LastValue, BinaryOperatorAggregate, Topic, ...
+    Checkpoint/       BaseCheckpointSaver, MemorySaver, SqliteSaver
+      MongoDB/       MongoDBSaver over a MongoCollectionInterface seam
       Postgres/      PostgresSaver
       Redis/         RedisSaver, ShallowRedisSaver
       Serde/         JsonPlusSerializer
-    Errors/          Interrupts, recursion and update errors
-    Graph/           Graph, CompiledGraph, Branch, MessageGraph, messages reducer
-    Prebuilt/        ToolNode, toolsCondition, agentName
-    Pregel/          algo, loop, read, write, runner, retry
+    Errors/           Interrupts, recursion and update errors
+    Func/             Func::entrypoint, Func::task, Func::getPreviousState
+    Graph/            Graph, CompiledGraph, Branch, MessageGraph, messages reducer
+    Prebuilt/         ToolNode, toolsCondition, ReactAgent, AgentState, HumanInterrupt
+    Pregel/           algo, loop, read, write, runner, retry, Call, CallScheduler, Validate, Timeout
       Checkpoint/    Engine-side saver contract
       Messages/      messages / tools stream handlers
-    Sdk/             LangGraph API client (assistants, threads, store, crons)
-    State/           Annotation, StateGraph, CompiledStateGraph
-    Store/           BaseStore, InMemoryStore
-    Utils/           Hash, helpers
+    Sdk/              LangGraph API client (assistants, threads, store, crons, runs)
+      Utils/         StreamRetry, Reconnect, Signals, SseDecoder
+    State/            Annotation, StateGraph, CompiledStateGraph
+    Store/            BaseStore, InMemoryStore
+    Utils/            Hash, helpers
 ```
 
 ---
@@ -175,3 +270,7 @@ the Python-parity conformance tests from `langgraphjs`.
 ## License
 
 MIT
+
+---
+
+<p align="center">Made with 🐘, a lot of ☕, and a refusal to call it done before the tests say so.</p>
