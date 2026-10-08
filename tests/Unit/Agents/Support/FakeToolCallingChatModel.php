@@ -7,7 +7,6 @@ namespace LangChain\Tests\Unit\Agents\Support;
 use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Outputs\ChatGeneration;
 use LangChain\LanguageModels\Outputs\ChatResult;
-use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Tracers\CallbackManagerForLLMRun;
 
