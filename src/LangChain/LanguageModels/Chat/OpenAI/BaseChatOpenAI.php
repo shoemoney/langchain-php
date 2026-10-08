@@ -6,7 +6,9 @@ namespace LangChain\LanguageModels\Chat\OpenAI;
 
 use LangChain\LanguageModels\Chat\NormalisesProviderOptions;
 use LangChain\LanguageModels\BaseChatModel;
+use LangChain\LanguageModels\Chat\OpenAI\Converters\ResponsesTools;
 use LangChain\LanguageModels\Chat\OpenAI\Utils\Tools;
+use LangChain\Tools\StructuredTool;
 use LangChain\Utils\Http\GuzzleHttpClient;
 use LangChain\Utils\Js;
 use LangChain\Utils\Http\HttpClient;
@@ -398,6 +400,32 @@ abstract class BaseChatOpenAI extends BaseChatModel
     }
 
     /**
+     * One tool, in the form it is stored when bound.
+     *
+     * Built-in tools and custom tools pass through as they are. A tool that
+     * carries its own provider definition (`extras.providerToolDefinition`:
+     * local shell, computer use, ...) is stored as that definition. Everything
+     * else is rendered as a function tool, keeping `extras.defer_loading`.
+     */
+    private function bindableTool(mixed $tool, ?bool $strict): mixed
+    {
+        if (ResponsesTools::isBuiltInTool($tool) || ResponsesTools::isCustomTool($tool)) {
+            return $tool;
+        }
+
+        if (ResponsesTools::hasProviderToolDefinition($tool)) {
+            return ResponsesTools::providerToolDefinition($tool);
+        }
+
+        $converted = Tools::convert($tool, $strict);
+        if ($tool instanceof StructuredTool && ($tool->extras['defer_loading'] ?? null) === true) {
+            $converted['defer_loading'] = true;
+        }
+
+        return $converted;
+    }
+
+    /**
      * Offer tools to the model.
      *
      * Returns a **new** instance. The bound tools live in that instance's
@@ -416,7 +444,10 @@ abstract class BaseChatOpenAI extends BaseChatModel
         $next = clone $this;
 
         $strict = $kwargs['strict'] ?? $this->supportsStrictToolCalling;
-        $next->kwargs['tools'] = Tools::convertAll($tools, $strict === null ? null : (bool) $strict);
+        $next->kwargs['tools'] = array_map(
+            fn (mixed $tool): mixed => $this->bindableTool($tool, $strict === null ? null : (bool) $strict),
+            array_values($tools),
+        );
 
         // Remember the decision on the bound instance, so a later `bindTools()`
         // on it inherits it. Previously `supportsStrictToolCalling` stayed null
