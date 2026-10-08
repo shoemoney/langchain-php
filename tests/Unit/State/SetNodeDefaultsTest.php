@@ -30,6 +30,9 @@ use PHPUnit\Framework\TestCase;
  *  - a node with an error handler runs its retries inside the handler wrapper (the engine cannot
  *    schedule a handler task), so its *compiled* `retryPolicy` is null and the "default retry is
  *    applied" assertions for handled nodes observe behaviour (attempt counts) rather than the field;
+ *  - NON-EXACT (cache): combining a default `cachePolicy` with an `errorHandler` caches the handled
+ *    result under the failed node's key (upstream never caches a failed task); pinned in
+ *    `NodeErrorHandlerTest::testAHandledFailureIsCachedUnderTheFailedNodesKey`;
  *  - the "receives the failing node's input" case uses an Annotation `input` for the node.
  */
 #[CoversClass(StateGraph::class)]

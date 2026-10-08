@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\State;
 
 use LangChain\Runnables\RunnableConfig;
+use LangGraph\Cache\InMemoryCache;
 use LangGraph\Checkpoint\MemorySaver;
 use LangGraph\Errors\NodeError;
 use LangGraph\Pregel\Command;
@@ -29,7 +30,10 @@ use function LangGraph\Pregel\interrupt;
  *  - routing matches upstream (the failed node's edges do not fire after a handler) but the `updates`
  *    stream and checkpoint writes are attributed to the failed node, not `__error_handler__<node>`;
  *  - the two async-handler cases collapse into the synchronous ones (PHP has no async functions);
- *    the second is kept as "the handler also receives the config and the NodeError in it".
+ *    the second is kept as "the handler also receives the config and the NodeError in it";
+ *  - NON-EXACT (cache): a handled failure is cached under the failed node's cache key, because the
+ *    handler runs inside that node's task and `PregelLoop` caches every non-error task. Upstream does
+ *    not cache a failed task. `testAHandledFailureIsCachedUnderTheFailedNodesKey` pins this.
  */
 #[CoversClass(StateGraph::class)]
 final class NodeErrorHandlerTest extends TestCase
@@ -401,5 +405,30 @@ final class NodeErrorHandlerTest extends TestCase
             ->compile();
 
         self::assertSame('handled', $graph->invoke(['foo' => ''])['foo']);
+    }
+
+    /**
+     * NON-EXACT: upstream would return 'handled' then 'ok' (two calls); this engine replays the
+     * handled result from the cache, so the node runs once and the second invoke is stale.
+     */
+    public function testAHandledFailureIsCachedUnderTheFailedNodesKey(): void
+    {
+        $calls = 0;
+        $graph = (new StateGraph(self::foo()))
+            ->setNodeDefaults(['cachePolicy' => true, 'errorHandler' => static fn (): array => ['foo' => 'handled']])
+            ->addNode('flaky', static function () use (&$calls): array {
+                $calls += 1;
+                if ($calls === 1) {
+                    throw new \RuntimeException('transient');
+                }
+
+                return ['foo' => 'ok'];
+            })
+            ->addEdge(Constants::START, 'flaky')
+            ->compile(['cache' => new InMemoryCache()]);
+
+        self::assertSame('handled', $graph->invoke(['foo' => 'x'])['foo']);
+        self::assertSame('handled', $graph->invoke(['foo' => 'x'])['foo'], 'upstream would return "ok" here');
+        self::assertSame(1, $calls, 'upstream would have called the node twice');
     }
 }
