@@ -16,6 +16,8 @@ use LangChain\Runnables\RunnableLambda;
 use LangChain\Runnables\RunnableParallel;
 use LangChain\Runnables\RunnablePassthrough;
 use LangChain\Runnables\RunnablePick;
+use LangGraph\Channels\AnyValue;
+use LangGraph\State\StateGraph;
 use LangChain\Tools\DynamicStructuredTool;
 use LangChain\Tools\DynamicTool;
 use LangChain\Tools\Schema;
@@ -631,5 +633,28 @@ final class RunnableStreamEventsV2Test extends TestCase
 
         self::assertSame('boom', $caught?->getMessage());
         self::assertSame(['on_chain_start boom'], StreamEventsAssertions::names($events));
+    }
+
+    /**
+     * End to end through a compiled graph: the Pregel engine is a `Runnable`, so it is the root of a run
+     * that wraps the whole execution and reports its chunks and final output.
+     */
+    public function testStreamEventsOverACompiledGraphWrapsTheRunInARootChain(): void
+    {
+        $graph = (new StateGraph(['messages' => new AnyValue()]))
+            ->addNode('a', static fn (array $s): array => ['messages' => 'A'])
+            ->addNode('b', static fn (array $s): array => ['messages' => 'B'])
+            ->addEdge('__start__', 'a')
+            ->addEdge('a', 'b')
+            ->addEdge('b', '__end__')
+            ->compile();
+
+        $events = self::events($graph->streamEvents(['messages' => 'q'], null, 'v2'));
+
+        $names = StreamEventsAssertions::names($events);
+        self::assertSame('on_chain_start ' . $graph->getName(), $names[0]);
+        self::assertSame(['input' => ['messages' => 'q']], $events[0]->data);
+        self::assertSame('on_chain_end ' . $graph->getName(), $names[array_key_last($names)]);
+        self::assertContains('on_chain_stream ' . $graph->getName(), $names);
     }
 }
