@@ -28,13 +28,14 @@ final class FakeToolCallingChatModel extends BaseChatModel
     /** @var list<array<string, mixed>> */
     public array $tools = [];
 
-    /** @var list<list<BaseMessage>> What each call was given. */
-    public array $seen = [];
+    /** @var \ArrayObject<int, list<BaseMessage>> What each call was given; shared with the copies `bindTools()` makes. */
+    public \ArrayObject $seen;
 
     /** @param array<string, mixed> $fields */
     public function __construct(array $fields = [])
     {
         parent::__construct($fields);
+        $this->seen = new \ArrayObject();
         $this->responses = array_values((array) ($fields['responses'] ?? []));
     }
 
@@ -45,7 +46,7 @@ final class FakeToolCallingChatModel extends BaseChatModel
 
     protected function generate(array $messages, array $options = [], ?CallbackManagerForLLMRun $runManager = null): ChatResult
     {
-        $this->seen[] = $messages;
+        $this->seen->append($messages);
         $pool = $this->responses !== [] ? $this->responses : $messages;
         $message = $pool[$this->idx % \count($pool)];
         $this->idx++;

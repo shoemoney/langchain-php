@@ -247,7 +247,7 @@ class ToolNode extends RunnableCallable
             'toolCall' => $call,
             'tool' => $registeredTool,
             'state' => $state,
-            'runtime' => Runtime::fromConfig($config),
+            'runtime' => Runtime::fromConfig($config)->with(['toolCallId' => $call['id'] ?? null]),
         ];
 
         if ($this->wrapToolCall !== null) {
