@@ -9,6 +9,7 @@ use LangGraph\Channels\BaseChannel;
 use LangGraph\Channels\ChannelRegistry;
 use LangGraph\Cache\BaseCache;
 use LangGraph\Errors\EmptyInputError;
+use LangGraph\Errors\GraphDrained;
 use LangGraph\Errors\GraphInterrupt;
 use LangGraph\Errors\GraphRecursionError;
 use LangGraph\Errors\Guard;
@@ -246,12 +247,24 @@ class PregelLoop
             cache: $params['cache'] ?? null,
         );
         $loop->hasPersistedParent = $hasPersistedParent;
+        $loop->durability = $params['durability'] ?? 'async';
 
         return $loop;
     }
 
     /** Whether a real checkpoint was loaded at initialization. */
     public bool $hasPersistedParent = false;
+
+    /**
+     * When checkpoints reach the saver: `sync`, `async` or `exit`.
+     *
+     * Port of the loop's `durability`. Upstream's `sync` and `async` differ only in whether the
+     * loop AWAITS the saver before preparing the next superstep; every PHP saver call is
+     * synchronous, so the two are the same here and both write a checkpoint per superstep. `exit`
+     * is real: nothing is written until the loop exits, and then the final checkpoint and the
+     * still-pending task writes are saved once.
+     */
+    public string $durability = 'async';
 
     /**
      * Whether this run is resuming rather than starting fresh.
@@ -321,6 +334,11 @@ class PregelLoop
 
                 $runner->tick();
                 yield from $this->drain();
+            }
+
+            if (($this->status['status'] ?? null) === 'draining') {
+                $control = $this->config->options['control'] ?? null;
+                throw new GraphDrained($control instanceof RunControl ? ($control->drainReason() ?? 'shutdown') : 'shutdown');
             }
 
             if (($this->status['status'] ?? null) === 'out_of_steps') {
@@ -444,6 +462,18 @@ class PregelLoop
 
         if ($taskList === []) {
             $this->status['status'] = 'done';
+
+            return false;
+        }
+
+        // Cooperative drain: the previous superstep's writes have been applied and checkpointed
+        // above and the next tasks are prepared. If a drain was requested and tasks remain, stop
+        // here WITHOUT dispatching them, so the run resumes from the saved checkpoint. A drain
+        // requested on the terminal superstep never reaches this point (no tasks), so that run
+        // finishes normally.
+        $control = $this->config->options['control'] ?? null;
+        if ($control instanceof RunControl && $control->drainRequested()) {
+            $this->status['status'] = 'draining';
 
             return false;
         }
@@ -742,7 +772,9 @@ class PregelLoop
             $this->checkpointPendingWrites[] = [$taskId, $write[0], $write[1] ?? null];
         }
 
-        if ($this->checkpointer !== null) {
+        // Under `exit` durability a task's writes stay in memory (`checkpointPendingWrites`) and
+        // are saved once, by flushPendingWrites(), when the loop exits.
+        if ($this->checkpointer !== null && $this->durability !== 'exit') {
             $config = clone $this->checkpointConfig;
             $config->configurable['thread_id'] ??= $this->config->configurable['thread_id'] ?? null;
             $config->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] = (string) ($this->config->configurable['checkpoint_ns'] ?? '');
@@ -981,12 +1013,19 @@ class PregelLoop
         //
         // The interrupt path still saves, because upstream's condition also admits a
         // nested graph with an error or interrupt, and `$error !== null` is that case.
-        if (
-            $this->checkpointer !== null
-            && $error !== null
-            && !$this->isNested
-        ) {
+        //
+        // Under `exit` durability this IS the gate upstream has: save when the graph is top
+        // level, or nested with an error or interrupt, or nested with `checkpointer: true` (a
+        // namespace with no `:`-suffixed task segment), then flush the writes held back in memory.
+        $exitDurability = $this->durability === 'exit';
+        $saveAtExit = $exitDurability
+            ? (!$this->isNested || $error !== null || $this->namespaceHasNoTaskSegment())
+            : ($error !== null && !$this->isNested);
+        if ($this->checkpointer !== null && $saveAtExit) {
             $this->putCheckpoint($this->checkpointMetadata['source'] ?? 'loop', exiting: true);
+            if ($exitDurability) {
+                $this->flushPendingWrites();
+            }
         }
 
         $suppress = $this->suppressInterrupt($error);
@@ -1042,6 +1081,44 @@ class PregelLoop
         return $suppress;
     }
 
+    /** Whether no segment of this loop's checkpoint namespace names a task (`node:taskId`). */
+    private function namespaceHasNoTaskSegment(): bool
+    {
+        foreach ($this->checkpointNamespace as $part) {
+            if (str_contains((string) $part, Constants::CHECKPOINT_NAMESPACE_END)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Save, in one go, the task writes that `exit` durability held back.
+     *
+     * Port of `_flushPendingWrites`. Grouped by task id, because a saver keys writes by
+     * (checkpoint, task).
+     */
+    private function flushPendingWrites(): void
+    {
+        if ($this->checkpointer === null || $this->checkpointPendingWrites === []) {
+            return;
+        }
+
+        $config = clone $this->checkpointConfig;
+        $config->configurable['thread_id'] ??= $this->config->configurable['thread_id'] ?? null;
+        $config->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] = (string) ($this->config->configurable['checkpoint_ns'] ?? '');
+        $config->configurable['checkpoint_id'] = $this->checkpoint->id;
+
+        $byTask = [];
+        foreach ($this->checkpointPendingWrites as [$taskId, $channel, $value]) {
+            $byTask[$taskId][] = [$channel, $value];
+        }
+        foreach ($byTask as $taskId => $writes) {
+            $this->checkpointer->putWrites($config->configurable, $writes, (string) $taskId);
+        }
+    }
+
     /**
      * Whether an interrupt should be absorbed rather than propagated.
      *
@@ -1084,7 +1161,10 @@ class PregelLoop
         // overwrite successive supersteps onto a single row and silently
         // destroy the thread's history.
         $exiting = $exiting;
-        $doCheckpoint = $this->checkpointer !== null;
+        // Under `exit` durability only the final (exiting) save reaches the saver; the
+        // intermediate calls still advance ids, metadata and the step counter so the run's
+        // bookkeeping is identical, they just do not persist.
+        $doCheckpoint = $this->checkpointer !== null && ($this->durability !== 'exit' || $exiting);
 
         $values = [];
         foreach (ChannelRegistry::getOnlyChannels($this->channels) as $name => $channel) {
@@ -1104,7 +1184,9 @@ class PregelLoop
             $this->checkpointPreviousVersions,
             $channelVersions
         );
-        $this->checkpointPreviousVersions = $channelVersions;
+        if ($doCheckpoint) {
+            $this->checkpointPreviousVersions = $channelVersions;
+        }
 
         $newCheckpoint = new Checkpoint(
             v: 4,
@@ -1116,6 +1198,22 @@ class PregelLoop
         );
         $this->checkpoint = $newCheckpoint;
 
+        // An exiting save re-puts the checkpoint the loop already holds, so its metadata
+        // stays as it was (upstream only rewrites `step` and `parents` when `!exiting`).
+        // Bumping `step` here would make the NEXT run resume at `step + 1`, derive different
+        // task ids, and orphan every pending write (RESUME and INTERRUPT included) that was
+        // stored under the ids of the run that was interrupted.
+        if (!$exiting) {
+            $this->checkpointMetadata = array_merge($this->checkpointMetadata, [
+                'source' => $source,
+                'step' => $this->step,
+                // The checkpoint map is the subgraph lineage: every namespace
+                // this run has touched, mapped to the checkpoint it was at.
+                // A subgraph resuming later reads its parent's id from here.
+                'parents' => (object) ($this->config->configurable[Constants::CONFIG_KEY_CHECKPOINT_MAP] ?? []),
+            ]);
+        }
+
         if ($doCheckpoint) {
             $config = clone $this->checkpointConfig;
             $config->configurable['thread_id'] ??= $this->config->configurable['thread_id'] ?? null;
@@ -1125,22 +1223,6 @@ class PregelLoop
                 $this->prevCheckpointConfig = $this->checkpointConfig;
             } else {
                 $this->prevCheckpointConfig = null;
-            }
-
-            // An exiting save re-puts the checkpoint the loop already holds, so its metadata
-            // stays as it was (upstream only rewrites `step` and `parents` when `!exiting`).
-            // Bumping `step` here would make the NEXT run resume at `step + 1`, derive different
-            // task ids, and orphan every pending write (RESUME and INTERRUPT included) that was
-            // stored under the ids of the run that was interrupted.
-            if (!$exiting) {
-                $this->checkpointMetadata = array_merge($this->checkpointMetadata, [
-                    'source' => $source,
-                    'step' => $this->step,
-                    // The checkpoint map is the subgraph lineage: every namespace
-                    // this run has touched, mapped to the checkpoint it was at.
-                    // A subgraph resuming later reads its parent's id from here.
-                    'parents' => (object) ($this->config->configurable[Constants::CONFIG_KEY_CHECKPOINT_MAP] ?? []),
-                ]);
             }
 
             $this->checkpointer->put(
