@@ -6,11 +6,11 @@ namespace LangChain\Tests\Unit\Utils;
 
 use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
 use LangChain\Messages\AIMessage;
+use LangChain\Tools\DynamicStructuredTool;
 use LangChain\Tools\Schema;
 use LangChain\Tools\ToolUtils;
 use LangChain\Utils\FunctionCalling;
 use LangChain\Utils\Testing\FakeHttpClient;
-use LangChain\Utils\Testing\FakeTool;
 use LangChain\Utils\Testing\StructuredToolSpec;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -52,13 +52,13 @@ final class FunctionCallingTest extends TestCase
         ];
     }
 
-    private static function tool(): FakeTool
+    private static function tool(): DynamicStructuredTool
     {
-        return new FakeTool([
+        return new DynamicStructuredTool([
             'name' => 'faketesttool',
             'description' => 'A fake test tool',
             'schema' => new Schema(self::parameters()),
-        ]);
+        ], static fn (mixed $args): string => (string) json_encode($args, \JSON_UNESCAPED_SLASHES));
     }
 
     public function testCanConvertToolToOpenAIFunctionsFormat(): void

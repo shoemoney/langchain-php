@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\Utils;
 
+use LangChain\Tools\DynamicStructuredTool;
 use LangChain\Tools\Schema;
 use LangChain\Utils\FunctionCalling;
 use LangChain\Utils\JsonSchema;
-use LangChain\Utils\Testing\FakeTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -163,9 +163,9 @@ final class JsonSchemaTest extends TestCase
         self::assertCount(1, $log);
     }
 
-    public function testAFakeToolSchemaConvertsThroughTheSamePath(): void
+    public function testAToolSchemaConvertsThroughTheSamePath(): void
     {
-        $tool = new FakeTool(['name' => 't', 'description' => 'd', 'schema' => new Schema(self::OBJECT_SCHEMA)]);
+        $tool = new DynamicStructuredTool(['name' => 't', 'description' => 'd', 'schema' => new Schema(self::OBJECT_SCHEMA)], static fn (): string => '');
 
         self::assertSame(self::OBJECT_SCHEMA, FunctionCalling::convertToOpenAIFunction($tool)['parameters']);
     }
