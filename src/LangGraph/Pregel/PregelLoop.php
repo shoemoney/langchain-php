@@ -153,9 +153,12 @@ class PregelLoop
         // graph's own (upstream `_defaults`). Without this a subgraph never saved a checkpoint,
         // so a resume found nothing, minted a fresh checkpoint id, derived different task ids
         // and re-fired the same interrupt forever.
-        $checkpointer = $config->configurable[Constants::CONFIG_KEY_CHECKPOINTER]
-            ?? $params['checkpointer']
-            ?? null;
+        // `checkpointer: false` opts out entirely and is checked first (upstream `_defaults`).
+        $checkpointer = ($params['checkpointerDisabled'] ?? false)
+            ? null
+            : ($config->configurable[Constants::CONFIG_KEY_CHECKPOINTER]
+                ?? $params['checkpointer']
+                ?? null);
         $saved = null;
         if ($checkpointer !== null) {
             $saved = $checkpointer->getTuple($checkpointConfig->configurable);

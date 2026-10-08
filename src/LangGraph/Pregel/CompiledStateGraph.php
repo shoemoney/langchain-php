@@ -35,6 +35,7 @@ class CompiledStateGraph extends Pregel
         ?Retry\RetryPolicy $retryPolicy = null,
         array $triggerToNodes = [],
         public readonly ?StateGraph $builder = null,
+        bool $checkpointerDisabled = false,
     ) {
         parent::__construct(
             nodes: $nodes,
@@ -50,6 +51,7 @@ class CompiledStateGraph extends Pregel
             interruptBefore: $interruptBefore,
             interruptAfter: $interruptAfter,
             description: $description,
+            checkpointerDisabled: $checkpointerDisabled,
         );
     }
 }

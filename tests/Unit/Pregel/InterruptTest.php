@@ -491,6 +491,28 @@ final class InterruptTest extends TestCase
         self::assertSame(2, $subRuns, 'raised once, re-executed once on resume');
     }
 
+    public function testASubgraphCompiledWithCheckpointerFalseWritesNoCheckpoints(): void
+    {
+        $subgraph = (new StateGraph(Annotation::root(['answer' => Annotation::last()])))
+            ->addNode('ask', static fn (): array => ['answer' => 'done'])
+            ->addEdge(Constants::START, 'ask')
+            ->compile(['checkpointer' => false]);
+
+        $saver = new MemorySaver();
+        $graph = (new StateGraph(Annotation::root(['answer' => Annotation::last()])))
+            ->addNode('sub', $subgraph)
+            ->addEdge(Constants::START, 'sub')
+            ->compile(['checkpointer' => $saver]);
+
+        $graph->invoke(['answer' => null], self::config());
+
+        $namespaces = array_values(array_unique(array_map(
+            static fn ($t): string => (string) ($t->config['configurable']['checkpoint_ns'] ?? ''),
+            $saver->list(['thread_id' => '1']),
+        )));
+        self::assertSame([''], $namespaces, 'an opted-out subgraph persists nothing under its namespace');
+    }
+
     public function testDoublyNestedGraphInterrupts(): void
     {
         $schema = static fn () => Annotation::root(['myKey' => Annotation::last()]);
