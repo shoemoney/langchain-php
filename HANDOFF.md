@@ -34,8 +34,8 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **5283 passing, 11003 assertions** |
-| Size | 245 src files / 36,964 lines · 174 test files / 35,922 lines |
+| Tests | **5537 passing, 11510 assertions** |
+| Size | 264 src files / 38,558 lines · 181 test files / 37,782 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
@@ -254,6 +254,7 @@ there is marked done **only if its tests exist and pass**.
   language_models, tracers/callbacks, load/serializable
 - **langgraph-core**: channels (all), pregel (algo, loop, read, write, retry,
   cache-key derivation, runner), state, errors
+- **langgraph store + cache (WP-01)**: `LangGraph\Store\*` (BaseStore, InMemoryStore, AsyncBatchedStore, StoreUtils, ops/Item/SearchItem/IndexConfig), `LangGraph\Cache\*` (BaseCache, InMemoryCache), `LangChain\Embeddings\*`. The store reaches nodes and subgraphs via `configurable[Constants::CONFIG_KEY_STORE]` (`__pregel_store`); the loop wraps it in `AsyncBatchedStore` and puts it only on its own cloned config. Call-time overrides are `configurable[CONFIG_KEY_STORE]`/`[CONFIG_KEY_CACHE]`. `StateGraph::compile()` takes `store`/`cache`; `Pregel`/`CompiledStateGraph` constructors take `?BaseStore`, `?BaseCache` last. Node cache: `PregelLoop::cacheTaskWrites()` / `matchCachedWrites()`. `ToolRuntime::$store` stays `?object` (layering guard); known gap: `NextTaskExtraFields::$store` is dead.
 - **langgraph-checkpoint**: BaseCheckpointSaver, MemorySaver, **SqliteSaver**,
   and the `serde` layer (`JsonPlusSerializer` + `_default` replacer + `_reviver`
   + `LcConstructorLoader`)
@@ -292,8 +293,9 @@ rather than completing it.
    two.
 3. `langgraph` client SDK (REST) — the `client`/`runs`/`threads`/`stores` HTTP
    surface. ⬜
-4. Vector stores, embeddings, retrievers, memory, document loaders. ⬜
-   Interfaces and seams exist; no concrete backends.
+4. Vector stores, concrete embeddings, retrievers, memory, document loaders. ⬜
+   Interfaces and seams exist (the `Embeddings` interface and the LangGraph
+   store/cache are ported); no concrete backends.
 5. Postgres / Redis / MongoDB checkpoint savers. ⬜ `BaseCheckpointSaver` is
    the seam they plug into, and the shared validation spec already runs against
    two savers — a third should be cheap.

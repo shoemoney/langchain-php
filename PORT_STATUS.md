@@ -53,7 +53,7 @@ composer test
 | `output_parsers` | ✅ | incl. **openai_tools**: `JsonOutputToolsParser`, `JsonOutputKeyToolsParser` |
 | `tools` | ✅ | `StructuredTool`, `Tool`, `DynamicTool`, `DynamicStructuredTool`, `tool()`, `BaseToolkit`, `ToolRuntime`, `ToolException`. Schema is **JSON Schema**, not Zod — see below. |
 | `tracers` / `callbacks` | ✅ | `BaseCallbackHandler` + method-bag handlers, `CallbackManager` and the four run managers, `BaseTracer`, `ConsoleCallbackHandler`, `RunCollectorCallbackHandler`, `Run`. No LangSmith HTTP transport. |
-| `embeddings` / `vectorstores` | ⬜ | Interfaces are the seam; no concrete backend yet |
+| `embeddings` / `vectorstores` | 🟡 | `Embeddings` + `EmbeddingsInterface` ported (no `AsyncCaller`, WP-12b); vector stores ⬜, no concrete backend yet |
 | `utils` (env, json patch, function_calling, standard_schema, tiktoken) | ⬜ | |
 | `structured_query`, `indexing`, `example_selectors` | ⬜ | |
 | `utils/function_calling`, `utils/standard_schema`, `utils/tiktoken`, `utils/env` | ⬜ | Zod has no PHP analogue; the port uses JSON Schema throughout (see below) |
@@ -102,6 +102,7 @@ One further fix — the `SseParser` separator offset — has **no** observable f
 | `serde` (`Serialization`, `JsonPlusSerializer`) | ✅ | The `lc:2` envelope: constructor records, `DeltaSnapshot`, `Send` packets, `undefined`, byte strings, LangChain `lc:1` objects, circular-reference replacement, and an inert-by-default reviver |
 | `sqlite` saver | ✅ | PDO, WAL, `checkpoints`/`writes` schema, `before`/`limit`/metadata-filter in SQL |
 | `postgres` / `redis` / `mongodb` savers | ⬜ | |
+| LangGraph store + cache (`store/{base,memory,batch,utils}`, `cache/{base,memory}`, Embeddings seam) | ✅ | `LangGraph\Store\*`, `LangGraph\Cache\*`, `LangChain\Embeddings\*`; 117 new tests (store/namespace/cache/utils/vector converted; memory-pollution skipped, JS-only) | InMemoryStore with filters, namespaces listing, vector search; InMemoryCache with TTL; store + cache threaded through Pregel, PregelLoop (cache read/write via BaseCache), StateGraph::compile(['store','cache']) and task configs (configurable `__pregel_store`) |
 
 ## langgraph (client SDK)
 
@@ -543,6 +544,13 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | **`MemorySaver` and `SqliteSaver` group a cross-thread `list()` differently** | The in-process saver iterates threads then namespaces; the database orders by `checkpoint_id` globally. Both are newest-first *within* a thread and namespace, which is the only ordering the `before` cursor and the engine depend on, and the upstream spec compares the list as a set for the same reason. | `MemorySaver::list()`, `SqliteSaver::list()` |
 
 ---
+| **`AsyncBatchedStore` forwards every call at once as a one-operation batch** | Upstream coalesces concurrent calls into one batch; with synchronous execution results are identical but the batch count differs, so upstream's "should batch concurrent calls" assertion became a forwarding test. |
+| **Store namespace sort approximates JS `localeCompare`** | Case-insensitive then lowercase-first; ICU is not guaranteed in PHP, so punctuation ordering may differ. |
+| **Store `compareValues` compares arrays by value** | JS compares by reference; int and float are one number, as in JS. |
+| **Store and cache calls are synchronous** | No `Promise.all`; `embedDocuments`/`embedQuery` run in order. |
+| **`InMemoryStore` returns `Item` objects by reference** | As upstream: an update mutates an earlier-returned `Item`. |
+| **`PregelLoop::setWriteCache()` removed** | Never called anywhere; replaced by BaseCache-backed `matchCachedWrites()`/`cacheTaskWrites()`. `AsyncBatchedCache` is not ported (the loop uses the BaseCache directly). |
+| **`ToolRuntime::$store` is `?object`, filled from `configurable['__pregel_store']`** | `src/LangChain` must not import the LangGraph namespace (LayeringInstrumentScansCodeTest); retype when WP-13b ports the @langchain/core BaseStore. `NextTaskExtraFields::$store` is a dead `?array` field. |
 
 ## Upstream test conversion ledger
 
@@ -579,7 +587,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | provider regression suite (adversarial-review round 1, each mutation-verified) | — | 12 |
 | provider regression suite (round 2: system blocks, empty args, dropped kwargs, dead flag, stream retry) | — | 18 |
 | `runnables` — `RunnableBinding` precedence (added after review) | — | +4 |
-| **Total so far** | | **5283** |
+| **Total so far** | | **5537** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
