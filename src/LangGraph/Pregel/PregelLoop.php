@@ -370,6 +370,7 @@ class PregelLoop
     public function run($inputKeys = []): \Generator
     {
         $runner = new PregelRunner($this);
+        $failed = false;
 
         try {
             while ($this->tick($inputKeys)) {
@@ -397,6 +398,7 @@ class PregelLoop
                 );
             }
         } catch (\Throwable $e) {
+            $failed = true;
             $suppress = $this->finishAndHandleError($e);
             if (!$suppress) {
                 yield from $this->drain();
@@ -404,7 +406,12 @@ class PregelLoop
             }
         }
 
-        $this->finishAndHandleError();
+        // Exactly one finish per run (upstream's `finally { if (tickError === undefined) ... }`):
+        // an absorbed interrupt already finished above, and a second finish would save the exit
+        // checkpoint and flush the held-back writes a second time.
+        if (!$failed) {
+            $this->finishAndHandleError();
+        }
         yield from $this->drain();
 
         return $this->output;
@@ -501,6 +508,11 @@ class PregelLoop
                 triggerToNodes: $this->triggerToNodes,
                 updatedChannels: $this->updatedChannels,
             ),
+            // A task that already finished before a crash or an interrupt must be prepared again
+            // so that the pending-writes pass below can re-attach its recorded writes. Dropping it
+            // here (as a "completed" filter does) loses that task's output on resume: the node is
+            // not re-run, and nothing ever applies what it wrote.
+            includeCompleted: true,
         );
         foreach ($nextTasks as $nextTask) {
             $this->traceTask($nextTask);
