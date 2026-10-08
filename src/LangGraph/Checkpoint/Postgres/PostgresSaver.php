@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Checkpoint\Postgres;
 
-use LangGraph\Checkpoint\BaseCheckpointSaver;
+use LangGraph\Pregel\Checkpoint\BaseCheckpointSaver;
 use LangGraph\Checkpoint\Checkpoint;
 use LangGraph\Checkpoint\CheckpointConstants;
 use LangGraph\Checkpoint\CheckpointId;
