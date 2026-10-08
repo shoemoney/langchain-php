@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Nodes;
 
+use LangGraph\Agents\Utils as AgentUtils;
+
 /**
  * Node for executing a single middleware's `afterModel` hook (after each model call).
  *
@@ -16,7 +18,7 @@ final class AfterModelNode extends MiddlewareNode
      */
     public function __construct(array|object $middleware)
     {
-        parent::__construct($middleware, 'AfterModelNode_' . \LangGraph\Agents\Utils::middlewareName($middleware));
+        parent::__construct($middleware, 'AfterModelNode_' . AgentUtils::middlewareName($middleware));
     }
 
     protected function hookName(): string

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Nodes;
 
+use LangGraph\Agents\Utils as AgentUtils;
+
 /**
  * Node for executing a single middleware's `beforeAgent` hook (before the agent starts).
  *
@@ -16,7 +18,7 @@ final class BeforeAgentNode extends MiddlewareNode
      */
     public function __construct(array|object $middleware)
     {
-        parent::__construct($middleware, 'BeforeAgentNode_' . \LangGraph\Agents\Utils::middlewareName($middleware));
+        parent::__construct($middleware, 'BeforeAgentNode_' . AgentUtils::middlewareName($middleware));
     }
 
     protected function hookName(): string
