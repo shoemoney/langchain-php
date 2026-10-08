@@ -167,13 +167,13 @@ final class ReferenceCountInstrumentTest extends TestCase
             . 'inside a literal is a mention, not a use',
         );
 
-        // The three orphans, named in this very file and in HANDOFF, must still read
-        // as unreferenced. The sweep is re-implemented here rather than shelled out
+        // The remaining orphan, named in this very file and in HANDOFF, must still read
+        // as unreferenced. `BaseToolkit` and `FakeTool` were wired up by WP-02 (`ToolNode`
+        // flattens toolkits; its tests run `FakeTool`), which is exactly the situation the
+        // failure message below anticipates. The sweep is re-implemented here rather than shelled out
         // to, so the expectation is checkable inside the suite and does not depend
         // on Node/Python being present on the CI runner.
         foreach ([
-            'LangChain\\Tools\\BaseToolkit' => 'src/LangChain/Tools/BaseToolkit.php',
-            'LangChain\\Utils\\Testing\\FakeTool' => 'src/LangChain/Utils/Testing/FakeTool.php',
             'LangChain\\Utils\\Observable' => 'src/LangChain/Utils/Observable.php',
         ] as $class => $path) {
             $short = substr((string) strrchr('\\' . $class, '\\'), 1);
