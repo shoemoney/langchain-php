@@ -93,6 +93,55 @@ $response = $chain->invoke(['question' => 'Why is the sky blue?']);
 echo $response->content;
 ```
 
+### 🧰 An agent with a tool and middleware (`createAgent`)
+
+`Agent::create(array $options)` is the port of `createAgent`; it returns a `ReactAgent`. This runs
+offline against the scripted fake model, which first asks for the `get_weather` tool and then answers:
+
+```php
+use LangChain\Messages\AIMessage;
+use LangChain\Tools\Schema;
+use LangChain\Utils\Testing\FakeToolCallingChatModel;
+use LangGraph\Agents\Agent;
+use LangGraph\Agents\Middleware;
+
+use function LangChain\Tools\tool;
+
+$weather = tool(
+    fn (array $input): string => "It is sunny in {$input['city']}.",
+    ['name' => 'get_weather', 'description' => 'Look up the weather', 'schema' => Schema::object(['city' => ['type' => 'string']], ['city'])],
+);
+
+$model = new FakeToolCallingChatModel([
+    'sleep' => 0,
+    'responses' => [
+        new AIMessage(['content' => '', 'tool_calls' => [['type' => 'tool_call', 'name' => 'get_weather', 'args' => ['city' => 'Tokyo'], 'id' => 'call_1']]]),
+        new AIMessage('Sunny in Tokyo.'),
+    ],
+]);
+
+$agent = Agent::create([
+    'model' => $model,
+    'tools' => [$weather],
+    'systemPrompt' => 'You are a weather bot.',
+    'middleware' => [Middleware::create(['name' => 'log', 'beforeModel' => function (array $state): void { echo "model turn\n"; }])],
+]);
+
+$result = $agent->invoke(['messages' => 'Weather in Tokyo?']);
+foreach ($result['messages'] as $m) {
+    echo (new ReflectionClass($m))->getShortName(), ': ', $m->content, "\n";
+}
+// model turn
+// model turn
+// HumanMessage: Weather in Tokyo?
+// AIMessage:
+// ToolMessage: It is sunny in Tokyo.
+// AIMessage: Sunny in Tokyo.
+```
+
+Only the middleware hooks, structured-response strategies and agent nodes that exist are available; the
+pre-built middleware sets (summarisation, human-in-the-loop and friends) are **not** ported.
+
 ### 🦾 A ReAct agent (`createReactAgent`)
 
 `ReactAgent::create(array $params)` takes the keys of upstream's `CreateReactAgentParams`
@@ -136,8 +185,9 @@ $app->invoke([1, 2, 3], new RunnableConfig(configurable: ['thread_id' => 't1']))
 
 ### 🔎 An in-memory vector store
 
-`MemoryVectorStore` takes any `LangChain\Embeddings\Embeddings`; `OllamaEmbeddings` is the only
-concrete one shipped. There are no other vector-store backends yet.
+`MemoryVectorStore` takes any `LangChain\Embeddings\Embeddings` (`OpenAIEmbeddings`,
+`AzureOpenAIEmbeddings`, `FireworksEmbeddings`, `TogetherAIEmbeddings` and `OllamaEmbeddings` ship).
+There are no other vector-store backends yet.
 
 ```php
 use LangChain\VectorStores\MemoryVectorStore;
@@ -159,28 +209,32 @@ non-exact behaviours.
 | Area | State | Notes |
 |---|---|---|
 | 🧱 Messages, runnables (LCEL), prompts, output parsers, tools, tracers | ✅ Ported | `streamEvents`/`streamLog` are partial |
-| 💬 Chat models | 🟡 Partial | `ChatOpenAI` (Chat Completions and the Responses API, as a facade over `BaseChatOpenAI` / `ChatOpenAICompletions` / `ChatOpenAIResponses`), `ChatAnthropic`, `ChatOllama`. Streamed OpenAI custom-tool calls do not fold end to end; no Azure, no OpenAI hosted tools, no other providers |
-| 📚 Retrieval | 🟡 Partial | Base layer only: `VectorStores` (`MemoryVectorStore`), `Retrievers`, `ExampleSelectors`, `Indexing` (`RecordManager`, `Index::index`), `DocumentLoaders`. `FewShot*` prompt templates are not ported; `OllamaEmbeddings` is the only concrete embeddings class; no concrete backends, retrievers or loaders |
+| 💬 Chat models | 🟡 Partial | `ChatOpenAI` (Chat Completions and the Responses API, as a facade over `BaseChatOpenAI` / `ChatOpenAICompletions` / `ChatOpenAIResponses`), Azure OpenAI (`AzureChatOpenAI`), `ChatAnthropic`, `ChatOllama`, `ChatFireworks`, `ChatTogetherAI`, `ChatDeepSeek`, `ChatXAI` (Chat Completions only) and `ChatOpenRouter`. Every client is tested against a fake transport, never a live API. Streamed OpenAI custom-tool calls do not fold end to end; Fireworks and Together drop streamed `reasoning_content`; OpenRouter structured output is not validated; the xAI Responses API is not ported |
+| 🧩 Hosted tools | ✅ Ported (builders only) | OpenAI (`Chat\OpenAI\Tools`: web search, file search, code interpreter, MCP, image generation, shell, apply patch, computer use, custom, `DallEAPIWrapper`), Anthropic (`Chat\Anthropic\Tools`, with server-tool passthrough) and xAI search tools. Unit-tested against fakes; no live calls |
+| 🧬 Embeddings and legacy LLMs | 🟡 Partial | `OpenAIEmbeddings`, `AzureOpenAIEmbeddings`, `FireworksEmbeddings`, `TogetherAIEmbeddings`, `OllamaEmbeddings`; legacy `LLMs\{OpenAI,AzureOpenAI,Fireworks,TogetherAI}`. Upstream's `Promise.all` concurrency runs sequentially here |
+| 📚 Retrieval | 🟡 Partial | Base layer only: `VectorStores` (`MemoryVectorStore`), `Retrievers`, `ExampleSelectors`, `Indexing` (`RecordManager`, `Index::index`), `DocumentLoaders`. `FewShot*` prompt templates are not ported; no concrete backends, retrievers or loaders |
 | 🗄️ Stores, caches, chat history, memory, storage | ✅ Ported | `LangChain\{Stores,Caches,ChatHistory,Memory,Storage}`; models accept a `cache` option. `BaseMemory` only, no concrete memory classes |
 | 🔥 Structured query, text splitters, embeddings seam | ✅ Ported | |
 | 🕸️ Pregel engine, channels, `Graph`, `MessageGraph` | ✅ Ported | Superstep concurrency is sequential; timeouts cannot preempt; `sync` and `async` durability are identical |
-| 🧭 `StateGraph` | 🟡 Parity with non-exact items | `addSequence`, input/output schemas, node policies, `errorHandler`, `setNodeDefaults`, `validate`. The handler runs inline, `timeout` is not enforced, `GraphCallbackHandler` events are not ported; drawing / `getGraph` is open |
+| 🧭 `StateGraph` | 🟡 Parity with non-exact items | `addSequence`, input/output schemas, node policies, `errorHandler`, `setNodeDefaults`, `validate`. The handler runs inline, `timeout` is not enforced, `GraphCallbackHandler` events are not ported |
+| 🎨 Graph drawing | 🟡 Mermaid text ported | `Runnable::getGraph`, `Pregel::getGraph($config, $xray)` and `drawMermaid()` (checked byte for byte against upstream under Node). `drawMermaidPng()` returns image bytes but has never been run against the real mermaid.ink |
 | ⚙️ Functional API | 🟡 Partial | `Func::entrypoint`, `Func::task`, `Func::getPreviousState`; sequential, no `custom` stream mode |
-| 🦾 Prebuilt | 🟡 Partial | `ToolNode`, `toolsCondition`, `ReactAgent::create`, `HumanInterrupt`. A known engine defect breaks resume for a v2 agent making exactly two tool calls (`Topic::fromCheckpoint`, see HANDOFF) |
-| 🤖 Agents (`LangGraph\Agents`) | 🟡 Foundations only | State, errors, runtime, createAgent-flavoured `ToolNode`. **`createAgent` and middleware are not ported** |
+| 🦾 Prebuilt | 🟡 Partial | `ToolNode`, `toolsCondition`, `ReactAgent::create`, `HumanInterrupt`, `Supervisor::create`, `Swarm::create`. The `Topic::fromCheckpoint` two-tool-call resume defect is fixed. Supervisor and Swarm have no remote-graph branch, and deliver handoffs through a `ParentCommandBridge` because the engine does not handle `ParentCommand` |
+| 🤖 Agents (`LangGraph\Agents`) | 🟡 Partial | `Agent::create` (`createAgent`) returning a `ReactAgent`, `Middleware::create` with the hook nodes, `AgentNode`, `ToolStrategy` / `ProviderStrategy` structured responses, and the tool-call / subagent transformers. The transformers are driven by protocol-event arrays only: there is no v3 run stream. The pre-built middleware sets are not ported |
 | 💾 Checkpointers | 🟡 Partial | Memory, SQLite, Postgres (env-gated in CI), Redis (tested against a fake client), MongoDB (tested against a fake collection only, **never run against a real server**) |
 | 🧠 LangGraph store and cache | ✅ Ported | In-memory store and cache |
 | 🌐 LangGraph client SDK | 🟡 Partial | assistants, threads, store, crons, runs, `joinStream` and stream retry. `ThreadsClient::stream()` (the v2 protocol) is not ported; a signal is a polled callable, not an `AbortSignal` |
+| 🛰️ `RemoteGraph` | 🟡 Partial | `RemoteGraph` and `RemoteRunStream` over the SDK client, using `runs->create` + `joinStream` because `ThreadsClient::stream()` is not ported. Only part of `RemoteGraphRunStream` is ported; server error events throw a plain `RuntimeException` |
 | 🖼️ UI bindings (`sdk-react` etc.) | ⛔ Out of scope | Browser-only |
 
 <details>
 <summary>🚫 Not ported yet</summary>
 
-- `createAgent`, middleware, structured-response transformers
-- Supervisor / Swarm, `RemoteGraph`
-- Graph drawing (`getGraph`)
-- Azure, OpenAI hosted tools, and every provider beyond OpenAI, Anthropic and Ollama
+- `initChatModel` and the pre-built middleware sets (summarisation, human-in-the-loop, ...)
+- The xAI Responses API, `ThreadsClient::stream()` and the v3 run stream
+- Providers beyond OpenAI (incl. Azure), Anthropic, Ollama, Fireworks, Together, DeepSeek, xAI and OpenRouter
 - Concrete vector-store backends, retrievers and document loaders
+- MCP adapters
 - `custom` / `checkpoints` / `tasks` stream modes
 
 </details>
@@ -204,11 +258,23 @@ src/
     Caches/           BaseCache, InMemoryCache
     ChatHistory/      BaseChatMessageHistory, BaseListChatMessageHistory, InMemoryChatMessageHistory
     DocumentLoaders/  DocumentLoader, BaseDocumentLoader
-    Embeddings/       Embeddings interface, OllamaEmbeddings
+    Embeddings/       Embeddings interface; OpenAI, AzureOpenAI, Fireworks, TogetherAI, Ollama embeddings
     ExampleSelectors/ Length-based and semantic-similarity selectors, prompt selectors
     Indexing/         RecordManager, InMemoryRecordManager, HashedDocument, Index
     LanguageModels/   BaseChatModel, BaseLLM, Outputs/
-      Chat/          OpenAI/ (ChatOpenAI facade, Completions, Responses), Anthropic/, Ollama/
+      Chat/          one directory per provider client:
+        OpenAI/      ChatOpenAI facade, Completions, Responses, Converters/, Utils/
+          Azure/     AzureChatOpenAI and its Completions / Responses variants
+          Tools/     hosted-tool builders (web search, shell, computer use, ...)
+        Anthropic/   ChatAnthropic, Profiles, Utils/
+          Tools/     hosted-tool builders (web search, bash, text editor, ...)
+        Ollama/      ChatOllama (NDJSON)
+        Fireworks/   ChatFireworks
+        TogetherAI/  ChatTogetherAI
+        DeepSeek/    ChatDeepSeek (reasoning blocks)
+        XAI/         ChatXAI (Completions only), LiveSearch, Tools/
+        OpenRouter/  ChatOpenRouter, Converters/, Utils/
+      LLMs/          legacy completion LLMs: OpenAI, AzureOpenAI, Fireworks, TogetherAI
     Load/             Serializable
     Memory/           BaseMemory
     Messages/         BaseMessage + Human/AI/System/Tool/Function, content blocks
@@ -216,6 +282,7 @@ src/
     Prompts/          Prompt templates, chat prompt templates
     Retrievers/       BaseRetriever, BaseDocumentCompressor
     Runnables/        Runnable, Sequence, Parallel, Branch, Lambda, Binding, Assign, Passthrough
+      Graph/         Graph, Node, Edge, Mermaid (getGraph / drawMermaid)
     Schema/           Document, PromptValue
     Storage/          LocalFileStore, EncoderBackedStore, InMemoryStore
     Stores/           BaseStore, InMemoryStore
@@ -228,7 +295,11 @@ src/
       Testing/       Fakes (incl. FakeToolCallingChatModel)
     VectorStores/     VectorStore, MemoryVectorStore, VectorStoreRetriever
   LangGraph/
-    Agents/           createAgent foundations: AgentState, Runtime, Errors/, Nodes/ToolNode
+    Agents/           Agent::create (createAgent), ReactAgent, Middleware::create, AgentState, Runtime, Errors/
+      Middleware/    middleware types and utils
+      Nodes/         AgentNode, Before/After agent and model nodes, ToolNode
+      Responses/     ToolStrategy, ProviderStrategy, ResponseFormats
+      Transformers/  ToolCallTransformer, SubagentTransformer and protocol value classes
     Cache/            BaseCache, InMemoryCache
     Channels/         BaseChannel, LastValue, BinaryOperatorAggregate, Topic, ...
     Checkpoint/       BaseCheckpointSaver, MemorySaver, SqliteSaver
@@ -240,7 +311,9 @@ src/
     Func/             Func::entrypoint, Func::task, Func::getPreviousState
     Graph/            Graph, CompiledGraph, Branch, MessageGraph, messages reducer
     Prebuilt/         ToolNode, toolsCondition, ReactAgent, AgentState, HumanInterrupt
-    Pregel/           algo, loop, read, write, runner, retry, Call, CallScheduler, Validate, Timeout
+      Supervisor/    Supervisor::create, handoff tools, ParentCommandBridge
+      Swarm/         Swarm::create, handoff tools, active-agent router
+    Pregel/           algo, loop, read, write, runner, retry, Call, CallScheduler, Validate, Timeout, RemoteGraph
       Checkpoint/    Engine-side saver contract
       Messages/      messages / tools stream handlers
     Sdk/              LangGraph API client (assistants, threads, store, crons, runs)

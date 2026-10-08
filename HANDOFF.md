@@ -34,7 +34,7 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **14131 tests (13676 passing, 455 skipped), 33962 assertions** |
+| Tests | **14131 tests (13676 passing, 455 skipped), 33966 assertions** |
 | Size | 552 src files / 88,507 lines · 474 test files / 99,863 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
@@ -272,18 +272,27 @@ there is marked done **only if its tests exist and pass**.
   - **WP-02 prebuilt**: `ToolNode`, `toolsCondition`, `AgentName`, `CommandPassthroughTool` (adapter so a `Command` returned by a tool is not JSON-encoded). `ToolNode` rethrows only `GraphInterrupt`/`NodeInterrupt`. (`createReactAgent` landed later, in WP-03.)
   - **WP-09a/09b savers**: `Checkpoint\Postgres\*` (PDO; spec passed against real Postgres, env-gated on `LANGGRAPH_PG_DSN`) and `Checkpoint\Redis\*` behind `RedisClientInterface` (the suite runs against an in-memory fake; a real server only when `LANGGRAPH_REDIS_URL` is set, and that run deletes `checkpoint:*` keys in that database). Pregel needs a saver extending `LangGraph\Pregel\Checkpoint\BaseCheckpointSaver`. A skipped test breaks the done script and `sync_docs.py` (they need a plain `OK (N tests` line), so env gating switches backends instead of skipping. `ext-redis` is not in composer.json `suggest` yet.
   - **WP-14**: `LangChain\StructuredQuery\*` (IR, translators). **WP-16a**: OpenAI Responses API INPUT and tool converters (`formatToolChoice()` returns `?array`; null means omit); the output side landed in WP-16b. **WP-18a**: Anthropic `outputVersion: 'v1'`, `streamChatModelEvents()`, `AnthropicToolsOutputParser`, `Profiles`. **WP-19c**: `ChatOllama` (NDJSON, not SSE; an empty tool-arg map must encode as `{}`) and `OllamaEmbeddings`.
-  - **WP-23a SDK core**: `LangGraph\Sdk\*` assistants/threads/store/crons over `MethodHttpClient` (the shared `HttpClient` is POST-only). `getGraph` is spelled `getAssistantGraph` until WP-06 retires the Pregel `getGraph` OPEN row.
+  - **WP-23a SDK core**: `LangGraph\Sdk\*` assistants/threads/store/crons over `MethodHttpClient` (the shared `HttpClient` is POST-only). `getGraph` is spelled `getAssistantGraph`; WP-06 has since landed `Runnable::getGraph`, but the SDK spelling was not changed.
 - **Wave 2 (10 work packages, 12114 tests of which 455 are env-skipped)** — each accepted by an Opus review; many are 🟡, and the non-exact behaviours are in `PORT_STATUS.md`:
-  - **WP-05 `StateGraph` parity** (accepted in round 3): `addSequence`, `input` / `output` / `context` schemas, node policies (`retryPolicy`, `cachePolicy`, `timeout`, `errorHandler`), `setNodeDefaults`, `validate()`, subgraph detection. Non-exact: the error handler runs inline (not a separate task); updates and checkpoints are attributed to the failed node; `timeout` is recorded but not enforced; a handled failure is cached under the failed node's key; `GraphCallbackHandler` events are not ported; JSON Schema `input` / `output` is not run as a validator. Integrator commit 94db72b: `StateGraph::compile` skips the `['*']` interrupt-all wildcard (a WP-05 x WP-08b collision).
-  - **WP-03 `createReactAgent`**: `LangGraph\Prebuilt\ReactAgent::create(array $params)` (v1 and v2) plus `shouldBindTools` / `bindTools` / `getModel`, `AgentState`, `ConfigurableModelInterface`, `HumanInterrupt`, `HumanInterruptConfig`, `ActionRequest`, `HumanResponse`, and `LangChain\Utils\Testing\FakeToolCallingChatModel` (not final, so a test can subclass it as a spy). `LayeringDependencyDirectionTest` forbids `use LangChain\LanguageModels` anywhere in `src/LangGraph`, so chat models are duck-typed via `modelType() === 'chat'`. It exposed the `Topic::fromCheckpoint` defect under Open observations.
+  - **WP-05 `StateGraph` parity** (accepted in round 3): `addSequence`, `input` / `output` / `context` schemas, node policies (`retryPolicy`, `cachePolicy`, `timeout`, `errorHandler`), `setNodeDefaults`, `validate()`, subgraph detection. Non-exact: the error handler runs inline (not a separate task); updates and checkpoints are attributed to the failed node; `timeout` is recorded but not enforced; a handled failure used to be cached under the failed node's key (fixed in Wave 3); `GraphCallbackHandler` events are not ported; JSON Schema `input` / `output` is not run as a validator. Integrator commit 94db72b: `StateGraph::compile` skips the `['*']` interrupt-all wildcard (a WP-05 x WP-08b collision).
+  - **WP-03 `createReactAgent`**: `LangGraph\Prebuilt\ReactAgent::create(array $params)` (v1 and v2) plus `shouldBindTools` / `bindTools` / `getModel`, `AgentState`, `ConfigurableModelInterface`, `HumanInterrupt`, `HumanInterruptConfig`, `ActionRequest`, `HumanResponse`, and `LangChain\Utils\Testing\FakeToolCallingChatModel` (not final, so a test can subclass it as a spy). `LayeringDependencyDirectionTest` forbids `use LangChain\LanguageModels` anywhere in `src/LangGraph`, so chat models are duck-typed via `modelType() === 'chat'`. It exposed the `Topic::fromCheckpoint` defect (fixed in Wave 3, see Open observations).
   - **WP-08b Pregel state**: `updateState`, `bulkUpdateState`, `getStateHistory` filters (returns arrays), `getSubgraphs`, `durability`, `Validate`, `Utils\Config`, `RunControl`, `ReplayState`, `Timeout` / `TimeoutPolicy` / `NodeTimeoutError`. The timeout is non-exact: sync PHP cannot preempt, so it is judged after the node returns. It also fixed four loop bugs (see the Bugs table).
   - **WP-07 functional API**: `LangGraph\Func\{Func,EntrypointFinal}` (`Func::entrypoint`, `Func::task`, `Func::final`, `Func::getPreviousState`) and `LangGraph\Pregel\{Call,CallScheduler}`. Tasks run sequentially and eagerly; per-task streaming is emitted after the entrypoint returns; the `custom` stream mode is not supported. Gaps: `Pregel::getState()` raises a `TypeError` on an entrypoint, and there is no `Pregel::clearCache()`.
   - **WP-09c `MongoDBSaver`**: `LangGraph\Checkpoint\MongoDB\*` over `MongoCollectionInterface` with `FakeMongoCollection` (which must keep honouring sort, limit after sort, and `strcmp` ordering). **The live integration spec has never been run against a real MongoDB**: it skips without `LANGGRAPH_MONGO_URI` plus `ext-mongodb`, which is the entire 455-test skipped count. `composer.json` has no mongodb dependency, so a production driver adapter is still to do.
   - **WP-13a retrieval stack**: `LangChain\{VectorStores,Retrievers,ExampleSelectors,Indexing,DocumentLoaders}` including `MemoryVectorStore` (from langchain-classic), `Index::index`, `InMemoryRecordManager`. `BaseRetriever extends BaseLangChain`; subclasses implement protected `getRelevantDocuments()`. `BaseRetrieverInterface` deliberately does not extend `RunnableInterface`: an interface extending it, implemented by a `Runnable` subclass, fatals on the ambiguous `CHANNEL_DEFAULT` constant (same class of bug as section 6). Open hooks: `Schema\Document` needs `?string $id`; `FewShotPromptTemplate` / `FewShotChatMessagePromptTemplate` are not ported.
   - **WP-13b stores, caches, chat history, memory, storage**: `LangChain\{Stores,Caches,ChatHistory,Memory,Storage}`, separate from `LangGraph\Store` / `LangGraph\Cache`. Models take `['cache' => true|BaseCache]`; `true` means `InMemoryCache::global()`, a process-wide `\ArrayObject`, so tests should pass `new InMemoryCache()` to avoid leaking hits. `BaseChatModel` and `BaseLLM` declare their own constructor; a subclass constructor must call `parent::__construct($fields)` for `cache` to take effect.
   - **WP-16b OpenAI Responses output + provider split**: `BaseChatOpenAI` (abstract) -> `ChatOpenAICompletions` | `ChatOpenAIResponses`; `ChatOpenAI` extends `BaseChatOpenAI` and builds one delegate per call, routing on `useResponsesApi` or a Responses-only option. Known gap: a streamed custom tool call is not parsed by `AIMessageChunk::parseToolCalls()` (it does not understand `isCustomTool`).
-  - **WP-21a agent foundations**: `LangGraph\Agents\*` (namespace is LangGraph, not LangChain, because of the layering rule). `Agents\Nodes\ToolNode` is the createAgent variant and is separate from `Prebuilt\ToolNode`. **`createAgent` itself, `AgentNode` and middleware are WP-21b and are not done.**
+  - **WP-21a agent foundations**: `LangGraph\Agents\*` (namespace is LangGraph, not LangChain, because of the layering rule). `Agents\Nodes\ToolNode` is the createAgent variant and is separate from `Prebuilt\ToolNode`. (`createAgent`, `AgentNode` and middleware landed afterwards, in WP-21b; see Wave 3.)
   - **WP-23b SDK runs and streaming (PARTIAL)**: `RunsClient`, `Utils\{StreamRetry,Reconnect,Signals}`, `ThreadsClient::joinStream`, `Client->runs`, and the `StreamingMethodHttpClient` seam (`requestStream` returns a `StreamResponse`; null chunks are idle ticks). **`ThreadsClient::stream()` (the v2 thread-centric protocol) is not ported**, and a signal is a polled `callable(): bool`, not an `AbortSignal`. Test seams: `callerOptions.sleep` and `callerOptions.clock`.
+- **Wave 3 (13 merges: two engine fixes plus eleven work-package merges, WP-19b landing as two; 14131 tests of which 455 are env-skipped)** — landed 2026-10-08. Several are 🟡; non-exact behaviours are in `PORT_STATUS.md`. Every provider client is tested against a fake transport only, never a live API:
+  - **Engine fixes.** `Topic::fromCheckpoint` reads the `[seen, values]` shape only when `unique` (regression test `tests/Unit/Channels/TopicTwoSendsRegressionTest.php`); the port deliberately drops upstream's legacy pre-flat read for non-unique topics. A handled node failure is no longer cached: `StateGraph::getUpdates` appends a reserved `Constants::HANDLED` write and `PregelLoop::cacheTaskWrites` skips any task carrying it.
+  - **WP-06 drawing**: `LangChain\Runnables\Graph\{Graph,Node,Edge,Mermaid,RunnableIOSchema}`, `Runnable::getGraph`, `Pregel::getGraph($config, $xray)`. Mermaid text was checked against upstream under Node (24 cases). `drawMermaidPng` returns bytes as a string; the default fetch has never been run against the real mermaid.ink.
+  - **WP-11 Supervisor and Swarm**: `LangGraph\Prebuilt\{Supervisor\Supervisor,Swarm\Swarm}` with `::create(array $params)`. No remote-graph branch. The engine does not handle `ParentCommand` (`StateGraph::controlBranch` throws it for `Command(graph: PARENT)`), so each agent node runs through `Supervisor\ParentCommandBridge`; handling it in `PregelRunner` would make the bridge removable.
+  - **WP-17a**: Azure OpenAI chat (`Chat\OpenAI\Azure\*`, completions and responses), OpenAI `Profiles`, `OpenAIEmbeddings` / `AzureOpenAIEmbeddings`, legacy `LLMs\{OpenAI,AzureOpenAI}`. Non-exact: the Azure responses URL is built by string cutting.
+  - **WP-17b**: OpenAI hosted-tool builders, `Chat\OpenAI\Tools\*`. **WP-18b**: Anthropic hosted-tool builders, `Chat\Anthropic\Tools\*`, with server-tool passthrough in `MessageInputs::convertTool`.
+  - **WP-19a**: `ChatFireworks`, `ChatTogetherAI`, `ChatDeepSeek` plus their embeddings and LLMs. Known gap: Fireworks and Together drop streamed `reasoning_content` (see Open observations). **WP-19b**: `ChatXAI` (Chat Completions only) and `ChatOpenRouter` (`withStructuredOutput` does not validate the reply).
+  - **WP-21b**: `Agent::create` (`createAgent`, returns `ReactAgent`), `Middleware::create`, and `AgentNode` + the Before/After nodes under `LangGraph\Agents`. The graph-structure tests compare against upstream's snapshot data. **WP-21c**: structured responses (`ToolStrategy` / `ProviderStrategy`) and the tool-call / subagent transformers; the v3 run-stream cases are not ported.
+  - **WP-26 `RemoteGraph` (PARTIAL)**: `LangGraph\Pregel\{RemoteGraph,RemoteRunStream}` over `runs->create` + `joinStream`, because `ThreadsClient::stream()` (v2) is not ported; only part of `RemoteGraphRunStream` is ported; the signal is a polled callable.
 
 ---
 
@@ -310,27 +319,31 @@ because nothing calls them today; that is the reasoning that removes a port
 rather than completing it.
 
 1. **Agents.** 🟡 `ToolNode`, `toolsCondition` and `agentName` (WP-02), `ReactAgent::create`
-   (`createReactAgent`, WP-03) and the `LangGraph\Agents` foundations (WP-21a) landed.
-   **`createAgent`, `AgentNode`, the Before/After nodes and middleware are not ported**
-   (WP-21b), nor are structured responses and transformers (WP-21c). Supervisor and Swarm
-   (WP-11) are not started.
-2. **Finish the provider clients.** 🟡 `ChatOpenAI` (Chat Completions and the Responses API,
-   WP-16b), `ChatAnthropic` and `ChatOllama` are ported and tested. Outstanding: `azure/`
-   and OpenAI `profiles` (WP-17a), the OpenAI hosted tools (WP-17b), the Anthropic
-   hosted-tool builders (WP-18b), Fireworks/Together/DeepSeek (WP-19a), xAI and OpenRouter
-   (WP-19b), Anthropic `extract_generated_files` and prompt caching helpers.
+   (`createReactAgent`, WP-03), the `LangGraph\Agents` foundations (WP-21a), `createAgent` with
+   middleware (WP-21b), structured responses and transformers (WP-21c), and Supervisor / Swarm
+   (WP-11) landed. **Not ported:** the pre-built middleware sets (WP-22a/b/c), `initChatModel`
+   (WP-20), and the v3 run stream the transformers would plug into.
+2. **Finish the provider clients.** 🟡 `ChatOpenAI` (Chat Completions and Responses), Azure
+   OpenAI and OpenAI `Profiles`, `ChatAnthropic`, `ChatOllama`, `ChatFireworks`, `ChatTogetherAI`,
+   `ChatDeepSeek`, `ChatXAI` (Completions only), `ChatOpenRouter`, and the OpenAI / Anthropic
+   hosted-tool builders are ported and tested against fake transports. Outstanding: **the xAI
+   Responses API (a Wave 4 / backlog candidate)**, Anthropic `extract_generated_files` and
+   prompt caching helpers, and every provider not listed here.
 3. `langgraph` client SDK — 🟡 core (WP-23a) plus the runs client, `joinStream`,
    `streamWithRetry` and signals (WP-23b) landed. Not ported: `ThreadsClient::stream()` (the v2
-   thread-centric protocol) and the internal `~ui` client. `RemoteGraph` (WP-26) is not started.
+   thread-centric protocol) and the internal `~ui` client. `RemoteGraph` (WP-26) is 🟡 partial:
+   it runs over `runs->create` + `joinStream` and ports only part of `RemoteGraphRunStream`.
 4. Concrete vector-store backends, concrete retrievers, concrete document loaders and
    concrete memory classes. ⬜ The base layer plus `MemoryVectorStore` landed (WP-13a/b);
-   `OllamaEmbeddings` is the only concrete embeddings class.
+   the concrete embeddings are `OpenAIEmbeddings`, `AzureOpenAIEmbeddings`, `FireworksEmbeddings`,
+   `TogetherAIEmbeddings` and `OllamaEmbeddings`.
 5. MongoDB checkpoint saver. 🟡 `MongoDBSaver` landed over a collection seam (WP-09c) but
    has **never run against a real MongoDB** and has no production driver adapter. Postgres
    (spec-verified, env-gated in CI) and Redis (fake-verified; real server env-gated on
    `LANGGRAPH_REDIS_URL`) landed in Wave 1.
-6. `langgraph/graph` — 🟡 `Graph`, `CompiledGraph`, `Branch`, `MessageGraph` (WP-04) and
-   `StateGraph` parity (WP-05, non-exact) landed. Open: drawing / `getGraph` (WP-06).
+6. `langgraph/graph` — 🟡 `Graph`, `CompiledGraph`, `Branch`, `MessageGraph` (WP-04),
+   `StateGraph` parity (WP-05, non-exact) and drawing / `getGraph` (WP-06; `drawMermaidPng` never run against
+   the real mermaid.ink) landed.
 7. `langgraph/func` — 🟡 `entrypoint` / `task` landed (WP-07); sequential, no `custom` stream mode.
 8. `utils`: 🟡 `env`, `json_patch`, `function_calling` landed (WP-12a is partial, see
    PORT_STATUS); `standard_schema` and `tiktoken` ⬜.
@@ -383,21 +396,44 @@ Unresolved, recorded so they are not re-discovered:
   ~1853/6325 (about `ProviderClientRegressionTest::testAnthropicStreamingFailureBecomesAnAnthropicException`)
   until composer's 300s timeout. It did not reproduce in 3 full runs, 15 isolated runs, or any
   later run. Cause unknown; investigate if it recurs.
-- **ENGINE BUG, found by WP-03 and NOT fixed: `LangGraph\Channels\Topic::fromCheckpoint()` misreads exactly two queued `Send`s.**
-  It treats any 2-element list whose two entries are arrays as the `unique: true` `[seen, values]` shape,
-  even when `unique` is false (`src/LangGraph/Channels/Topic.php`, the `count($checkpoint) === 2` branch).
-  Two queued Sends, for example a v2 `ReactAgent` making exactly two tool calls, are restored as
-  `["work", {"n":2}]`. After an interrupt the pending PUSH tasks vanish, `getState()` shows `next=[]` and
-  `tasks=0`, and `Command(resume)` does nothing. **Repro:** a `StateGraph` with a node whose conditional edge
-  returns two `Send('work', ...)`, one of which calls `interrupt()`; run it, then resume. One or three Sends
-  work. Upstream's "parallel tool calls" test uses exactly two calls, so WP-03 ran it with three (weather x2
-  plus `human_assistance`) and left a comment in the test. Suggested fix: guard that branch with `$this->unique`.
-- **WP-05 follow-up: skip `PregelLoop::cacheTaskWrites` for writes produced by an error handler.** The handler
-  runs inline in the node's own task, so a handled failure is cached under the failed node's key and replays from
-  cache for the whole TTL when `cachePolicy` is on. Upstream never caches a failed task (`loop.ts:838-853`).
-  Pinned by `NodeErrorHandlerTest::testAHandledFailureIsCachedUnderTheFailedNodesKey`; the pin must be inverted
-  when this is fixed. Related edge: a node with an error handler gets `compiledRetry = null`, so a graph-level
-  `retryPolicy` could re-run the whole wrapper (node plus handler).
+- **One nondeterministic mass failure.** During Wave 3 landing a single `sync_docs.py` measurement produced **4410 errors across
+  unrelated classes** (`HashTest`, the Redis specs, the transport tests). The suite run immediately afterwards passed, and the
+  cause is unexplained; the suspicion is machine load from about 13 concurrent verifier suites. Logged next to the Wave 1 hang
+  because both are one-off, unreproduced and load-shaped. If a count measurement ever looks wild, re-run the suite before
+  believing it (`sync_docs.py` refuses to write on a failing run, which is what protected the ledger here).
+- ~~**ENGINE BUG, found by WP-03 and NOT fixed: `LangGraph\Channels\Topic::fromCheckpoint()` misreads exactly two queued `Send`s.**~~
+  **FIXED (Wave 3, 2026-10-08).** The `[seen, values]` branch (`src/LangGraph/Channels/Topic.php`) was taken for any
+  2-element list of arrays; it is now guarded by `$this->unique`. Corrected repro, because the first one was wrong:
+  the bare `StateGraph` / `Send` pattern (a conditional edge returning two `Send('work', ...)`, one calling `interrupt()`)
+  does **NOT** reproduce the loss. Only a `ReactAgent` v2 making **exactly two parallel tool calls with an interrupt in
+  one of them** does: before the fix `getState()->next` was `[]` with `tasks=0` and resume returned only
+  `[user, 'ai response']`; after it `next=['tools']` and `tasks=2`. The 1 / 2 / 3-`Send` `StateGraph` cases in
+  `tests/Unit/Channels/TopicTwoSendsRegressionTest.php` are controls; the reproducing case is
+  `testTwoParallelToolCallsWithAnInterruptSurviveCheckpointAndResume`, mutation-checked by removing the guard. The port
+  **deliberately drops** upstream's legacy pre-flat `[seen, values]` read for non-unique topics (it has no legacy
+  pre-flat checkpoints). Leftover: `tests/Unit/Prebuilt/ReactAgentToolNodeTest.php` still runs upstream's two-call case with
+  three calls under a now-stale comment.
+- ~~**WP-05 follow-up: skip `PregelLoop::cacheTaskWrites` for writes produced by an error handler.**~~ **FIXED (Wave 3,
+  2026-10-08).** A handler outcome now carries a reserved `Constants::HANDLED` (`__handled__`) write, appended by
+  `StateGraph::getUpdates`, and `cacheTaskWrites` returns early if any write has that key (upstream never caches a failed
+  task, `loop.ts:838-853`). The pin was inverted to `NodeErrorHandlerTest::testAHandledFailureIsNotCachedUnderTheFailedNodesKey`.
+  Still open: a node with an error handler gets `compiledRetry = null`, so a graph-level `retryPolicy` could re-run the whole
+  wrapper (node plus handler).
+- **NEW, `PregelRunner::taskResult` leaks the marker.** It copies every write except `NO_WRITES` into the debug-mode
+  `task_result` payload, so a handled node shows `{"foo":"h","__handled__":true}` in the `debug` stream. Channel state, `updates`
+  and `values` are unaffected, and no test pins the leak. A one-line filter on `Constants::HANDLED` (as for `NO_WRITES`) closes it.
+- **NEW, `Completions::deltaToChunk` drops streamed `reasoning_content`.** `ChatFireworks` and `ChatTogetherAI` subclass
+  `ChatOpenAICompletions` unmodified, so they lose reasoning deltas while streaming (`ChatDeepSeek` and `ChatOpenRouter` carry
+  it themselves); two upstream stream-reasoning tests are not converted for that reason. Fix it in
+  `src/LangChain/LanguageModels/Chat/OpenAI/Utils/Completions.php` and the two Fireworks / Together tests can follow.
+- **NEW, `ParentCommand` is not handled by the engine.** `PregelRunner::runWithRetry` / `commit` and `CallScheduler` never re-address
+  a `ParentCommand`, which `StateGraph::controlBranch` throws for any `Command(graph: PARENT)`, so a handoff tool inside a plain
+  subgraph kills the run. WP-11 works around it with `Supervisor\ParentCommandBridge`; handling it in the runner as upstream's
+  `_runWithRetry` does would make the bridge removable.
+- **Other Wave 3 gaps:** `LangGraph\Errors\RemoteException` does not exist, so `RemoteGraph` throws a plain `\RuntimeException` on a server
+  `error` event; `ChatOllama` and `ChatOpenAICompletions` call `handleLLMNewToken($text, ['chunk' => $chunk])`, which puts the fields array in
+  the `$idx` position (`ChatOpenRouter` does it correctly); the messages reducer treats equal message ids as an update, so a scripted
+  provider reusing one response id collapses the AI messages in an agent loop; `AzureChatOpenAIResponses::url()` builds its URL by string cutting.
 - **455 skipped tests are the MongoDB integration spec** (`MongoDBSaverIntegrationTest`, gated on
   `LANGGRAPH_MONGO_URI` plus `ext-mongodb`). They inflate the Skipped count in `composer test`, and the saver has
   never been exercised against a real server.
@@ -413,14 +449,16 @@ Unresolved, recorded so they are not re-discovered:
 
 ## Where to start
 
-Recommended order, and why. Waves 0, 1 and 2 of `.loop/COMPLETION_PLAN.md` have landed (Wave 2: WP-03, 05, 07, 08b, 09c, 13a, 13b, 16b, 21a, 23b; several are 🟡, see above). `Pregel`/`CompiledStateGraph` carry a `checkpointerDisabled` flag set by `StateGraph::compile`. **Next is Wave 3**: WP-06 (drawing / `getGraph`), WP-11 (Supervisor + Swarm), WP-17a (Azure, profiles, embeddings, legacy LLM), WP-17b (OpenAI hosted tools), WP-18b (Anthropic hosted-tool builders), WP-19a (Fireworks/Together/DeepSeek), WP-19b (xAI + OpenRouter), WP-21b then WP-21c (`createAgent` and middleware, then structured responses), and WP-26 (RemoteGraph).
+Recommended order, and why. Waves 0, 1, 2 and 3 of `.loop/COMPLETION_PLAN.md` have landed (Wave 3: WP-06, 11, 17a, 17b, 18b, 19a, 19b, 21b, 21c, 26 plus the Topic and handler-cache engine fixes; several are 🟡, see above). **Next is Wave 4**:
 
-1. **Fix the `Topic::fromCheckpoint` defect first** (see Open observations): it silently breaks interrupt/resume
-   for any graph that fans out exactly two Sends, and WP-21b's agent will hit it.
-2. **`createAgent` (WP-21b)**, which needs the WP-21a foundations and the now-landed `StateGraph` input/output schemas.
-3. **Drawing / `getGraph` (WP-06)**, which retires the `getGraph` OPEN row in `PORT_STATUS.md` and the
-   `getAssistantGraph` spelling in the SDK.
-4. Then work down the NOT-ported list.
+1. **WP-20 `initChatModel`.**
+2. **WP-22a / WP-22b / WP-22c**, the pre-built middleware sets that sit on the WP-21b `Middleware::create` foundation.
+3. **WP-10, the store backends (three of them).**
+4. **WP-25 MCP adapters**, as a stretch item.
+5. **Close the open follow-ups first if they are cheap** (see Open observations): the `PregelRunner::taskResult` `__handled__` debug leak (one line), `Completions::deltaToChunk` dropping `reasoning_content` (then convert the two Fireworks / Together reasoning tests), `ParentCommand` handling in the runner (then drop `ParentCommandBridge`), `LangGraph\Errors\RemoteException`, and `ReactAgentToolNodeTest` back to upstream's two-call form.
+6. **Backlog candidates:** the xAI Responses API, `ThreadsClient::stream()` (v2) with the v3 run stream and the remaining `RemoteGraphRunStream` projections, a real-server run of `drawMermaidPng`, and then the NOT-ported list.
+
+`Pregel`/`CompiledStateGraph` carry a `checkpointerDisabled` flag set by `StateGraph::compile`.
 
 When porting a subsystem: read the upstream TS, port the **tests** with it,
 and prefer running the real upstream TypeScript under Node as an executable
