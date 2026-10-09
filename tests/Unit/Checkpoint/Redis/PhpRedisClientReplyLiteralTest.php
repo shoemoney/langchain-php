@@ -6,9 +6,11 @@ namespace LangChain\Tests\Unit\Checkpoint\Redis;
 
 use LangGraph\Checkpoint\Redis\PhpRedisClient;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(PhpRedisClient::class)]
+#[RequiresPhpExtension('redis')]
 final class PhpRedisClientReplyLiteralTest extends TestCase
 {
     private static function fakeRedis(bool $initial, bool $fail = false): \Redis
