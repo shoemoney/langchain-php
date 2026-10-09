@@ -154,7 +154,8 @@ class PregelRunner
         $out = [];
         foreach ($task->writes as $write) {
             $channel = $write[0] ?? null;
-            if (!is_string($channel) || $channel === Constants::NO_WRITES) {
+            // HANDLED is bookkeeping for PregelLoop::cacheTaskWrites(), not part of the result.
+            if (!is_string($channel) || $channel === Constants::NO_WRITES || $channel === Constants::HANDLED) {
                 continue;
             }
             $out[$channel] = $write[1] ?? null;
