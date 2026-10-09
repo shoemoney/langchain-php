@@ -226,11 +226,12 @@ final class FakeRedisClient implements RedisClientInterface
                 'value' => $this->json[$key],
                 'sort' => $sortBy === '' ? null : $this->fieldValue($doc, $definition['fields'][$sortBy]['path'] ?? ''),
                 'distance' => null,
+                'order' => count($rows),
             ];
         }
 
         if ($knn !== null) {
-            $rows = $this->nearest($rows, $definition['fields'], $knn, $params);
+            $rows = $this->nearest($rows, $definition['fields'], $knn, $params, $sortBy === '__' . $knn['field'] . '_score');
         } else {
             usort($rows, static function (array $a, array $b) use ($descending): int {
                 $cmp = ($a['sort'] ?? 0) <=> ($b['sort'] ?? 0);
@@ -539,13 +540,16 @@ final class FakeRedisClient implements RedisClientInterface
     /**
      * The `k` nearest rows by the vector field's distance metric, ties broken by id.
      *
-     * @param list<array{id: string, doc: array<string, mixed>, value: string, sort: mixed, distance: float|null}> $rows
-     * @param array<string, array{path: string, type: string, attributes: array<string, string|int>}>             $fields
-     * @param array{k: int, field: string, param: string}                                                          $knn
-     * @param array<string, string>                                                                                $params
-     * @return list<array{id: string, doc: array<string, mixed>, value: string, sort: mixed, distance: float|null}>
+     * The k nearest are chosen by distance, but, as on the server, they come back ordered by distance
+     * only when the query says `SORTBY __<field>_score`; otherwise in the order the documents were indexed.
+     *
+     * @param list<array{id: string, doc: array<string, mixed>, value: string, sort: mixed, distance: float|null, order: int}> $rows
+     * @param array<string, array{path: string, type: string, attributes: array<string, string|int>}>                         $fields
+     * @param array{k: int, field: string, param: string}                                                                      $knn
+     * @param array<string, string>                                                                                            $params
+     * @return list<array{id: string, doc: array<string, mixed>, value: string, sort: mixed, distance: float|null, order: int}>
      */
-    private function nearest(array $rows, array $fields, array $knn, array $params): array
+    private function nearest(array $rows, array $fields, array $knn, array $params, bool $byDistance): array
     {
         $field = $fields[$knn['field']] ?? null;
         if ($field === null || $field['type'] !== 'VECTOR') {
@@ -574,7 +578,12 @@ final class FakeRedisClient implements RedisClientInterface
         }
         usort($scored, static fn (array $a, array $b): int => ($a['distance'] <=> $b['distance']) ?: strcmp($a['id'], $b['id']));
 
-        return array_slice($scored, 0, $knn['k']);
+        $nearest = array_slice($scored, 0, $knn['k']);
+        if (!$byDistance) {
+            usort($nearest, static fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+        }
+
+        return $nearest;
     }
 
     /**
@@ -602,7 +611,7 @@ final class FakeRedisClient implements RedisClientInterface
     /**
      * The RETURN projection: a JSON object of string values, like the server's field/value pairs.
      *
-     * @param array{id: string, doc: array<string, mixed>, value: string, sort: mixed, distance: float|null} $row
+     * @param array{id: string, doc: array<string, mixed>, value: string, sort: mixed, distance: float|null, order: int} $row
      * @param array<string, array{path: string, type: string}>                                               $fields
      * @param list<string>                                                                                    $return
      * @param array{k: int, field: string, param: string}|null                                                $knn

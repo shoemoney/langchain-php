@@ -1078,7 +1078,7 @@ abstract class RedisStoreSpecCase extends TestCase
 
         self::assertNull($store->get(['t'], 'short'));
         self::assertNotNull($store->get(['t'], 'long'));
-        self::assertSame(1, $store->stats()['vectorDocuments'], 'the vector key expired with its item');
+        self::assertCount(1, $this->client->keys('store_vectors:*'), 'the vector key expired with its item');
     }
 
     public function testSearchRefreshTtlRearmsEveryHit(): void

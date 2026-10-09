@@ -153,6 +153,10 @@ final class RedisStore extends BaseStore
         }
 
         RedisUtils::ensureIndexes($this->client, $schemas);
+
+        foreach ($schemas as $schema) {
+            $this->awaitIndexing($schema['index']);
+        }
     }
 
     /**
@@ -508,7 +512,9 @@ final class RedisStore extends BaseStore
     {
         [$embedding] = $embeddings->embedDocuments([$query]);
 
-        // Narrow on the first token of the prefix, wildcarded, as upstream does.
+        // Narrow on the first token of the prefix, wildcarded, as upstream does. Upstream leaves the
+        // hits unsorted, and a filtered KNN query then returns them in index order, not best-first;
+        // sorting by the distance makes the first result the nearest.
         $first = FilterBuilder::prefixTokens($prefix)[0] ?? null;
         $scope = $prefix !== '' && $first !== null ? "@prefix:{$first}*" : '*';
 
@@ -518,7 +524,7 @@ final class RedisStore extends BaseStore
                 "({$scope})=>[KNN {$limit} @embedding \$BLOB]",
                 $offset,
                 $limit,
-                '',
+                '__embedding_score',
                 false,
                 ['prefix', 'key', '__embedding_score'],
                 ['BLOB' => pack('g*', ...array_map('floatval', $embedding))],
@@ -587,6 +593,26 @@ final class RedisStore extends BaseStore
         }
 
         return $all ? $matches : ($matches[0] ?? null);
+    }
+
+    /**
+     * Wait (briefly) for a new index to finish its initial scan.
+     *
+     * A document written while RediSearch is still back-filling an index can be left out of it for
+     * good. Upstream does not wait; a store that is about to be written to should.
+     */
+    private function awaitIndexing(string $index): void
+    {
+        for ($attempt = 0; $attempt < 200; $attempt++) {
+            try {
+                if ((int) ($this->client->ftInfo($index)['indexing'] ?? 0) === 0) {
+                    return;
+                }
+            } catch (RedisClientException) {
+                return;
+            }
+            usleep(5000);
+        }
     }
 
     private function refreshItemTtl(string $docId): void
