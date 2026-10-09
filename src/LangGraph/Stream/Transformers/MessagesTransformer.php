@@ -90,7 +90,7 @@ final class MessagesTransformer extends AbstractStreamTransformer
                 if (isset($this->ignored[$key])) {
                     break;
                 }
-                $this->active[$key]?->push($data);
+                ($this->active[$key] ?? null)?->push($data);
                 break;
 
             case 'message-finish':

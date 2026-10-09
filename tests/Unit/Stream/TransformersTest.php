@@ -326,6 +326,33 @@ final class TransformersTest extends TestCase
         $this->assertSame(['input_tokens' => 3, 'output_tokens' => 4], $stream->usage());
     }
 
+    public function testOrphanContentBlockAndErrorEventsForAnUnknownKeyAreDroppedSilently(): void
+    {
+        $transformer = new MessagesTransformer([]);
+        $proj = $transformer->init();
+
+        $warnings = [];
+        set_error_handler(static function (int $no, string $str) use (&$warnings): bool {
+            $warnings[] = $str;
+
+            return true;
+        });
+        try {
+            $delta = $transformer->process(self::messageEvent(['event' => 'content-block-delta', 'run_id' => 'r1', 'index' => 0, 'content' => ['type' => 'text', 'text' => 'x']]));
+            $error = $transformer->process(self::messageEvent(['event' => 'error', 'run_id' => 'r1', 'message' => 'boom']));
+            $noKey = $transformer->process(self::messageEvent(['event' => 'content-block-delta', 'index' => 0, 'content' => ['type' => 'text', 'text' => 'y']]));
+        } finally {
+            restore_error_handler();
+        }
+        $transformer->finalize();
+
+        $this->assertTrue($delta);
+        $this->assertTrue($error);
+        $this->assertTrue($noKey);
+        $this->assertSame([], $warnings);
+        $this->assertCount(0, self::collect($proj['messages']));
+    }
+
     public function testAMessageStillOpenAtFinalizeIsClosedWithASyntheticFinish(): void
     {
         $transformer = new MessagesTransformer([]);
