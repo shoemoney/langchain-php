@@ -13,7 +13,10 @@ use LangChain\Tests\Unit\Agents\Support\FakeToolCallingModel;
 use LangChain\Tools\Schema;
 use LangChain\Tools\StructuredTool;
 use LangGraph\Agents\Agent;
+use LangGraph\Agents\Middleware\ClearToolUsesEdit;
+use LangGraph\Agents\Middleware\ContextEditingMiddleware;
 use LangGraph\Agents\Middleware\HumanInTheLoopMiddleware;
+use LangGraph\Agents\Middleware\SummarizationMiddleware;
 use LangGraph\Agents\ReactAgent;
 use LangGraph\Agents\Runtime;
 use LangGraph\Checkpoint\MemorySaver;
@@ -904,6 +907,54 @@ final class HumanInTheLoopMiddlewareTest extends TestCase
         $agent->invoke(['messages' => [new HumanMessage('go')]], ['configurable' => ['thread_id' => 'none']]);
 
         self::assertCount(1, $this->writeFileCalls);
+    }
+
+    public function testComposesWithSummarizationAndContextEditingEndToEnd(): void
+    {
+        $summarizer = new class () {
+            /** @var list<string> */
+            public array $calls = [];
+
+            public function invoke(string $prompt, mixed $config = null): array
+            {
+                $this->calls[] = $prompt;
+
+                return ['content' => 'The user asked to write hello to a.txt.'];
+            }
+        };
+        $agent = Agent::create([
+            'model' => new FakeToolCallingModel(['toolCalls' => [[self::write('call_1', 'a.txt', 'hello')], []]]),
+            'checkpointer' => new MemorySaver(),
+            'tools' => [$this->writeFileTool],
+            'middleware' => [
+                SummarizationMiddleware::create(['model' => $summarizer, 'trigger' => ['messages' => 3], 'keep' => ['messages' => 1]]),
+                ContextEditingMiddleware::create(['edits' => [new ClearToolUsesEdit(['trigger' => ['tokens' => 10], 'keep' => ['messages' => 0]])]]),
+                HumanInTheLoopMiddleware::create(['interruptOn' => ['write_file' => true]]),
+            ],
+        ]);
+        $config = ['configurable' => ['thread_id' => 'compose']];
+
+        $agent->invoke(['messages' => [new HumanMessage('Write hello to a.txt')]], $config);
+
+        // Paused on the write, nothing summarized or written yet
+        self::assertSame('write_file', self::pendingRequest($agent, $config)['actionRequests'][0]['name']);
+        self::assertSame([], $this->writeFileCalls);
+        self::assertSame([], $summarizer->calls);
+
+        $result = $agent->invoke(self::resume([['type' => 'approve']]), $config);
+
+        // The approved call ran once; the history was summarized before the next model call, then the tool
+        // result was cleared from it
+        self::assertSame([['filename' => 'a.txt', 'content' => 'hello']], $this->writeFileCalls);
+        self::assertCount(1, $summarizer->calls);
+        $messages = $result['messages'];
+        self::assertInstanceOf(HumanMessage::class, $messages[0]);
+        self::assertStringContainsString('Here is a summary of the conversation to date', $messages[0]->content);
+        $toolMessages = AgentAssertions::ofType($messages, ToolMessage::class);
+        self::assertCount(1, $toolMessages);
+        self::assertSame('[cleared]', $toolMessages[0]->content);
+        self::assertInstanceOf(AIMessage::class, $messages[array_key_last($messages)]);
+        self::assertSame([], $agent->getState($config)->next);
     }
 
     public function testLiveApiTestsAreNotConverted(): void
