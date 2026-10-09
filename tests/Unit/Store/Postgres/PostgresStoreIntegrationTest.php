@@ -252,6 +252,23 @@ final class PostgresStoreIntegrationTest extends TestCase
         self::assertSame([], $store->search($namespace, ['query' => 'test document', 'mode' => 'vector']));
     }
 
+    public function testAnEmptyIndexListIndexesNothingAndClearsExistingVectors(): void
+    {
+        $embeddings = new MockEmbeddings(128, true);
+        $store = $this->vectorStore($embeddings);
+        $schema = PostgresStoreTestConnection::schemaOf($store);
+        $namespace = ['vectors'];
+
+        $store->put($namespace, 'k', ['title' => 'first'], null);
+        self::assertNotSame([], $this->rows($store, "SELECT 1 FROM \"{$schema}\".store_vectors WHERE key = ?", ['k']));
+
+        $before = count($embeddings->calls);
+        $store->put($namespace, 'k', ['title' => 'second'], []);
+
+        self::assertCount($before, $embeddings->calls);
+        self::assertSame([], $this->rows($store, "SELECT 1 FROM \"{$schema}\".store_vectors WHERE key = ?", ['k']));
+    }
+
     public function testShouldSupportSpecificFieldsToIndex(): void
     {
         $embeddings = new MockEmbeddings(128, true);

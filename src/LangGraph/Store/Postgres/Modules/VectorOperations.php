@@ -37,7 +37,7 @@ final class VectorOperations
             [$namespacePath, $key],
         );
 
-        $fields = ($index === null || $index === []) ? ($indexConfig->fields ?? ['$']) : $index;
+        $fields = $index === null ? ($indexConfig->fields ?? ['$']) : $index;
         /** @var list<array{fieldPath: string, text: string}> $textsToEmbed */
         $textsToEmbed = [];
 
