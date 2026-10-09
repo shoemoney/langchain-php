@@ -87,7 +87,7 @@ if (!$isInitialize) {
 
         return;
     }
-    if ($variant === 'expired' || !is_file($sessionFile($sessionId))) {
+    if (($variant === 'expired' && ($message['method'] ?? '') !== 'notifications/initialized') || !is_file($sessionFile($sessionId))) {
         http_response_code(404);
         echo 'Session not found';
 

@@ -36,6 +36,8 @@ final class StreamableHttpTransport implements TransportInterface
 
     private ?string $protocolVersion = null;
 
+    private ?float $requestTimeout = null;
+
     private bool $started = false;
 
     /** @var list<array<string, mixed>> */
@@ -85,6 +87,11 @@ final class StreamableHttpTransport implements TransportInterface
     public function sessionId(): ?string
     {
         return $this->sessionId;
+    }
+
+    public function setRequestTimeout(float $seconds): void
+    {
+        $this->requestTimeout = $seconds;
     }
 
     public function setProtocolVersion(string $version): void
@@ -288,6 +295,7 @@ final class StreamableHttpTransport implements TransportInterface
                 'http_errors' => false,
                 'stream' => $stream,
                 'read_timeout' => 1,
+                ...($this->requestTimeout === null ? [] : ['timeout' => $this->requestTimeout]),
             ]);
         } catch (GuzzleException $e) {
             throw new McpClientError("MCP HTTP request failed: {$e->getMessage()}", null, $e);

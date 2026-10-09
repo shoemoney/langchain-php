@@ -300,9 +300,10 @@ final class McpClient implements McpClientInterface, ElicitationCapableClientInt
     private function request(string $method, array $params, array $extra = []): array
     {
         $id = ++$this->nextId;
+        $timeoutMs = $extra['timeout'] ?? $this->options['requestTimeoutMs'] ?? self::DEFAULT_TIMEOUT_MS;
+        $this->transport->setRequestTimeout($timeoutMs / 1000);
         $this->transport->send(JsonRpc::request($id, $method, $params));
 
-        $timeoutMs = $extra['timeout'] ?? $this->options['requestTimeoutMs'] ?? self::DEFAULT_TIMEOUT_MS;
         $signal = $extra['signal'] ?? null;
         $deadline = microtime(true) + $timeoutMs / 1000;
 

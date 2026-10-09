@@ -33,6 +33,9 @@ interface TransportInterface
      */
     public function receive(float $timeoutSeconds): ?array;
 
+    /** How long a blocking send may wait for the server to answer, for transports that block on it. */
+    public function setRequestTimeout(float $seconds): void;
+
     /** Called once the handshake settles on a protocol revision. */
     public function setProtocolVersion(string $version): void;
 

@@ -159,6 +159,10 @@ final class StdioTransport implements TransportInterface
         }
     }
 
+    public function setRequestTimeout(float $seconds): void
+    {
+    }
+
     public function setProtocolVersion(string $version): void
     {
     }
