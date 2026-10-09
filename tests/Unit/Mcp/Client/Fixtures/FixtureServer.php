@@ -18,6 +18,9 @@ final class FixtureServer
 
     public string $logLevel = 'unset';
 
+    /** @var array<string, mixed> */
+    public array $clientCapabilities = [];
+
     public function __construct(
         private readonly string $name = 'dummy-server',
         private readonly string $mode = 'legacy',
@@ -45,6 +48,7 @@ final class FixtureServer
 
         switch ($message['method']) {
             case 'initialize':
+                $this->clientCapabilities = (array) ($params['capabilities'] ?? []);
                 $offered = (string) ($params['protocolVersion'] ?? '');
                 $version = $this->mode === 'modern' && $offered === self::MODERN_VERSION ? self::MODERN_VERSION : $this->legacyVersion;
 
@@ -114,6 +118,8 @@ final class FixtureServer
                 return [$result($text((string) ($context['headers'][strtolower((string) ($args['name'] ?? ''))] ?? 'NOT_SET')))];
             case 'cwd':
                 return [$result($text((string) getcwd()))];
+            case 'client_caps':
+                return [$result($text((string) json_encode($this->clientCapabilities, JSON_FORCE_OBJECT)))];
             case 'log_level':
                 return [$result($text($this->logLevel))];
             case 'fail_tool':
