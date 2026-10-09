@@ -661,7 +661,7 @@ So: two kinds live here, both settled. Unverified lives in the ledger, with its 
 | agent middleware: tool emulator / provider tool search / prompt caching / moderation (WP-22c part 2) | 16 / 7 / 10 / 28 | 15 passing + 1 skipped (v3) / 7 / 10 / 28, plus 13 extras |
 | `store.int.test.ts` for the Postgres, Redis and MongoDB stores (WP-10) | one scenario set per backend | Postgres 55 live-gated cases, Redis 69 cases (75 spec methods, fake-backed and live-gated), MongoDB contract cases over a fake with the live spec skipped |
 | `langchain-mcp-adapters` (WP-25) over a fake client | tools 30, tools.errors 9 | tools 30 of 30, tools.errors 7 of 9, 211 MCP tests in all; real-server suites skipped |
-| **Total so far** | | **16100** |
+| **Total so far** | | **16629** |
 
 <!-- fix:d6b0b7f -->
 | RunnableConfig::mergeConfigs added; StructuredTool::mergeConfig delegates to it | `mergeConfig` merged 7 of 16 config keys and dropped the other 9 (incl. `runId`) | upstream `mergeConfigs` | `d6b0b7f` |
