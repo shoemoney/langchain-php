@@ -6,6 +6,7 @@ namespace LangChain\Tests\Unit\Agents\Support;
 
 use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Outputs\ChatResult;
+use LangChain\Runnables\RunnableConfig;
 use LangChain\Tracers\CallbackManagerForLLMRun;
 use LangGraph\Agents\ConfigurableModelInterface;
 
@@ -42,7 +43,7 @@ final class FakeConfigurableModel extends BaseChatModel implements ConfigurableM
         return $this->queuedMethodOperations;
     }
 
-    public function getModelInstance(): BaseChatModel
+    public function getModelInstance(?RunnableConfig $config = null): BaseChatModel
     {
         return $this->chatModel;
     }

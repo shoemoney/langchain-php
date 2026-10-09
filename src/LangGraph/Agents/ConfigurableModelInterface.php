@@ -10,12 +10,10 @@ namespace LangGraph\Agents;
  * Port of `ConfigurableModelInterface` from `langchain/src/agents/model.ts`, which names two members:
  * `_queuedMethodOperations` and `_getModelInstance()`. Upstream detects them structurally; PHP states
  * them as an interface so {@see Model::isConfigurableModel()} is a type check.
+ *
+ * The members are declared once, in the LangChain layer, so `initChatModel`'s own class can implement them.
+ * The layering guard forbids a `use` of `LangChain\LanguageModels` here, so the parent is named by its FQCN.
  */
-interface ConfigurableModelInterface
+interface ConfigurableModelInterface extends \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface
 {
-    /** @return array<string, mixed> */
-    public function getQueuedMethodOperations(): array;
-
-    /** Resolve the underlying chat model. */
-    public function getModelInstance(): \LangChain\LanguageModels\BaseChatModel;
 }

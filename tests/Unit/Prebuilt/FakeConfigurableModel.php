@@ -6,13 +6,14 @@ namespace LangChain\Tests\Unit\Prebuilt;
 
 use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Outputs\ChatResult;
+use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableInterface;
 use LangChain\Tracers\CallbackManagerForLLMRun;
 use LangGraph\Prebuilt\ConfigurableModelInterface;
 
 /**
  * Port of `FakeConfigurableModel` from `langgraph-core/src/tests/utils.models.ts`: a chat model that is only a
- * wrapper, resolving to the model it holds through `model()` (what `initChatModel` returns upstream).
+ * wrapper, resolving to the model it holds through `getModelInstance()` (what `initChatModel` returns upstream).
  */
 final class FakeConfigurableModel extends BaseChatModel implements ConfigurableModelInterface
 {
@@ -42,14 +43,26 @@ final class FakeConfigurableModel extends BaseChatModel implements ConfigurableM
         throw new \Exception('Not implemented');
     }
 
-    public function queuedMethodOperations(): array
+    public function getQueuedMethodOperations(): array
     {
         return $this->queuedMethodOperations;
     }
 
-    public function model(): RunnableInterface
+    public function getModelInstance(?RunnableConfig $config = null): RunnableInterface
     {
         return $this->chatModel;
+    }
+
+    /** The upstream spelling (`_queuedMethodOperations`), kept for the ported tests that read it. */
+    public function queuedMethodOperations(): array
+    {
+        return $this->getQueuedMethodOperations();
+    }
+
+    /** The upstream spelling (`_model`), kept for the ported tests that read it. */
+    public function model(): RunnableInterface
+    {
+        return $this->getModelInstance();
     }
 
     public function bindTools(array $tools, array $kwargs = []): static

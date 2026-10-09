@@ -157,11 +157,9 @@ final class AgentNode extends RunnableCallable
         $model = $this->options['model'] ?? null;
 
         if (\is_string($model)) {
-            // `initChatModel` (WP-20) turns a "provider:model" string into a chat model.
-            throw new \RuntimeException(sprintf(
-                'Cannot resolve the model "%s": model id strings need initChatModel, which is not ported yet. Pass a chat model instance.',
-                $model,
-            ));
+            // `initChatModel` turns a "provider:model" string into a chat model. The layering guard forbids
+            // importing `LangChain\LanguageModels` here, so the class is named by its FQCN.
+            return \LangChain\LanguageModels\Chat\Universal\InitChatModel::init($model);
         }
 
         if ($model instanceof RunnableInterface) {
