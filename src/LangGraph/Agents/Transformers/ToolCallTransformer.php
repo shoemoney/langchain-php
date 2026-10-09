@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace LangGraph\Agents\Transformers;
 
 use LangChain\Messages\ToolMessage;
+use LangGraph\Stream\AbstractStreamTransformer;
+use LangGraph\Stream\Deferred;
+use LangGraph\Stream\NativeStreamTransformer;
+use LangGraph\Stream\StreamChannel;
 
 /**
  * Correlates `tools` channel events into per-call {@see ToolCallStream} objects.
@@ -12,7 +16,7 @@ use LangChain\Messages\ToolMessage;
  * Port of `createToolCallTransformer` from `langchain/src/agents/transformers/tool-call.ts`; the factory is
  * {@see self::factory()} and the instance it makes is the transformer. Its projection is `toolCalls`.
  */
-final class ToolCallTransformer implements NativeStreamTransformerInterface
+final class ToolCallTransformer extends AbstractStreamTransformer implements NativeStreamTransformer
 {
     private StreamChannel $toolCallsLog;
 
@@ -24,7 +28,7 @@ final class ToolCallTransformer implements NativeStreamTransformerInterface
      */
     public function __construct(private readonly array $path = [])
     {
-        $this->toolCallsLog = new StreamChannel();
+        $this->toolCallsLog = StreamChannel::local();
     }
 
     /**
@@ -102,7 +106,7 @@ final class ToolCallTransformer implements NativeStreamTransformerInterface
         return true;
     }
 
-    public function finalize(): void
+    public function finalize(): mixed
     {
         foreach ($this->pendingCalls as $pending) {
             $pending['status']->resolve(Types::STATUS_FINISHED);
@@ -111,6 +115,8 @@ final class ToolCallTransformer implements NativeStreamTransformerInterface
         }
         $this->pendingCalls = [];
         $this->toolCallsLog->close();
+
+        return null;
     }
 
     public function fail(mixed $error): void

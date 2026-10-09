@@ -17,12 +17,16 @@ use LangGraph\Agents\Nodes\BeforeModelNode;
 use LangGraph\Agents\Nodes\MiddlewareNode;
 use LangGraph\Agents\Nodes\ToolNode;
 use LangGraph\Agents\Nodes\Utils as NodeUtils;
+use LangGraph\Agents\Transformers\SubagentTransformer;
+use LangGraph\Agents\Transformers\ToolCallTransformer;
 use LangGraph\Pregel\Command;
 use LangGraph\Pregel\CompiledStateGraph;
 use LangGraph\Pregel\Constants;
 use LangGraph\Pregel\Send;
 use LangGraph\State\AnnotationRoot;
 use LangGraph\State\StateGraph;
+use LangGraph\Stream\RunStream;
+use LangGraph\Stream\StreamTransformer;
 
 /**
  * A ReAct (Reasoning + Acting) agent that combines a language model with tools and middleware.
@@ -53,8 +57,10 @@ use LangGraph\State\StateGraph;
  *    graph here has no config of its own, so the defaults (callbacks included) are merged into every `invoke` /
  *    `stream` / `streamEvents` call instead, and a handler present in both is delivered once;
  *  - a graph run reports chain callbacks (`handleChainStart`/`End`) only through `streamEvents`;
- *  - `version: "v3"` event streaming and stream transformers have no PHP counterpart (there is no transformer
- *    protocol), so `streamTransformers` are accepted and ignored;
+ *  - `streamEvents(..., 'v3')` takes the version as an argument rather than a config key, returns a
+ *    {@see RunStream} over the compiled graph (transformers are registered per run, not at compile time), and
+ *    reads call-site transformers from `$config['transformers']`; the run stream is pull-driven and its
+ *    engine feed carries no `tasks` events or subgraph namespaces, see {@see RunStream};
  *  - config passed as a {@see RunnableConfig} object overwrites the defaults field by field (an object cannot say
  *    which fields it set), so pass a config array (`['recursionLimit' => 100]`) to override only some.
  */
@@ -237,10 +243,21 @@ final class ReactAgent
 
         if ($clientTools !== [] || $hasWrapToolCallMiddleware) {
             $wrapToolCall = Utils::wrapToolCall($middleware);
-            $workflow->addNode(ToolNode::TOOLS_NODE_NAME, new ToolNode($clientTools, [
+            // Upstream's `patchConfig` drops the node's `runName` from the config it hands to a child and the tool
+            // then names its own run (`config.runName ??= this.name`), so the `tools` stream reports `tool_name: "add"`.
+            // This port's node config keeps `tools` and its tools do not default the name, so the node sets it.
+            $workflow->addNode(ToolNode::TOOLS_NODE_NAME, new class($clientTools, [
                 'signal' => $options['signal'] ?? null,
                 ...($wrapToolCall !== null ? ['wrapToolCall' => $wrapToolCall] : []),
-            ]));
+            ]) extends ToolNode {
+                protected function runTool(array $call, RunnableConfig $config, mixed $state): ToolMessage|Command
+                {
+                    $toolConfig = clone $config;
+                    $toolConfig->runName = isset($call['name']) ? (string) $call['name'] : null;
+
+                    return parent::runTool($call, $toolConfig, $state);
+                }
+            });
         }
 
         // Add edges.
@@ -868,23 +885,62 @@ final class ReactAgent
     }
 
     /**
-     * Stream events (`v1` / `v2`) from the compiled graph.
+     * Stream events from the compiled graph.
+     *
+     * `v1` / `v2` yield the event stream of the compiled graph. `v3` returns a {@see RunStream}: protocol events
+     * plus the `messages()`, `values()`, `output()`, `lifecycle()` and `subgraphs()` projections, the agent's own
+     * `toolCalls` and `subagents` (read as properties) and the `extensions` of every registered stream
+     * transformer. Transformers register in this order: the built-in {@see ToolCallTransformer} and
+     * {@see SubagentTransformer}, the `streamTransformers` of each middleware, the `streamTransformers`
+     * option, then `$config['transformers']` for this call. Each is a {@see StreamTransformer} or a factory
+     * returning one.
      *
      * @param array<string, mixed>|Command|null        $state
-     * @param RunnableConfig|array<string, mixed>|null $config
+     * @param RunnableConfig|array<string, mixed>|null $config `transformers` (v3 only) adds call-site stream transformers
      * @param array<string, mixed>                     $streamOptions
-     * @return \Generator<int, mixed>
+     * @return \Generator<int, mixed>|RunStream
      */
-    public function streamEvents(mixed $state, RunnableConfig|array|null $config = null, string $version = 'v2', array $streamOptions = []): \Generator
+    public function streamEvents(mixed $state, RunnableConfig|array|null $config = null, string $version = 'v2', array $streamOptions = []): \Generator|RunStream
     {
-        if ($version === 'v3') {
-            throw new \InvalidArgumentException('streamEvents version "v3" is not available: there is no stream transformer protocol in this port.');
+        if ($version === 'v3' && $streamOptions === []) {
+            $callSiteTransformers = [];
+            if (\is_array($config)) {
+                $callSiteTransformers = array_values((array) ($config['transformers'] ?? []));
+                unset($config['transformers']);
+            }
+            $mergedConfig = $this->configForRun($config);
+            $initializedState = $this->initializeMiddlewareStates($state, $mergedConfig);
+
+            return RunStream::create($this->compiled, $initializedState, $mergedConfig, [
+                ...$this->streamTransformers(),
+                ...$callSiteTransformers,
+            ]);
         }
 
         $mergedConfig = $this->configForRun($config);
         $initializedState = $this->initializeMiddlewareStates($state, $mergedConfig);
 
         return $this->compiled->streamEvents($initializedState, $mergedConfig, $version, $streamOptions);
+    }
+
+    /**
+     * The stream transformers every v3 run of this agent registers: native, middleware, then user-defined.
+     *
+     * @return list<StreamTransformer|callable(): StreamTransformer>
+     */
+    private function streamTransformers(): array
+    {
+        $middlewareTransformers = [];
+        foreach ((array) ($this->options['middleware'] ?? []) as $m) {
+            array_push($middlewareTransformers, ...array_values((array) (Utils::middlewareValue($m, 'streamTransformers') ?? [])));
+        }
+
+        return [
+            ToolCallTransformer::factory([]),
+            SubagentTransformer::factory([]),
+            ...$middlewareTransformers,
+            ...array_values((array) ($this->options['streamTransformers'] ?? [])),
+        ];
     }
 
     /**

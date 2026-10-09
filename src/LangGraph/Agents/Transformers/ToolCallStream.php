@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Transformers;
 
+use LangGraph\Stream\Deferred;
+
 /**
  * One tool call as the {@see ToolCallTransformer} surfaces it: what was asked, and settle-later outcomes.
  *

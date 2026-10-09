@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Transformers;
 
+use LangGraph\Stream\AbstractStreamTransformer;
+use LangGraph\Stream\Deferred;
+use LangGraph\Stream\NativeStreamTransformer;
+use LangGraph\Stream\StreamChannel;
+use LangGraph\Stream\Transformers\MessagesTransformer;
+
 /**
  * Surfaces nested named agents as {@see SubagentRunStream}s on `subagents`.
  *
@@ -17,12 +23,14 @@ namespace LangGraph\Agents\Transformers;
  * transformer). Every event in the subtree is fed straight into them; the subagent's final `output` is resolved
  * from its last `values` snapshot when its `lifecycle` completes.
  *
- * Langgraph's `createMessagesTransformer` has no PHP counterpart, so a messages transformer is supplied by the
- * caller as `$messagesFactory` (a callable taking the subagent's namespace and returning a
- * {@see NativeStreamTransformerInterface} whose projection is `messages`). Without one, a handle's `messages`
- * is an empty channel.
+ * The per-subagent messages transformer is langgraph's `createMessagesTransformer(ns)`, here a
+ * {@see MessagesTransformer} scoped to the subagent's namespace.
+ *
+ * PHP has no event loop, so the run is pull-driven (see {@see \LangGraph\Stream\RunStream}). The per-subagent
+ * channels are not attached to the mux, so they borrow the driver of the `subagents` channel: asking one for
+ * more advances the run until the next subagent is discovered or the run ends.
  */
-final class SubagentTransformer implements NativeStreamTransformerInterface
+final class SubagentTransformer extends AbstractStreamTransformer implements NativeStreamTransformer
 {
     private StreamChannel $subagentsLog;
 
@@ -44,14 +52,14 @@ final class SubagentTransformer implements NativeStreamTransformerInterface
     private array $handles = [];
 
     /**
-     * @param list<string>                                                              $scope           namespace prefix this transformer is scoped to: the root agent uses `[]`, nested handles their own namespace
-     * @param (callable(list<string>): NativeStreamTransformerInterface)|null            $messagesFactory builds the per-subagent messages transformer
+     * @param list<string> $scope namespace prefix this transformer is scoped to: the root agent uses `[]`, nested handles their own namespace
+     * @param (\Closure(): bool)|null $driver advances the run one step; nested transformers get the parent's
      */
     public function __construct(
         private readonly array $scope = [],
-        private readonly mixed $messagesFactory = null,
+        private readonly ?\Closure $driver = null,
     ) {
-        $this->subagentsLog = new StreamChannel();
+        $this->subagentsLog = StreamChannel::local();
     }
 
     /**
@@ -60,9 +68,9 @@ final class SubagentTransformer implements NativeStreamTransformerInterface
      * @param list<string> $scope
      * @return \Closure(): self
      */
-    public static function factory(array $scope = [], ?callable $messagesFactory = null): \Closure
+    public static function factory(array $scope = []): \Closure
     {
-        return static fn (): self => new self($scope, $messagesFactory);
+        return static fn (): self => new self($scope);
     }
 
     public function init(): array
@@ -105,7 +113,7 @@ final class SubagentTransformer implements NativeStreamTransformerInterface
                 continue;
             }
 
-            $handle->messages?->process($event);
+            $handle->messages->process($event);
             $handle->toolCall->process($event);
             $handle->nested->process($event);
 
@@ -128,12 +136,14 @@ final class SubagentTransformer implements NativeStreamTransformerInterface
         return true;
     }
 
-    public function finalize(): void
+    public function finalize(): mixed
     {
         foreach ($this->handles as $handle) {
             $this->finishHandle($handle, null);
         }
         $this->subagentsLog->close();
+
+        return null;
     }
 
     public function fail(mixed $error): void
@@ -238,22 +248,52 @@ final class SubagentTransformer implements NativeStreamTransformerInterface
             return;
         }
 
-        $messages = $this->messagesFactory !== null ? ($this->messagesFactory)($namespace) : null;
-        $messagesChannel = $messages?->init()['messages'] ?? new StreamChannel();
+        $driver = $this->channelDriver();
+        $messages = new MessagesTransformer($namespace, null, $driver);
         $toolCall = new ToolCallTransformer($namespace);
-        $nested = new self($namespace, $this->messagesFactory);
+        $nested = new self($namespace, $driver);
         $output = new Deferred();
 
-        $this->handles[$key] = new SubagentHandle($key, $namespace, $lc, $messages, $messagesChannel, $toolCall, $nested, $output);
+        $toolCallsLog = $toolCall->init()['toolCalls'];
+        $nestedLog = $nested->init()['subagents'];
+        $toolCallsLog->setDriver($driver);
+        $nestedLog->setDriver($driver);
+
+        $this->handles[$key] = new SubagentHandle($key, $namespace, $lc, $messages, $toolCall, $nested, $output);
 
         $this->subagentsLog->push(new SubagentRunStream(
             name: $lc,
             cause: $this->deriveCause($namespace),
             output: $output,
-            messages: $messagesChannel,
-            toolCalls: $toolCall->init()['toolCalls'],
-            subagents: $nested->init()['subagents'],
+            messages: $messages->init()['messages'],
+            toolCalls: $toolCallsLog,
+            subagents: $nestedLog,
         ));
+    }
+
+    /**
+     * What a per-subagent channel calls when its cursor runs dry: the driver this transformer was given, or,
+     * at the root, a probe cursor on the `subagents` channel, which the mux wires to the run. The probe
+     * advances the run until the channel yields another item or the run ends.
+     *
+     * @return \Closure(): bool
+     */
+    private function channelDriver(): \Closure
+    {
+        if ($this->driver !== null) {
+            return $this->driver;
+        }
+
+        return function (): bool {
+            if ($this->subagentsLog->done()) {
+                return false;
+            }
+            $before = $this->subagentsLog->size();
+            $this->subagentsLog->iterate($before)->current();
+
+            // Progress only counts when a subagent was discovered; a run that ended has closed every channel.
+            return $this->subagentsLog->size() > $before;
+        };
     }
 
     private function finishHandle(SubagentHandle $handle, ?\Throwable $error): void
@@ -267,11 +307,7 @@ final class SubagentTransformer implements NativeStreamTransformerInterface
         } else {
             $handle->output->reject($error);
         }
-        if ($handle->messages !== null) {
-            $handle->messages->finalize();
-        } else {
-            $handle->messagesChannel->close();
-        }
+        $handle->messages->finalize();
         $handle->toolCall->finalize();
         $handle->nested->finalize();
     }
