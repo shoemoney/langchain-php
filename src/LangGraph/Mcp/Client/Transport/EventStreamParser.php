@@ -7,7 +7,7 @@ namespace LangGraph\Mcp\Client\Transport;
 /**
  * Incremental parser for `text/event-stream` bodies (WHATWG server-sent events framing).
  */
-final class SseParser
+final class EventStreamParser
 {
     private string $buffer = '';
 

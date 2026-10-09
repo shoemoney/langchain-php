@@ -45,7 +45,7 @@ final class StreamableHttpTransport implements TransportInterface
 
     private ?StreamInterface $stream = null;
 
-    private ?SseParser $parser = null;
+    private ?EventStreamParser $parser = null;
 
     private int|string|null $awaitedId = null;
 
@@ -236,7 +236,7 @@ final class StreamableHttpTransport implements TransportInterface
     private function openStream(StreamInterface $body, int|string|null $awaitedId): void
     {
         $this->stream = $body;
-        $this->parser = new SseParser();
+        $this->parser = new EventStreamParser();
         $this->awaitedId = $awaitedId;
         $this->reconnectAttempts = 0;
     }
