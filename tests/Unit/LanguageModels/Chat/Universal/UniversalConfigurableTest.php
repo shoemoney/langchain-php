@@ -373,7 +373,8 @@ final class UniversalConfigurableTest extends TestCase
         $c = $model->getModelInstance(new RunnableConfig(configurable: ['model' => 'gpt-4o']));
         $d = $model->getModelInstance(new RunnableConfig(configurable: ['model' => 'gpt-4o', '__pregel_task_id' => 'volatile']));
 
-        self::assertSame($a, $b);
+        self::assertNotSame($a, $b, 'upstream keys the whole config, so tags split the cache');
+        self::assertSame($a, $model->getModelInstance(new RunnableConfig()));
         self::assertNotSame($a, $c);
         self::assertSame($c, $d, 'Pregel-injected keys do not split the cache');
     }
@@ -410,5 +411,54 @@ final class UniversalConfigurableTest extends TestCase
         $expected = (new ChatOpenAI($fields))->toJson();
         self::assertSame($expected['id'], $handler->serialized->id);
         self::assertSame($expected['kwargs'], $handler->serialized->kwargs);
+    }
+
+    // ---- Cache key and call options ----------------------------------------------------------------
+
+    public function testCacheKeyStringifiesTheWholeConfigAndSkipsPregelKeys(): void
+    {
+        $model = new ConfigurableModel(['defaultConfig' => ['model' => 'gpt-4o', 'apiKey' => 'x']]);
+
+        self::assertSame($model->getCacheKey(null), $model->getCacheKey(new RunnableConfig()));
+        self::assertNotSame($model->getCacheKey(null), $model->getCacheKey(new RunnableConfig(tags: ['t1'])));
+        self::assertNotSame(
+            $model->getCacheKey(new RunnableConfig(tags: ['t1'])),
+            $model->getCacheKey(new RunnableConfig(tags: ['t2'])),
+        );
+        self::assertSame(
+            $model->getCacheKey(new RunnableConfig(configurable: ['a' => 1])),
+            $model->getCacheKey(new RunnableConfig(configurable: ['a' => 1, '__pregel_send' => 'x'])),
+        );
+        self::assertSame($model->getCacheKey(null), $model->getCacheKey(new RunnableConfig(configurable: ['__pregel_send' => 'x'])));
+    }
+
+    public function testCallbacksDoNotDefeatTheInstanceCache(): void
+    {
+        $model = new ConfigurableModel(['defaultConfig' => ['model' => 'gpt-4o', 'apiKey' => 'x']]);
+
+        self::assertSame(
+            $model->getCacheKey(new RunnableConfig(callbacks: [new class () extends BaseCallbackHandler {
+            }])),
+            $model->getCacheKey(new RunnableConfig(callbacks: [new class () extends BaseCallbackHandler {
+            }])),
+        );
+    }
+
+    public function testGeneratePassesItsOptionsToTheModelInstanceLookup(): void
+    {
+        $openAi = UniversalFixtures::openAiHttp('I am GPT.');
+        $model = InitChatModel::init('gpt-4o-mini', [
+            'modelProvider' => 'openai',
+            'configurableFields' => 'any',
+            'apiKey' => self::OPENAI_KEY,
+        ]);
+
+        $generate = new \ReflectionMethod($model, 'generate');
+        $result = $generate->invoke($model, [new \LangChain\Messages\HumanMessage('hi')], [
+            'configurable' => ['model' => 'gpt-4o', 'httpClient' => $openAi],
+        ]);
+
+        self::assertSame('I am GPT.', $result->generations[0]->message->content);
+        self::assertSame('gpt-4o', $openAi->lastRequestBody()['model']);
     }
 }
