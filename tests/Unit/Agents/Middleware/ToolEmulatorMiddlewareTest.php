@@ -9,6 +9,7 @@ use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Tests\Unit\Agents\Support\AgentAssertions;
 use LangChain\Tests\Unit\Agents\Support\FlakyChatModel;
+use LangChain\Tests\Unit\Agents\Support\StubInitChatModel;
 use LangChain\Tools\Schema;
 use LangChain\Tools\StructuredTool;
 use LangChain\Utils\Testing\FakeToolCallingChatModel;
@@ -16,6 +17,8 @@ use LangGraph\Agents\Agent;
 use LangGraph\Agents\Middleware\ToolEmulatorMiddleware;
 use LangGraph\Agents\Runtime;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 use function LangChain\Tools\tool;
@@ -270,6 +273,63 @@ final class ToolEmulatorMiddlewareTest extends TestCase
             . "Generate a realistic response that this tool would return given these arguments.\nReturn ONLY the tool's output, no explanation or preamble. Introduce variation into your responses.",
             $prompt,
         );
+    }
+
+    // ---- Beyond the upstream cases: a model string -----------------------------------------------
+
+    public function testAModelStringFailsClearlyWhileInitChatModelIsNotPorted(): void
+    {
+        if (class_exists('LangChain\\ChatModels\\InitChatModel')) {
+            self::markTestSkipped('initChatModel is ported: the string model resolves now.');
+        }
+        $middleware = ToolEmulatorMiddleware::create(['model' => 'anthropic:claude-sonnet-4-5-20250929']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('model id strings need initChatModel');
+
+        $middleware['wrapToolCall'](self::toolRequest('1', 'search', ['query' => 'test'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testAModelStringIsResolvedLazilyOnceWithTemperatureOne(): void
+    {
+        if (!StubInitChatModel::install()) {
+            self::markTestSkipped('initChatModel is ported now: this stub-based case needs a rewrite against the real one.');
+        }
+        StubInitChatModel::$result = self::fake([new AIMessage('From the string model')]);
+        $middleware = ToolEmulatorMiddleware::create(['model' => 'anthropic:claude-sonnet-4-5-20250929']);
+        self::assertSame([], StubInitChatModel::$calls, 'creating the middleware resolves nothing');
+
+        $first = $middleware['wrapToolCall'](self::toolRequest('1', 'search', ['query' => 'a'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
+        $second = $middleware['wrapToolCall'](self::toolRequest('2', 'search', ['query' => 'b'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
+
+        self::assertSame('From the string model', $first->content);
+        self::assertSame('From the string model', $second->content);
+        self::assertSame([['anthropic:claude-sonnet-4-5-20250929', ['temperature' => 1]]], StubInitChatModel::$calls);
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testAModelStringThatCannotBeInitializedFallsBackToTheAgentModel(): void
+    {
+        if (!StubInitChatModel::install()) {
+            self::markTestSkipped('initChatModel is ported now: this stub-based case needs a rewrite against the real one.');
+        }
+        StubInitChatModel::$result = new \RuntimeException('no such provider');
+        ini_set('error_log', sys_get_temp_dir() . '/tool-emulator-' . getmypid() . '.log');
+        $model = self::fake([
+            new AIMessage(['content' => '', 'tool_calls' => [['id' => '1', 'name' => 'search', 'args' => ['query' => 'test']]]]),
+            new AIMessage('Emulated by the agent model'),
+            new AIMessage('Final response'),
+        ]);
+        $agent = Agent::create(['model' => $model, 'tools' => [$this->searchTool()], 'middleware' => [ToolEmulatorMiddleware::create(['model' => 'bad:model'])]]);
+
+        $result = $agent->invoke(['messages' => [new HumanMessage('Search for something')]]);
+
+        $toolMessages = AgentAssertions::ofType($result['messages'], ToolMessage::class);
+        self::assertSame('Emulated by the agent model', $toolMessages[0]->content);
+        self::assertSame(0, $this->realCalls['search']);
     }
 
     // ---- Internal call suppression -------------------------------------------------------------
