@@ -799,7 +799,7 @@ final class MultiServerBasicTest extends MultiServerTestCase
 
     // ----------------------------------------------------------------------------- helpers
 
-    private function observedTransport(MultiServerMcpClient $client, string $serverName): \LangGraph\Mcp\Connection\ObservedTransport
+    private function observedTransport(MultiServerMcpClient $client, string $serverName): ObservedTransport
     {
         $reflection = new \ReflectionProperty($client, 'clientConnections');
         $manager = $reflection->getValue($client);
