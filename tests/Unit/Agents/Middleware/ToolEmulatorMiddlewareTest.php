@@ -323,7 +323,26 @@ final class ToolEmulatorMiddlewareTest extends TestCase
 
     public function testOmitsTheEmulationCallFromRunMessages(): void
     {
-        self::markTestSkipped('streamEvents version "v3" (run.messages) has no PHP target: there is no stream transformer protocol in this port.');
+        $emulated = 'EMULATED_TOOL_RESULT';
+        $main = 'Main model answer.';
+        $agent = Agent::create([
+            'model' => self::fake([
+                new AIMessage(['content' => 'Calling the tool.', 'tool_calls' => [['id' => 'call_1', 'name' => 'search', 'args' => ['query' => 'cats']]]]),
+                new AIMessage($main),
+            ]),
+            'tools' => [$this->searchTool()],
+            'middleware' => [ToolEmulatorMiddleware::create(['model' => self::fake([new AIMessage($emulated)])])],
+        ]);
+
+        $run = $agent->streamEvents(['messages' => [new HumanMessage('search for cats')]], null, 'v3');
+        $texts = [];
+        foreach ($run->messages() as $message) {
+            $texts[] = $message->text();
+        }
+
+        self::assertNotContains($emulated, $texts);
+        self::assertContains($main, $texts);
+        self::assertSame(0, $this->realCalls['search'], 'the real tool never ran');
     }
 
     public function testOmitsTheEmulationCallFromStreamModeMessages(): void
