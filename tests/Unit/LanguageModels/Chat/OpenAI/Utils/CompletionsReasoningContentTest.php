@@ -56,7 +56,7 @@ final class CompletionsReasoningContentTest extends TestCase
         ], self::RAW_CHUNK);
 
         self::assertSame('I should search.', $chunk->additional_kwargs['reasoning_content']);
-        self::assertSame('web_search', $chunk->tool_call_chunks[0]['name']);
+        self::assertSame('web_search', $chunk->toolCallChunks[0]['name']);
     }
 
     public function testFoldedChunksConcatenateReasoning(): void
