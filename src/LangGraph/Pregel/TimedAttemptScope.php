@@ -31,9 +31,23 @@ final class TimedAttemptScope
     /** Longest ms between two consecutive progress signals so far. */
     public float $maxGap = 0.0;
 
-    public function __construct(private readonly string $refreshOn)
+    /** @var \Closure(): float */
+    private readonly \Closure $clock;
+
+    /**
+     * @param (callable(): float)|null $clock monotonic milliseconds; defaults to `hrtime`. Injected
+     *                                        by tests so budget comparisons are exact.
+     */
+    public function __construct(private readonly string $refreshOn, ?callable $clock = null)
     {
-        $this->lastProgress = self::now();
+        $this->clock = $clock === null ? self::now(...) : \Closure::fromCallable($clock);
+        $this->lastProgress = $this->read();
+    }
+
+    /** Read this scope's clock (monotonic ms). */
+    public function read(): float
+    {
+        return ($this->clock)();
     }
 
     public static function now(): float
@@ -44,7 +58,7 @@ final class TimedAttemptScope
     /** Record progress now. Always honoured (used by `heartbeat()`). */
     public function touch(): void
     {
-        $now = self::now();
+        $now = $this->read();
         $this->maxGap = max($this->maxGap, $now - $this->lastProgress);
         $this->lastProgress = $now;
     }
