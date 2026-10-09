@@ -371,14 +371,33 @@ final class ConnectionManager
      */
     private function defaultTransport(string $type, array $options): TransportInterface
     {
+        $config = self::transportConfig($type, $options);
+
+        return $type === 'stdio' ? new StdioTransport($config) : new StreamableHttpTransport($config);
+    }
+
+    /**
+     * The transport configuration a resolved connection maps to.
+     *
+     * A streamable HTTP connection that is not pinned to the legacy protocol never retries a
+     * dropped stream (modern streams cannot replay lost requests); a legacy one maps `reconnect`
+     * onto the transport's backoff: `delayMs` is both the initial and the maximum delay,
+     * `maxAttempts` the retry count, and `enabled: false` zero retries.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    public static function transportConfig(string $type, array $options): array
+    {
         if ($type === 'stdio') {
-            return new StdioTransport(array_filter([
+            return array_filter([
                 'command' => $options['command'] ?? '',
                 'args' => $options['args'] ?? [],
                 'env' => $options['env'] ?? null,
                 'stderr' => $options['stderr'] ?? 'inherit',
                 'cwd' => $options['cwd'] ?? null,
-            ], static fn (mixed $value): bool => $value !== null));
+            ], static fn (mixed $value): bool => $value !== null);
         }
 
         $config = ['url' => (string) ($options['url'] ?? '')];
@@ -403,6 +422,6 @@ final class ConnectionManager
             ];
         }
 
-        return new StreamableHttpTransport($config);
+        return $config;
     }
 }
