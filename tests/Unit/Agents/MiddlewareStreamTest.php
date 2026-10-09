@@ -9,26 +9,95 @@ use LangChain\Messages\HumanMessage;
 use LangChain\Tests\Unit\Agents\Support\AgentAssertions;
 use LangGraph\Agents\Agent;
 use LangGraph\Agents\Middleware;
+use LangGraph\Agents\ReactAgent;
+use LangGraph\Stream\AbstractStreamTransformer;
+use LangGraph\Stream\StreamChannel;
+use LangGraph\Stream\StreamTransformer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 /**
  * `langchain/src/agents/tests/middleware.stream.test.ts`.
  *
- * Only "should expose streamTransformers on the middleware instance" has a counterpart. The other four stream
- * `run.extensions` out of `streamEvents(..., { version: "v3" })`, which needs LangGraph's stream transformer
- * protocol (`StreamTransformer`, `StreamChannel`, the v3 run stream); this port has neither, so a transformer
- * factory is recorded on the middleware and never run.
+ * Each case streams `run.extensions` out of `streamEvents(..., 'v3')`. The run stream is pull-driven (no event
+ * loop), so iterating an extension channel advances the run until the channel is exhausted.
  */
 #[CoversClass(Middleware::class)]
+#[CoversClass(ReactAgent::class)]
 final class MiddlewareStreamTest extends TestCase
 {
+    /** @return \Closure(): StreamTransformer a factory whose transformer pushes the running event count */
+    private static function eventCounter(): \Closure
+    {
+        return static fn (): StreamTransformer => new class extends AbstractStreamTransformer {
+            private readonly StreamChannel $eventCount;
+
+            private int $count = 0;
+
+            public function __construct()
+            {
+                $this->eventCount = StreamChannel::remote('eventCount');
+            }
+
+            public function init(): array
+            {
+                return ['eventCount' => $this->eventCount];
+            }
+
+            public function process(array $event): bool
+            {
+                $this->eventCount->push(++$this->count);
+
+                return true;
+            }
+        };
+    }
+
+    /** @return \Closure(): StreamTransformer a factory whose transformer pushes every event's method */
+    private static function methodTracker(): \Closure
+    {
+        return static fn (): StreamTransformer => new class extends AbstractStreamTransformer {
+            private readonly StreamChannel $methods;
+
+            public function __construct()
+            {
+                $this->methods = StreamChannel::remote('methods');
+            }
+
+            public function init(): array
+            {
+                return ['methods' => $this->methods];
+            }
+
+            public function process(array $event): bool
+            {
+                $this->methods->push($event['method']);
+
+                return true;
+            }
+        };
+    }
+
+    /** @param array<string, mixed> $options */
+    private static function agent(array $options): ReactAgent
+    {
+        return Agent::create(['model' => AgentAssertions::fakeChat([new AIMessage('ok')]), 'tools' => [], ...$options]);
+    }
+
+    /**
+     * @param array<string, mixed> $extensions
+     * @return list<mixed>
+     */
+    private static function drain(array $extensions, string $name): array
+    {
+        self::assertArrayHasKey($name, $extensions);
+
+        return iterator_to_array($extensions[$name], false);
+    }
+
     public function testShouldExposeStreamTransformersOnTheMiddlewareInstance(): void
     {
-        $eventCounter = static fn (): array => [
-            'init' => static fn (): array => ['eventCount' => 'remote:eventCount'],
-            'process' => static fn (): bool => true,
-        ];
+        $eventCounter = self::eventCounter();
 
         $middleware = Middleware::create(['name' => 'StreamMiddleware', 'streamTransformers' => [$eventCounter]]);
 
@@ -37,15 +106,8 @@ final class MiddlewareStreamTest extends TestCase
 
     public function testAnAgentWithAStreamTransformerMiddlewareStillStreamsAsUsual(): void
     {
-        $middleware = Middleware::create([
-            'name' => 'StreamMiddleware',
-            'streamTransformers' => [static fn (): array => ['process' => static fn (): bool => true]],
-        ]);
-        $agent = Agent::create([
-            'model' => AgentAssertions::fakeChat([new AIMessage('ok')]),
-            'tools' => [],
-            'middleware' => [$middleware],
-        ]);
+        $middleware = Middleware::create(['name' => 'StreamMiddleware', 'streamTransformers' => [self::eventCounter()]]);
+        $agent = self::agent(['middleware' => [$middleware]]);
 
         $chunks = iterator_to_array($agent->stream(['messages' => [new HumanMessage('hi')]]), false);
 
@@ -54,13 +116,59 @@ final class MiddlewareStreamTest extends TestCase
         self::assertArrayHasKey('model_request', $updates[0][1]);
     }
 
-    public function testStreamEventsV3IsRefusedClearly(): void
+    public function testShouldStreamEventCountsFromAMiddlewareRegisteredTransformer(): void
     {
-        $agent = Agent::create(['model' => AgentAssertions::fakeChat([new AIMessage('ok')]), 'tools' => []]);
+        $middleware = Middleware::create(['name' => 'StreamMiddleware', 'streamTransformers' => [self::eventCounter()]]);
+        $agent = self::agent(['middleware' => [$middleware]]);
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('version "v3" is not available');
+        $run = $agent->streamEvents(['messages' => [new HumanMessage('hi')]], null, 'v3');
+        $counts = self::drain($run->extensions(), 'eventCount');
 
-        $agent->streamEvents(['messages' => [new HumanMessage('hi')]], null, 'v3');
+        self::assertNotEmpty($counts);
+        foreach ($counts as $i => $count) {
+            self::assertSame($i + 1, $count);
+        }
+        self::assertSame(\count($counts), $counts[\count($counts) - 1]);
+    }
+
+    public function testShouldStreamProtocolMethodsFromAMiddlewareRegisteredTransformer(): void
+    {
+        $middleware = Middleware::create(['name' => 'MethodMiddleware', 'streamTransformers' => [self::methodTracker()]]);
+        $agent = self::agent(['middleware' => [$middleware]]);
+
+        $run = $agent->streamEvents(['messages' => [new HumanMessage('hi')]], null, 'v3');
+        $seenMethods = self::drain($run->extensions(), 'methods');
+
+        self::assertNotEmpty($seenMethods);
+        self::assertContains('values', $seenMethods);
+    }
+
+    public function testShouldMergeAgentAndMiddlewareStreamTransformers(): void
+    {
+        $middleware = Middleware::create(['name' => 'MethodMiddleware', 'streamTransformers' => [self::methodTracker()]]);
+        $agent = self::agent(['middleware' => [$middleware], 'streamTransformers' => [self::eventCounter()]]);
+
+        $run = $agent->streamEvents(['messages' => [new HumanMessage('hi')]], null, 'v3');
+        $counts = self::drain($run->extensions(), 'eventCount');
+        $seenMethods = self::drain($run->extensions(), 'methods');
+
+        self::assertNotEmpty($counts);
+        self::assertNotEmpty($seenMethods);
+        self::assertContains('values', $seenMethods);
+    }
+
+    public function testShouldMergeStreamTransformersFromMultipleMiddlewareInstances(): void
+    {
+        $counterMiddleware = Middleware::create(['name' => 'CounterMiddleware', 'streamTransformers' => [self::eventCounter()]]);
+        $trackerMiddleware = Middleware::create(['name' => 'TrackerMiddleware', 'streamTransformers' => [self::methodTracker()]]);
+        $agent = self::agent(['middleware' => [$counterMiddleware, $trackerMiddleware]]);
+
+        $run = $agent->streamEvents(['messages' => [new HumanMessage('hi')]], null, 'v3');
+        $counts = self::drain($run->extensions(), 'eventCount');
+        $seenMethods = self::drain($run->extensions(), 'methods');
+
+        self::assertNotEmpty($counts);
+        self::assertNotEmpty($seenMethods);
+        self::assertContains('values', $seenMethods);
     }
 }

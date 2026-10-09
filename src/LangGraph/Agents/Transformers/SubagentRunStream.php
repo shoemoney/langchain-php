@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Transformers;
 
+use LangGraph\Stream\Deferred;
+use LangGraph\Stream\StreamChannel;
+
 /**
  * A nested named-agent execution surfaced on `run.subagents`.
  *
@@ -18,7 +21,7 @@ final class SubagentRunStream
      * @param string                                         $name      the subagent's `lc_agent_name`
      * @param array{type: 'toolCall', tool_call_id: string}|null $cause the tool call that dispatched it, when it could be recovered
      * @param Deferred                                       $output    resolves with the subagent's final state once it completes
-     * @param StreamChannel                                  $messages  per-message chat-model streams scoped to this subagent
+     * @param \IteratorAggregate                              $messages  one {@see \LangGraph\Stream\ChatModelStream} per message, scoped to this subagent
      * @param StreamChannel                                  $toolCalls the subagent's own {@see ToolCallStream}s
      * @param StreamChannel                                  $subagents nested {@see SubagentRunStream}s this subagent dispatches from its own tools
      */
@@ -26,7 +29,7 @@ final class SubagentRunStream
         public readonly string $name,
         public readonly ?array $cause,
         public readonly Deferred $output,
-        public readonly StreamChannel $messages,
+        public readonly \IteratorAggregate $messages,
         public readonly StreamChannel $toolCalls,
         public readonly StreamChannel $subagents,
     ) {

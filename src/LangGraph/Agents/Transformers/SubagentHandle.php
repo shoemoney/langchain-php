@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Transformers;
 
+use LangGraph\Stream\Deferred;
+use LangGraph\Stream\Transformers\MessagesTransformer;
+
 /**
  * The bookkeeping the {@see SubagentTransformer} keeps per discovered subagent (upstream's `SubagentHandle`).
  *
@@ -18,15 +21,13 @@ final class SubagentHandle
 
     /**
      * @param list<string>                                $path     the subagent's namespace
-     * @param NativeStreamTransformerInterface|null       $messages the per-subagent messages transformer, when one was supplied
-     * @param StreamChannel                               $messagesChannel the `messages` projection (the transformer's, or an empty one)
+     * @param MessagesTransformer                         $messages the per-subagent messages transformer
      */
     public function __construct(
         public readonly string $key,
         public readonly array $path,
         public readonly string $name,
-        public readonly ?NativeStreamTransformerInterface $messages,
-        public readonly StreamChannel $messagesChannel,
+        public readonly MessagesTransformer $messages,
         public readonly ToolCallTransformer $toolCall,
         public readonly SubagentTransformer $nested,
         public readonly Deferred $output,

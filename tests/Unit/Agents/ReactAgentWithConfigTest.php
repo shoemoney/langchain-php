@@ -25,7 +25,7 @@ use function LangChain\Tools\tool;
  *
  * Not converted: "preserves callbacks on the extracted graph" and the assertions on `agent.graph.config` (a
  * compiled graph here has no config of its own, see `ReactAgent`), the callback-manager variants (a config's
- * callbacks are a list of handlers), `streamEvents` version `v3`, and the two LangSmith "tracing metadata" tests.
+ * callbacks are a list of handlers) and the two LangSmith "tracing metadata" tests.
  * What those assertions establish (the defaults reach the run) is asserted through what a tool receives.
  */
 #[CoversClass(ReactAgent::class)]
@@ -64,7 +64,7 @@ final class ReactAgentWithConfigTest extends TestCase
     public static function methodsAndInvocationCallbacks(): array
     {
         $rows = [];
-        foreach (['invoke', 'stream', 'streamEvents'] as $method) {
+        foreach (['invoke', 'stream', 'streamEvents', 'streamEventsV3'] as $method) {
             foreach ([true, false] as $withInvocationCallbacks) {
                 $rows[$method . ($withInvocationCallbacks ? ' with invocation callbacks' : ' without invocation callbacks')] = [$method, $withInvocationCallbacks];
             }
@@ -112,6 +112,8 @@ final class ReactAgentWithConfigTest extends TestCase
 
         if ($method === 'invoke') {
             $agent->invoke($input, $config);
+        } elseif ($method === 'streamEventsV3') {
+            $agent->streamEvents($input, $config, 'v3')->output();
         } else {
             $stream = $method === 'stream' ? $agent->stream($input, $config) : $agent->streamEvents($input, $config, 'v2');
             foreach ($stream as $ignored) {
@@ -137,7 +139,7 @@ final class ReactAgentWithConfigTest extends TestCase
     /** @return array<string, array{0: string}> */
     public static function invokeAndStream(): array
     {
-        return ['invoke' => ['invoke'], 'stream' => ['stream']];
+        return ['invoke' => ['invoke'], 'stream' => ['stream'], 'streamEventsV3' => ['streamEventsV3']];
     }
 
     #[DataProvider('invokeAndStream')]
@@ -164,6 +166,8 @@ final class ReactAgentWithConfigTest extends TestCase
         $input = ['messages' => [new HumanMessage('hello')]];
         if ($method === 'invoke') {
             $agent->invoke($input);
+        } elseif ($method === 'streamEventsV3') {
+            $agent->streamEvents($input, null, 'v3')->output();
         } else {
             foreach ($agent->stream($input) as $ignored) {
                 // Consume the stream to complete callback delivery.

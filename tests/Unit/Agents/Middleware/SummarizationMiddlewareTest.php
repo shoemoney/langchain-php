@@ -699,14 +699,49 @@ final class SummarizationMiddlewareTest extends TestCase
         ]);
     }
 
+    /**
+     * What upstream's `collectV3Messages` gathers from `run.messages`: each message's text and the number of
+     * `content-block-delta` events across them.
+     *
+     * @return array{texts: list<string>, deltaCount: int}
+     */
+    private static function collectRunMessages(\LangGraph\Stream\RunStream $run): array
+    {
+        $texts = [];
+        $deltaCount = 0;
+        foreach ($run->messages() as $message) {
+            $texts[] = $message->text();
+            foreach ($message as $event) {
+                if (($event['event'] ?? null) === 'content-block-delta') {
+                    ++$deltaCount;
+                }
+            }
+        }
+
+        return ['texts' => $texts, 'deltaCount' => $deltaCount];
+    }
+
     public function testOmitsTheSummarizationCallFromRunMessages(): void
     {
-        self::markTestSkipped('Reads `run.messages` of the streamEvents v3 protocol, which this port does not have (ReactAgent::streamEvents() rejects "v3").');
+        $agent = self::suppressionAgent(AgentAssertions::fakeChat([new AIMessage(self::SUMMARY)]));
+
+        ['texts' => $texts] = self::collectRunMessages($agent->streamEvents(['messages' => self::suppressionInput()], null, 'v3'));
+
+        self::assertNotContains(self::SUMMARY, $texts);
+        self::assertContains(self::MAIN, $texts);
+        self::assertSame([], array_filter($texts, static fn (string $t): bool => str_contains($t, self::SUMMARY_PREFIX)));
     }
 
     public function testOmitsAStreamingSummarizationCallFromRunMessages(): void
     {
-        self::markTestSkipped('Reads `run.messages` of the streamEvents v3 protocol, which this port does not have (ReactAgent::streamEvents() rejects "v3").');
+        $agent = self::suppressionAgent(new \LangChain\Utils\Testing\FakeListChatModel(['responses' => [self::SUMMARY]]));
+
+        ['texts' => $texts, 'deltaCount' => $deltaCount] = self::collectRunMessages($agent->streamEvents(['messages' => self::suppressionInput()], null, 'v3'));
+
+        self::assertNotContains(self::SUMMARY, $texts);
+        self::assertContains(self::MAIN, $texts);
+        // The main model's synthetic delta only; a leaked stream would add one per character.
+        self::assertSame(1, $deltaCount);
     }
 
     public function testOmitsTheSummarizationCallFromStreamMessages(): void

@@ -36,9 +36,6 @@ use function LangChain\Tools\tool;
  * call and the agent call both land on one `invoke` mock. Here the model is a `SpyingToolCallingChatModel`
  * whose structured-output runnable is replaced by a lambda that records what the selection call was given
  * (messages and config) and answers from a queue.
- *
- * The second streaming case runs on `streamEvents(version: "v3")` upstream (`run.messages`), which is not
- * ported; it is converted to the same check on the state `invoke()` returns.
  */
 #[CoversClass(LlmToolSelectorMiddleware::class)]
 final class LlmToolSelectorMiddlewareTest extends TestCase
@@ -478,9 +475,12 @@ final class LlmToolSelectorMiddlewareTest extends TestCase
             'middleware' => [LlmToolSelectorMiddleware::create(['model' => self::listModel([json_encode(['tools' => ['get_weather']])]), 'maxTools' => 1])],
         ]);
 
-        $result = $agent->invoke(['messages' => [new HumanMessage("What's the weather in Seoul?")]]);
+        $run = $agent->streamEvents(['messages' => [new HumanMessage("What's the weather in Seoul?")]], null, 'v3');
 
-        $texts = array_map(static fn (object $m): string => $m->text(), $result['messages']);
+        $texts = [];
+        foreach ($run->messages() as $message) {
+            $texts[] = $message->text();
+        }
         foreach ($texts as $text) {
             self::assertStringNotContainsString('tools', $text);
         }
