@@ -179,7 +179,9 @@ final class SearchOperations
 
         [$distanceOp, $scoreTransform] = match ($metric) {
             'l2' => ['<->', '1 / (1 + MIN(v.embedding <-> ?::vector))'],
-            'inner_product' => ['<#>', 'MIN(v.embedding <#> ?::vector)'],
+            // pgvector's `<#>` is the NEGATIVE inner product; upstream sorts it descending, which
+            // returns the least similar item first. The score is negated so higher is better.
+            'inner_product' => ['<#>', '-MIN(v.embedding <#> ?::vector)'],
             default => ['<=>', '1 - MIN(v.embedding <=> ?::vector)'],
         };
 
@@ -191,7 +193,7 @@ final class SearchOperations
 
         if ($threshold > 0) {
             if ($metric === 'inner_product') {
-                $sql .= ' AND v.embedding <#> ?::vector >= ?::float8';
+                $sql .= ' AND -(v.embedding <#> ?::vector) >= ?::float8';
             } else {
                 $sql .= " AND v.embedding {$distanceOp} ?::vector <= ?::float8";
             }
