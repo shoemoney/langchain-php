@@ -274,13 +274,14 @@ final class McpClientHttpTest extends TestCase
             $sse(['jsonrpc' => '2.0', 'id' => 2, 'result' => ['content' => [['type' => 'text', 'text' => 'tool-result']]]]),
         ];
         $body = FnStream::decorate(Utils::streamFor(''), [
-            'read' => static fn (): string => array_shift($events) ?? '',
+            'read' => static function () use (&$events): string {
+                return array_shift($events) ?? '';
+            },
             'eof' => static function () use (&$events): bool {
                 return $events === [];
             },
         ]);
 
-        $history = [];
         $mock = new MockHandler([
             new Response(200, $json, json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => ['protocolVersion' => '2025-06-18', 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'mock', 'version' => '1']]])),
             new Response(202),
@@ -288,6 +289,7 @@ final class McpClientHttpTest extends TestCase
             new Response(202),
         ]);
         $stack = HandlerStack::create($mock);
+        $history = [];
         $stack->push(Middleware::history($history));
 
         $answered = [];
