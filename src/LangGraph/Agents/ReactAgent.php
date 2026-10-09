@@ -920,7 +920,8 @@ final class ReactAgent
         $mergedConfig = $this->configForRun($config);
         $initializedState = $this->initializeMiddlewareStates($state, $mergedConfig);
 
-        return $this->compiled->streamEvents($initializedState, $mergedConfig, $version, $streamOptions);
+        // Stream options belong to the event-stream protocols; as upstream, they keep a `v3` request on `v2`.
+        return $this->compiled->streamEvents($initializedState, $mergedConfig, $version === 'v3' ? 'v2' : $version, $streamOptions);
     }
 
     /**
