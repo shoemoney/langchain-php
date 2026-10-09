@@ -138,6 +138,24 @@ final class UniversalAgentTest extends TestCase
         self::assertInstanceOf(ConfigurableModel::class, $derived);
         self::assertInstanceOf(ChatOpenAI::class, $derived->getModelInstance());
         self::assertSame('gpt-4o-mini', $derived->getModelInstance()->model);
+        self::assertTrue($derived->getModelInstance()->useResponsesApi, 'openai: strings default to the Responses API');
+    }
+
+    public function testANonOpenAiModelIdStringDoesNotForceTheResponsesApi(): void
+    {
+        $previous = getenv('ANTHROPIC_API_KEY');
+        putenv('ANTHROPIC_API_KEY=sk-env');
+        try {
+            $agentNode = (new \ReflectionClass(\LangGraph\Agents\Nodes\AgentNode::class))->newInstanceWithoutConstructor();
+            (new \ReflectionProperty(\LangGraph\Agents\Nodes\AgentNode::class, 'options'))->setValue($agentNode, ['model' => 'anthropic:claude-3-5-sonnet-latest']);
+            $derived = (new \ReflectionMethod(\LangGraph\Agents\Nodes\AgentNode::class, 'deriveModel'))->invoke($agentNode);
+        } finally {
+            $previous === false ? putenv('ANTHROPIC_API_KEY') : putenv('ANTHROPIC_API_KEY=' . $previous);
+        }
+
+        self::assertInstanceOf(ConfigurableModel::class, $derived);
+        self::assertNotInstanceOf(ChatOpenAI::class, $derived->getModelInstance());
+        self::assertFalse(property_exists($derived->getModelInstance(), 'useResponsesApi') && $derived->getModelInstance()->useResponsesApi);
     }
 
     public function testAnUnresolvableModelIdStringFailsAtTheCall(): void

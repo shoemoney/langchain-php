@@ -159,7 +159,11 @@ final class AgentNode extends RunnableCallable
         if (\is_string($model)) {
             // `initChatModel` turns a "provider:model" string into a chat model. The layering guard forbids
             // importing `LangChain\LanguageModels` here, so the class is named by its FQCN.
-            return \LangChain\LanguageModels\Chat\Universal\InitChatModel::init($model);
+            // `openai:` model strings default to the Responses API; pass a model instance to opt out.
+            return \LangChain\LanguageModels\Chat\Universal\InitChatModel::init(
+                $model,
+                str_starts_with($model, 'openai:') ? ['useResponsesApi' => true] : [],
+            );
         }
 
         if ($model instanceof RunnableInterface) {
