@@ -34,6 +34,31 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(SummarizationMiddleware::class)]
 final class SummarizationMiddlewareTest extends TestCase
 {
+    /** @var list<string> */
+    private array $deprecations = [];
+
+    private bool $capturing = false;
+
+    /** Collect the E_USER_DEPRECATED notices the deprecated options raise (upstream: `console.warn`). */
+    private function captureDeprecations(): void
+    {
+        $this->capturing = true;
+        set_error_handler(function (int $level, string $message): bool {
+            $this->deprecations[] = $message;
+
+            return true;
+        }, \E_USER_DEPRECATED);
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->capturing) {
+            restore_error_handler();
+            $this->capturing = false;
+        }
+        $this->deprecations = [];
+    }
+
     /**
      * The `createMockSummarizationModel` of the test: answers a fixed summary and records every call.
      *
@@ -178,8 +203,7 @@ final class SummarizationMiddlewareTest extends TestCase
 
     public function testShouldTriggerSummarizationWhenTokenCountExceedsThresholdDeprecatedSyntax(): void
     {
-        $this->expectUserDeprecationMessage('maxTokensBeforeSummary is deprecated. Use `trigger: { tokens: value }` instead.');
-        $this->expectUserDeprecationMessage('messagesToKeep is deprecated. Use `keep: { messages: value }` instead.');
+        $this->captureDeprecations();
 
         $summarizer = self::mockSummarizer();
         $agent = self::agent(self::mainModel(), ['model' => $summarizer, 'maxTokensBeforeSummary' => 50, 'messagesToKeep' => 2]);
@@ -189,6 +213,8 @@ final class SummarizationMiddlewareTest extends TestCase
         self::assertNotSame([], $summarizer->calls);
         self::assertIsSummary($result['messages'][0]);
         self::assertLessThanOrEqual(4, \count($result['messages']));
+
+        self::assertSame(['maxTokensBeforeSummary is deprecated. Use `trigger: { tokens: value }` instead.', 'messagesToKeep is deprecated. Use `keep: { messages: value }` instead.'], $this->deprecations);
     }
 
     public function testShouldNotTriggerSummarizationWhenBelowTokenThreshold(): void
@@ -229,8 +255,7 @@ final class SummarizationMiddlewareTest extends TestCase
 
     public function testShouldPreserveAIToolMessagePairsTogether(): void
     {
-        $this->expectUserDeprecationMessage('maxTokensBeforeSummary is deprecated. Use `trigger: { tokens: value }` instead.');
-        $this->expectUserDeprecationMessage('messagesToKeep is deprecated. Use `keep: { messages: value }` instead.');
+        $this->captureDeprecations();
 
         $summarizer = self::mockSummarizer();
         $toolCallMessage = new AIMessage([
@@ -259,6 +284,8 @@ final class SummarizationMiddlewareTest extends TestCase
         // Both present or both absent: the pair is not split
         self::assertTrue($hasToolCall);
         self::assertTrue($hasToolMessage);
+
+        self::assertSame(['maxTokensBeforeSummary is deprecated. Use `trigger: { tokens: value }` instead.', 'messagesToKeep is deprecated. Use `keep: { messages: value }` instead.'], $this->deprecations);
     }
 
     public function testShouldHandleTokenBasedKeepConfiguration(): void
@@ -467,8 +494,7 @@ final class SummarizationMiddlewareTest extends TestCase
 
     public function testShouldHandleEmptyConversationGracefully(): void
     {
-        $this->expectUserDeprecationMessage('maxTokensBeforeSummary is deprecated. Use `trigger: { tokens: value }` instead.');
-        $this->expectUserDeprecationMessage('messagesToKeep is deprecated. Use `keep: { messages: value }` instead.');
+        $this->captureDeprecations();
 
         $summarizer = self::mockSummarizer();
         $agent = self::agent(self::mainModel(), ['model' => $summarizer, 'maxTokensBeforeSummary' => 100, 'messagesToKeep' => 5]);
@@ -478,6 +504,8 @@ final class SummarizationMiddlewareTest extends TestCase
         // Does not crash and adds a response
         self::assertGreaterThan(0, \count($result['messages']));
         self::assertSame([], $summarizer->calls);
+
+        self::assertSame(['maxTokensBeforeSummary is deprecated. Use `trigger: { tokens: value }` instead.', 'messagesToKeep is deprecated. Use `keep: { messages: value }` instead.'], $this->deprecations);
     }
 
     public function testShouldValidateContextSizeSchemaCorrectly(): void

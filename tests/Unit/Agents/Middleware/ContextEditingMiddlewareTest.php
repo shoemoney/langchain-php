@@ -28,6 +28,31 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(ClearToolUsesEdit::class)]
 final class ContextEditingMiddlewareTest extends TestCase
 {
+    /** @var list<string> */
+    private array $deprecations = [];
+
+    private bool $capturing = false;
+
+    /** Collect the E_USER_DEPRECATED notices the deprecated options raise (upstream: `console.warn`). */
+    private function captureDeprecations(): void
+    {
+        $this->capturing = true;
+        set_error_handler(function (int $level, string $message): bool {
+            $this->deprecations[] = $message;
+
+            return true;
+        }, \E_USER_DEPRECATED);
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->capturing) {
+            restore_error_handler();
+            $this->capturing = false;
+        }
+        $this->deprecations = [];
+    }
+
     /** @return list<BaseMessage> */
     private static function createToolCallConversation(): array
     {
@@ -212,7 +237,7 @@ final class ContextEditingMiddlewareTest extends TestCase
 
     public function testShouldSupportDeprecatedTriggerTokensProperty(): void
     {
-        $this->expectUserDeprecationMessage('triggerTokens is deprecated. Use `trigger: { tokens: value }` instead.');
+        $this->captureDeprecations();
 
         $agent = self::agent('Response', [new ClearToolUsesEdit(['triggerTokens' => 100, 'keep' => ['messages' => 1]])]);
 
@@ -221,11 +246,13 @@ final class ContextEditingMiddlewareTest extends TestCase
 
         // Still works and clears messages
         self::assertCount(1, self::filterClearedMessages($result['messages']));
+
+        self::assertSame(['triggerTokens is deprecated. Use `trigger: { tokens: value }` instead.'], $this->deprecations);
     }
 
     public function testShouldSupportDeprecatedKeepMessagesProperty(): void
     {
-        $this->expectUserDeprecationMessage('keepMessages is deprecated. Use `keep: { messages: value }` instead.');
+        $this->captureDeprecations();
 
         $agent = self::agent('Response', [new ClearToolUsesEdit(['trigger' => ['tokens' => 100], 'keepMessages' => 1])]);
 
@@ -234,15 +261,13 @@ final class ContextEditingMiddlewareTest extends TestCase
 
         // Still works and keeps the specified number of messages
         self::assertCount(1, self::filterUnclearedMessages($result['messages']));
+
+        self::assertSame(['keepMessages is deprecated. Use `keep: { messages: value }` instead.'], $this->deprecations);
     }
 
     public function testShouldSupportDeprecatedClearAtLeastProperty(): void
     {
-        $this->expectUserDeprecationMessage(
-            'clearAtLeast is deprecated and will be removed in a future version. '
-            . 'It conflicts with the `keep` property. Use `keep: { tokens: value }` or '
-            . '`keep: { messages: value }` instead to control retention.',
-        );
+        $this->captureDeprecations();
 
         // Multiple large tool results
         $messages = [new HumanMessage("Search for 'React'")];
@@ -264,6 +289,8 @@ final class ContextEditingMiddlewareTest extends TestCase
         // With keep 1 we would normally keep one result, but clearAtLeast needs more cleared to meet the budget
         self::assertGreaterThanOrEqual(2, \count(self::filterClearedMessages($result['messages'])));
         self::assertLessThanOrEqual(1, \count(self::filterUnclearedMessages($result['messages'])));
+
+        self::assertSame(['clearAtLeast is deprecated and will be removed in a future version. It conflicts with the `keep` property. Use `keep: { tokens: value }` or `keep: { messages: value }` instead to control retention.'], $this->deprecations);
     }
 
     // ---- custom editing strategies ----------------------------------------------------------------
