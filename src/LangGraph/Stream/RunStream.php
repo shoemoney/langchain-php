@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LangGraph\Stream;
 
 use LangChain\Runnables\RunnableConfig;
+use LangGraph\Pregel\Constants;
 use LangGraph\Pregel\Pregel;
 use LangGraph\Stream\Transformers\LifecycleTransformer;
 use LangGraph\Stream\Transformers\MessagesTransformer;
@@ -36,9 +37,10 @@ use LangGraph\Stream\Transformers\ValuesTransformer;
  *    returns the final state, or throws the run's failure.
  *  - Abort is observed between chunks.
  *  - The engine stream of this port carries no subgraph namespaces (`Pregel::stream()` yields
- *    `[mode, payload]`), so a run created by {@see self::create()} reports the root namespace only. A source
- *    that carries `[namespace, mode, payload]` chunks, via {@see self::fromSource()}, gets full subgraph
- *    discovery and lifecycle.
+ *    `[mode, payload]`). A run created by {@see self::create()} reports the root namespace for everything
+ *    except `messages`, whose namespace is recovered from the chunk metadata. Subgraph-internal events are
+ *    therefore not surfaced by `create()`. A source that carries `[namespace, mode, payload]` chunks, via
+ *    {@see self::fromSource()}, gets full subgraph discovery and lifecycle.
  */
 class RunStream implements \IteratorAggregate, StreamHandle
 {
@@ -110,7 +112,22 @@ class RunStream implements \IteratorAggregate, StreamHandle
             $run = clone $graph;
             $run->streamMode = $modes;
 
-            yield from $run->stream($input, $config);
+            foreach ($run->stream($input, $config) as $chunk) {
+                // The engine drops the namespace of a messages chunk, but the metadata it carries holds
+                // the task's checkpoint namespace (`node:taskId`, `|`-joined for subgraphs), which is the
+                // namespace upstream's subgraph-aware stream puts on the chunk. Recover it, so
+                // `messages()` finds node-level messages exactly one level below the root.
+                $namespace = $chunk[0] === 'messages' && \is_array($chunk[1] ?? null) && \is_array($chunk[1][1] ?? null)
+                    ? ($chunk[1][1]['langgraph_checkpoint_ns'] ?? null)
+                    : null;
+                if (\is_string($namespace) && $namespace !== '') {
+                    yield [explode(Constants::CHECKPOINT_NAMESPACE_SEPARATOR, $namespace), 'messages', $chunk[1]];
+
+                    continue;
+                }
+
+                yield $chunk;
+            }
         })();
 
         return self::fromSource($source, $transformers, $abortSignal);
