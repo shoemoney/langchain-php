@@ -156,6 +156,25 @@ final class ChatTogetherAITest extends TestCase
         self::assertSame('Hello world', $text);
     }
 
+    public function testStreamsReasoning(): void
+    {
+        $model = self::model(stream: [
+            self::sse(['choices' => [['index' => 0, 'delta' => ['role' => 'assistant', 'reasoning_content' => 'Let me ']]]]),
+            self::sse(['choices' => [['index' => 0, 'delta' => ['reasoning_content' => 'reason...']]]]),
+            self::sse(['choices' => [['index' => 0, 'delta' => ['content' => 'Done']]]]),
+            self::sse(['choices' => [['index' => 0, 'delta' => [], 'finish_reason' => 'stop']]]),
+            "data: [DONE]\n\n",
+        ]);
+
+        $folded = null;
+        foreach ($model->stream('Hello') as [, $chunk]) {
+            $folded = $folded === null ? $chunk : $folded->concat($chunk);
+        }
+
+        self::assertSame('Let me reason...', $folded->additional_kwargs['reasoning_content']);
+        self::assertSame('Done', $folded->content);
+    }
+
     public function testStreamsToolCalls(): void
     {
         $model = self::model(stream: [
