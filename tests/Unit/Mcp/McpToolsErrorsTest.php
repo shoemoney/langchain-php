@@ -6,7 +6,6 @@ namespace LangChain\Tests\Unit\Mcp;
 
 use LangGraph\Mcp\Errors;
 use LangGraph\Mcp\McpClientError;
-use LangGraph\Mcp\McpTools;
 use LangGraph\Mcp\ToolException;
 use LangGraph\Mcp\ValidationException;
 use PHPUnit\Framework\Attributes\CoversClass;
