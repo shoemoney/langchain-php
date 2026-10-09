@@ -171,4 +171,25 @@ final class McpEndToEndTest extends McpTestCase
         self::assertSame('state-1', $last['options']['requestState']);
         self::assertSame(['action' => 'accept', 'content' => ['go' => true]], $last['options']['inputResponses']['approve']);
     }
+
+    public function testAnAfterToolCallHookReturningACommandSteersTheAgentThroughToolNode(): void
+    {
+        $client = (new FakeMcpClient([self::echoTool(['name' => 'steer'])]))->willReturn(['content' => [['type' => 'text', 'text' => 'raw']]]);
+        $tools = McpTools::loadMcpTools('srv', $client, [
+            'afterToolCall' => static fn (): array => [
+                'result' => new Command(update: ['messages' => [new ToolMessage(['content' => 'from hook', 'tool_call_id' => 's1', 'name' => 'steer'])]]),
+            ],
+        ]);
+        $llm = ReactAgentFixtures::fake([
+            new AIMessage(['content' => '', 'tool_calls' => [ReactAgentFixtures::toolCall('steer', 's1')]]),
+            new AIMessage('done'),
+        ]);
+
+        $result = ReactAgent::create(['llm' => $llm, 'tools' => $tools])->invoke(['messages' => 'go']);
+
+        $contents = array_map(static fn ($m) => $m->content, $result['messages']);
+        self::assertContains('from hook', $contents);
+        self::assertNotContains('{"graph":null', array_map(static fn ($c) => is_string($c) ? substr($c, 0, 13) : '', $contents));
+        self::assertSame('done', end($result['messages'])->content);
+    }
 }
