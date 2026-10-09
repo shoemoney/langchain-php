@@ -14,6 +14,7 @@ use LangChain\Runnables\RunnableBinding;
 use LangChain\Runnables\RunnableConfig;
 use LangGraph\Checkpoint\CheckpointListOptions;
 use LangGraph\Errors\GraphInterrupt;
+use LangGraph\Errors\RemoteException;
 use LangGraph\Pregel\Utils\Config;
 use LangGraph\Sdk\Client;
 
@@ -153,7 +154,7 @@ class RemoteGraph extends RunnableBinding
      * Start a run on the server and yield its chunks.
      *
      * An `updates` chunk carrying `__interrupt__` is rethrown as a {@see GraphInterrupt}; an `error` event
-     * becomes a RuntimeException (upstream's `RemoteException`, which this port does not define).
+     * becomes a {@see RemoteException}.
      * `streamResumable` and the reconnect-by-Location-header behaviour are the SDK's.
      *
      * @return \Generator<int, mixed>
@@ -222,7 +223,7 @@ class RemoteGraph extends RunnableBinding
                     continue;
                 }
             } elseif (str_starts_with($event, 'error')) {
-                throw new \RuntimeException(is_string($data) ? $data : (string) json_encode($data));
+                throw new RemoteException(is_string($data) ? $data : (string) json_encode($data), ['data' => $data]);
             }
 
             if (!in_array($mode, $streamModes, true)) {

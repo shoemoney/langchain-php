@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
+use LangGraph\Errors\RemoteException;
 use LangGraph\Sdk\Client;
 
 /**
@@ -125,7 +126,7 @@ final class RemoteRunStream implements \IteratorAggregate
             $data = $part['data'];
 
             if ($method === 'error') {
-                throw new \RuntimeException(is_string($data) ? $data : (string) json_encode($data));
+                throw new RemoteException(is_string($data) ? $data : (string) json_encode($data), ['data' => $data]);
             }
             if ($method === 'metadata' || $method === 'end') {
                 continue;

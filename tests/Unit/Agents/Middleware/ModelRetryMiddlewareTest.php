@@ -21,9 +21,6 @@ use PHPUnit\Framework\TestCase;
 /**
  * `langchain/src/agents/middleware/tests/modelRetry.test.ts`.
  *
- * Not converted: "should not retry a core error that is non-retryable by construction", which needs
- * `ContextOverflowError` from `@langchain/core/errors`; this port has no such error class.
- *
  * Upstream's `error.constructor.name` is the short class name here, so the custom-formatter case reads
  * `Custom error: Exception` where upstream reads `Custom error: Error`.
  */
@@ -227,6 +224,11 @@ final class ModelRetryMiddlewareTest extends TestCase
         $error = AsyncCaller::stampRetryable(new \Exception('Invalid API key'), false);
 
         self::assertSame(1, self::generateCallsWithDefaultRetryOn($error, 'non-retryable'));
+    }
+
+    public function testShouldNotRetryACoreErrorThatIsNonRetryableByConstruction(): void
+    {
+        self::assertSame(1, self::generateCallsWithDefaultRetryOn(new \LangChain\Errors\ContextOverflowError(), 'core-non-retryable'));
     }
 
     public function testShouldRetryAnErrorMarkedRetryable(): void

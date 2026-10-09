@@ -16,8 +16,7 @@ use PHPUnit\Framework\TestCase;
  *
  * The retry loop sleeps through an injected recorder, so retry-on-429 is asserted
  * (the recorded backoff is at least the server's Retry-After) without real waiting.
- * `ContextOverflowError` belongs to the unported errors module and is replaced by a
- * plain exception that is marked non-retryable.
+ * `ContextOverflowError` is the real {@see \LangChain\Errors\ContextOverflowError}.
  */
 #[CoversClass(AsyncCaller::class)]
 final class AsyncCallerTest extends TestCase
@@ -557,9 +556,9 @@ final class AsyncCallerTest extends TestCase
 
     public function testStopsRetryingAMarkedErrorWithNoStatusAtAll(): void
     {
-        $callable = self::script([AsyncCaller::stampRetryable(new \OverflowException('context overflow'), false)], $calls);
+        $callable = self::script([new \LangChain\Errors\ContextOverflowError('context overflow')], $calls);
 
-        $this->expectException(\OverflowException::class);
+        $this->expectException(\LangChain\Errors\ContextOverflowError::class);
         try {
             $this->caller(3)->call($callable);
         } finally {

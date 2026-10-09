@@ -427,8 +427,9 @@ final class RemoteGraphTest extends TestCase
 
         [, $error] = self::collect($remote->stream([], self::threadConfig()));
 
-        $this->assertInstanceOf(\RuntimeException::class, $error);
+        $this->assertInstanceOf(\LangGraph\Errors\RemoteException::class, $error);
         $this->assertStringContainsString('boom', $error->getMessage());
+        $this->assertSame(['error' => 'ValueError', 'message' => 'boom'], $error->fields['data']);
     }
 
     public function testStreamWithoutAThreadRunsStatelessly(): void
