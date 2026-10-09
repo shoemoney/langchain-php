@@ -171,6 +171,29 @@ foreach ($result['messages'] as $m) {
 // AIMessage: Got it.
 ```
 
+### 🌊 Streaming an agent run (`streamEvents` v3)
+
+`ReactAgent::streamEvents($state, $config, 'v3')` returns a run stream: `messages()` yields one stream per AI message,
+`output()` drives the run to its final state. The run is pull-driven, so a result settles only once you read it. This
+runs offline against the scripted fake model:
+
+```php
+use LangChain\Messages\AIMessage;
+use LangChain\Utils\Testing\FakeToolCallingChatModel;
+use LangGraph\Agents\Agent;
+
+$agent = Agent::create([
+    'model' => new FakeToolCallingChatModel(['sleep' => 0, 'responses' => [new AIMessage('Hello from the stream.')]]),
+    'tools' => [],
+]);
+
+$run = $agent->streamEvents(['messages' => 'hi'], null, 'v3');
+foreach ($run->messages() as $message) {
+    echo $message->content, "\n"; // Hello from the stream.
+}
+echo count($run->output()['messages']), " messages\n"; // 2 messages
+```
+
 ### 🧭 `initChatModel`
 
 `InitChatModel::init('provider:model', $fields)` returns a `ConfigurableModel` that builds the real client
@@ -254,7 +277,7 @@ non-exact behaviours.
 | Area | State | Notes |
 |---|---|---|
 | 🧱 Messages, runnables (LCEL), prompts, output parsers, tools, tracers | ✅ Ported | `streamEvents`/`streamLog` are partial |
-| 💬 Chat models | 🟡 Partial | `ChatOpenAI` (Chat Completions and the Responses API, as a facade over `BaseChatOpenAI` / `ChatOpenAICompletions` / `ChatOpenAIResponses`), Azure OpenAI (`AzureChatOpenAI`), `ChatAnthropic`, `ChatOllama`, `ChatFireworks`, `ChatTogetherAI`, `ChatDeepSeek`, `ChatXAI` (Chat Completions only) and `ChatOpenRouter`. Every client is tested against a fake transport, never a live API. Streamed OpenAI custom-tool calls do not fold end to end; Fireworks and Together drop streamed `reasoning_content`; OpenRouter structured output is not validated; the xAI Responses API is not ported |
+| 💬 Chat models | 🟡 Partial | `ChatOpenAI` (Chat Completions and the Responses API, as a facade over `BaseChatOpenAI` / `ChatOpenAICompletions` / `ChatOpenAIResponses`), Azure OpenAI (`AzureChatOpenAI`), `ChatAnthropic`, `ChatOllama`, `ChatFireworks`, `ChatTogetherAI`, `ChatDeepSeek`, `ChatXAI` (Chat Completions), `ChatXAIResponses` (the xAI Responses API; built-in tools only) and `ChatOpenRouter`. Every client is tested against a fake transport, never a live API. Streamed OpenAI custom-tool calls do not fold end to end; OpenRouter structured output is not validated |
 | 🧩 Hosted tools | ✅ Ported (builders only) | OpenAI (`Chat\OpenAI\Tools`: web search, file search, code interpreter, MCP, image generation, shell, apply patch, computer use, custom, `DallEAPIWrapper`), Anthropic (`Chat\Anthropic\Tools`, with server-tool passthrough) and xAI search tools. Unit-tested against fakes; no live calls |
 | 🧬 Embeddings and legacy LLMs | 🟡 Partial | `OpenAIEmbeddings`, `AzureOpenAIEmbeddings`, `FireworksEmbeddings`, `TogetherAIEmbeddings`, `OllamaEmbeddings`; legacy `LLMs\{OpenAI,AzureOpenAI,Fireworks,TogetherAI}`. Upstream's `Promise.all` concurrency runs sequentially here |
 | 📚 Retrieval | 🟡 Partial | Base layer only: `VectorStores` (`MemoryVectorStore`), `Retrievers`, `ExampleSelectors`, `Indexing` (`RecordManager`, `Index::index`), `DocumentLoaders`. `FewShot*` prompt templates are not ported; no concrete backends, retrievers or loaders |
@@ -263,25 +286,27 @@ non-exact behaviours.
 | 🕸️ Pregel engine, channels, `Graph`, `MessageGraph` | ✅ Ported | Superstep concurrency is sequential; timeouts cannot preempt; `sync` and `async` durability are identical |
 | 🧭 `StateGraph` | 🟡 Parity with non-exact items | `addSequence`, input/output schemas, node policies, `errorHandler`, `setNodeDefaults`, `validate`. The handler runs inline, `timeout` is not enforced, `GraphCallbackHandler` events are not ported |
 | 🎨 Graph drawing | 🟡 Mermaid text ported | `Runnable::getGraph`, `Pregel::getGraph($config, $xray)` and `drawMermaid()` (checked byte for byte against upstream under Node). `drawMermaidPng()` returns image bytes but has never been run against the real mermaid.ink |
-| ⚙️ Functional API | 🟡 Partial | `Func::entrypoint`, `Func::task`, `Func::getPreviousState`; sequential, no `custom` stream mode |
-| 🦾 Prebuilt | 🟡 Partial | `ToolNode`, `toolsCondition`, `ReactAgent::create`, `HumanInterrupt`, `Supervisor::create`, `Swarm::create`. The `Topic::fromCheckpoint` two-tool-call resume defect is fixed. Supervisor and Swarm have no remote-graph branch, and deliver handoffs through a `ParentCommandBridge` because the engine does not handle `ParentCommand` |
-| 🤖 Agents (`LangGraph\Agents`) | 🟡 Partial | `Agent::create` (`createAgent`) returning a `ReactAgent`, `Middleware::create` with the hook nodes, `AgentNode`, `ToolStrategy` / `ProviderStrategy` structured responses, and the tool-call / subagent transformers. The transformers are driven by protocol-event arrays only: there is no v3 run stream |
-| 🛡️ Pre-built middleware | 🟡 Partial | Call limits, model and tool retries, model fallback, tool errors, dynamic system prompt, human-in-the-loop, summarisation, context editing, PII (and PII redaction), todo list, LLM tool selector, tool emulator, provider tool search, Anthropic prompt caching and OpenAI moderation. Partial: the v3 stream-transformer cases are skipped, `ContextOverflowError` does not exist in the port's core errors, Anthropic prompt caching sets `cache_control` but `ChatAnthropic` does not yet send it on the wire, and string models in model fallback, the tool emulator and moderation do not resolve yet |
-| 🧭 `initChatModel` | 🟡 Partial | `InitChatModel::init` / `ConfigurableModel` over the nine providers the port ships; unported providers are refused. Tested over a fake transport only |
+| ⚙️ Functional API | 🟡 Partial | `Func::entrypoint`, `Func::task`, `Func::getPreviousState`, `Pregel::getState` on an entrypoint and `Pregel::clearCache`; sequential, no `custom` stream mode |
+| 🦾 Prebuilt | 🟡 Partial | `ToolNode` (unwraps `[Command, artifact]` tuples), `toolsCondition`, `ReactAgent::create`, `HumanInterrupt`, `Supervisor::create`, `Swarm::create`. The `Topic::fromCheckpoint` two-tool-call resume defect is fixed, and the engine now handles `ParentCommand` natively. Supervisor and Swarm have no remote-graph branch |
+| 🤖 Agents (`LangGraph\Agents`) | 🟡 Partial | `Agent::create` (`createAgent`) returning a `ReactAgent`, `Middleware::create` with the hook nodes, `AgentNode`, `ToolStrategy` / `ProviderStrategy` structured responses, and the tool-call / subagent transformers, wired into `ReactAgent::streamEvents(..., 'v3')`. Nested agents do not surface on a real v3 run, because the engine emits no `tasks` chunks |
+| 🛡️ Pre-built middleware | 🟡 Partial | Call limits, model and tool retries, model fallback, tool errors, dynamic system prompt, human-in-the-loop, summarisation, context editing, PII (and PII redaction), todo list, LLM tool selector, tool emulator, provider tool search, Anthropic prompt caching and OpenAI moderation. Still partial (see `PORT_STATUS.md`): Zod validation is hand-written, live `.int` suites are not ported, and the backoff tests keep upstream's wall-clock bounds. `ContextOverflowError` exists, bound `cache_control` reaches the Anthropic request body, and string models resolve through `initChatModel` |
+| 🧭 `initChatModel` | 🟡 Partial | `InitChatModel::init` / `ConfigurableModel` over the nine providers the port ships; unported providers are refused. The cache key covers the whole call config. Tested over a fake transport only |
 | 💾 Checkpointers | 🟡 Partial | Memory, SQLite, Postgres (env-gated in CI), Redis (tested against a fake client), MongoDB (tested against a fake collection only, **never run against a real server**) |
 | 🧠 LangGraph store and cache | ✅ Ported | In-memory store and cache |
 | 🗃️ LangGraph store backends | 🟡 Partial | `PostgresStore` (PDO, pgvector, TTL; its integration spec is env-gated and ran against a local server), `RedisStore` (fake-backed plus an env-gated live spec; `fromCluster` dropped) and `MongoDBStore` (over a collection seam and a fake, **never run against a real MongoDB or Atlas**; no `fromConnString` / client ownership) |
-| 🔌 MCP adapters | 🟡 Partial | `LangGraph\Mcp\*` converts MCP tools, content, hooks and elicitation over an `McpClientInterface`. It is the **conversion layer only**: there is no `MultiServerMCPClient`, no stdio / HTTP / SSE transport, and it has only been driven by a fake client |
+| 🔌 MCP adapters and client | 🟡 Partial | `LangGraph\Mcp\*` converts MCP tools, content, hooks and elicitation; `Mcp\Client` is an in-house client over **stdio and streamable HTTP**, and `MultiServerMcpClient` manages several servers. Tested against in-repo fixture servers only, never a third-party server. OAuth, SSE, resource templates and subscriptions are not ported (SSE and provider auth are refused with an error, not ignored) |
+| 🌊 Run stream (v3) | 🟡 Partial | `LangGraph\Stream` (`RunStream`, `Mux`, `StreamChannel`, `Deferred`, messages / values / lifecycle / subgraph transformers). Pull-driven and sequential rather than async; `ThreadsClient::stream()` and the `RemoteGraphRunStream` projections are not ported |
 | 🌐 LangGraph client SDK | 🟡 Partial | assistants, threads, store, crons, runs, `joinStream` and stream retry. `ThreadsClient::stream()` (the v2 protocol) is not ported; a signal is a polled callable, not an `AbortSignal` |
-| 🛰️ `RemoteGraph` | 🟡 Partial | `RemoteGraph` and `RemoteRunStream` over the SDK client, using `runs->create` + `joinStream` because `ThreadsClient::stream()` is not ported. Only part of `RemoteGraphRunStream` is ported; server error events throw a plain `RuntimeException` |
+| 🛰️ `RemoteGraph` | 🟡 Partial | `RemoteGraph` and `RemoteRunStream` over the SDK client, using `runs->create` + `joinStream` because `ThreadsClient::stream()` is not ported. Only part of `RemoteGraphRunStream` is ported; server error events throw `RemoteException` |
 | 🖼️ UI bindings (`sdk-react` etc.) | ⛔ Out of scope | Browser-only |
 
 <details>
 <summary>🚫 Not ported yet</summary>
 
-- An MCP client and its transports (`MultiServerMCPClient`, stdio, HTTP, SSE); only the conversion layer is ported
+- MCP OAuth, the SSE transport, resource templates and subscriptions (the client covers stdio and streamable HTTP only)
 - `initChatModel` for providers the port has no client for (cohere, google, bedrock, groq, mistral, perplexity)
-- The xAI Responses API, `ThreadsClient::stream()` and the v3 run stream
+- `ThreadsClient::stream()` (v2) and the `RemoteGraph` v3 projections (about 13k upstream LOC, browser-shaped)
+- `MongoDBStore.fromConnString` / `ownsClient` and `RedisStore.fromCluster`
 - Providers beyond OpenAI (incl. Azure), Anthropic, Ollama, Fireworks, Together, DeepSeek, xAI and OpenRouter
 - Concrete vector-store backends, retrievers and document loaders
 - A production MongoDB driver adapter (the MongoDB saver and store have only run against fakes)
@@ -309,6 +334,7 @@ src/
     ChatHistory/      BaseChatMessageHistory, BaseListChatMessageHistory, InMemoryChatMessageHistory
     DocumentLoaders/  DocumentLoader, BaseDocumentLoader
     Embeddings/       Embeddings interface; OpenAI, AzureOpenAI, Fireworks, TogetherAI, Ollama embeddings
+    Errors/           ContextOverflowError (non-retryable)
     ExampleSelectors/ Length-based and semantic-similarity selectors, prompt selectors
     Indexing/         RecordManager, InMemoryRecordManager, HashedDocument, Index
     LanguageModels/   BaseChatModel, BaseLLM, Outputs/
@@ -323,7 +349,7 @@ src/
         Fireworks/   ChatFireworks
         TogetherAI/  ChatTogetherAI
         DeepSeek/    ChatDeepSeek (reasoning blocks)
-        XAI/         ChatXAI (Completions only), LiveSearch, Tools/
+        XAI/         ChatXAI (Completions), ChatXAIResponses, LiveSearch, Tools/
         OpenRouter/  ChatOpenRouter, Converters/, Utils/
       LLMs/          legacy completion LLMs: OpenAI, AzureOpenAI, Fireworks, TogetherAI
     Load/             Serializable
@@ -351,7 +377,7 @@ src/
                      summarization, PII, todo list, tool selector, emulator, ...); Provider/{Anthropic,OpenAI}/
       Nodes/         AgentNode, Before/After agent and model nodes, ToolNode
       Responses/     ToolStrategy, ProviderStrategy, ResponseFormats
-      Transformers/  ToolCallTransformer, SubagentTransformer and protocol value classes
+      Transformers/  AgentRunStream, ToolCallTransformer, SubagentTransformer and protocol value classes
     Cache/            BaseCache, InMemoryCache
     Channels/         BaseChannel, LastValue, BinaryOperatorAggregate, Topic, ...
     Checkpoint/       BaseCheckpointSaver, MemorySaver, SqliteSaver
@@ -359,16 +385,19 @@ src/
       Postgres/      PostgresSaver
       Redis/         RedisSaver, ShallowRedisSaver
       Serde/         JsonPlusSerializer
-    Errors/           Interrupts, recursion and update errors
+    Errors/           Interrupts, recursion, update and ParentCommand errors, RemoteException
     Func/             Func::entrypoint, Func::task, Func::getPreviousState
     Graph/            Graph, CompiledGraph, Branch, MessageGraph, messages reducer
     Prebuilt/         ToolNode, toolsCondition, ReactAgent, AgentState, HumanInterrupt
-      Supervisor/    Supervisor::create, handoff tools, ParentCommandBridge
+      Supervisor/    Supervisor::create, handoff tools
       Swarm/         Swarm::create, handoff tools, active-agent router
     Pregel/           algo, loop, read, write, runner, retry, Call, CallScheduler, Validate, Timeout, RemoteGraph
       Checkpoint/    Engine-side saver contract
       Messages/      messages / tools stream handlers
-    Mcp/              MCP tool / content / hook / elicitation conversion over McpClientInterface (no client)
+    Mcp/              MCP tool / content / hook / elicitation conversion over McpClientInterface, MultiServerMcpClient
+      Client/        McpClient, JsonRpc; Transport/ (stdio, streamable HTTP, SSE event parser)
+      Connection/    ConnectionManager, ConnectionConfig, ManagedClient
+    Stream/           v3 run stream: RunStream, Mux, StreamChannel, Deferred; Transformers/ (messages, values, lifecycle, subgraphs)
     Sdk/              LangGraph API client (assistants, threads, store, crons, runs)
       Utils/         StreamRetry, Reconnect, Signals, SseDecoder
     State/            Annotation, StateGraph, CompiledStateGraph
