@@ -147,7 +147,7 @@ class ConfigurableModel extends BaseChatModel implements ConfigurableModelInterf
      */
     protected function generate(array $messages, array $options = [], ?CallbackManagerForLLMRun $runManager = null): ChatResult
     {
-        $model = $this->getModelInstance();
+        $model = $this->getModelInstance(RunnableConfig::fromArray($options));
         if (!$model instanceof BaseChatModel) {
             throw new \LogicException(sprintf(
                 'The queued operations turned the model into a %s, which cannot generate chat results directly.',
@@ -339,19 +339,36 @@ class ConfigurableModel extends BaseChatModel implements ConfigurableModelInterf
     }
 
     /**
-     * Port of `_getCacheKey`. Upstream stringifies the whole config; only `configurable` can change which
-     * client is built, so only it is keyed. Keys Pregel injects (`__pregel_*`) vary per step and are skipped.
+     * Port of `_getCacheKey`: the whole config is stringified, `__pregel_*` keys of `configurable` skipped.
+     * Fields still at their default are left out, so no config and an untouched `RunnableConfig` share a key
+     * (upstream's `{}`). `callbacks`, `signal` and the run ids are per-call objects or identifiers that never
+     * pick a client; keying them would give every call its own instance, so they are skipped.
      */
     public function getCacheKey(?RunnableConfig $config = null): string
     {
-        $configurable = [];
-        foreach ($config?->configurable ?? [] as $key => $value) {
-            if (!str_starts_with((string) $key, '__pregel_')) {
-                $configurable[$key] = $value;
+        $toStringify = [];
+        if ($config !== null) {
+            $defaults = new RunnableConfig();
+            foreach (get_object_vars($config) as $field => $value) {
+                if (\in_array($field, ['callbacks', 'signal', 'runId', 'runIdParent'], true)
+                    || $value === ($defaults->{$field} ?? null)) {
+                    continue;
+                }
+                if ($field === 'configurable') {
+                    $value = array_filter(
+                        $value,
+                        static fn (int|string $key): bool => !str_starts_with((string) $key, '__pregel_'),
+                        ARRAY_FILTER_USE_KEY,
+                    );
+                    if ($value === []) {
+                        continue;
+                    }
+                }
+                $toStringify[$field] = $value;
             }
         }
 
-        return (string) json_encode(self::keyable($configurable), JSON_PARTIAL_OUTPUT_ON_ERROR);
+        return (string) json_encode(self::keyable($toStringify), JSON_PARTIAL_OUTPUT_ON_ERROR);
     }
 
     /** Objects have no stable JSON form; identity stands in for them. */

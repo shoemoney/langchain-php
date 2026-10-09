@@ -54,4 +54,27 @@ final class ModelTest extends TestCase
         self::assertFalse(Model::isBaseChatModel(new \stdClass()));
         self::assertFalse(Model::isBaseChatModel(null));
     }
+
+    public function testShouldReturnTrueForTheRealConfigurableModel(): void
+    {
+        $model = new \LangChain\LanguageModels\Chat\Universal\ConfigurableModel(['defaultConfig' => ['model' => 'gpt-4o', 'apiKey' => 'x']]);
+
+        self::assertTrue(Model::isConfigurableModel($model));
+        self::assertTrue(Model::isBaseChatModel($model));
+    }
+
+    public function testARealConfigurableModelRunsInAChainAfterBeingRecognised(): void
+    {
+        $http = \LangChain\Tests\Unit\LanguageModels\Chat\Universal\UniversalFixtures::openAiHttp('pong');
+        $model = \LangChain\LanguageModels\Chat\Universal\InitChatModel::init('gpt-4o-mini', [
+            'modelProvider' => 'openai',
+            'apiKey' => 'sk-test',
+            'httpClient' => $http,
+        ]);
+        self::assertTrue(Model::isConfigurableModel($model));
+
+        $chain = $model->pipe(new \LangChain\OutputParsers\StringOutputParser());
+
+        self::assertSame('pong', $chain->invoke('ping'));
+    }
 }

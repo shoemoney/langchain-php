@@ -30,6 +30,7 @@ final class Model
 
     public static function isConfigurableModel(mixed $model): bool
     {
-        return $model instanceof ConfigurableModelInterface;
+        // The LangGraph interface extends the LangChain one, so the base check covers both.
+        return $model instanceof \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface;
     }
 }
