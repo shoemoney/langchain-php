@@ -43,7 +43,7 @@ use LangChain\Runnables\RunnableConfig;
 final class StateSnapshot
 {
     /**
-     * @param array<string, mixed>       $values    Current values of the channels.
+     * @param mixed                      $values    Current values of the channels (a scalar for an entrypoint's single output channel).
      * @param list<string>               $next      Nodes to execute in the next step.
      * @param array<string, mixed>       $config    The config that fetched this snapshot.
      * @param array<string, mixed>       $metadata  Checkpoint metadata.
@@ -52,7 +52,7 @@ final class StateSnapshot
      * @param list<PregelTaskDescription> $tasks  Tasks in this step.
      */
     public function __construct(
-        public readonly array $values = [],
+        public readonly mixed $values = [],
         public readonly array $next = [],
         public readonly array $config = [],
         public readonly array $metadata = [],
@@ -72,7 +72,7 @@ final class StateSnapshot
      * a compatibility shim stops being one.
      *
      * @return array{
-     *     values: array<string, mixed>,
+     *     values: mixed,
      *     next: list<string>,
      *     config: array<string, mixed>,
      *     metadata: array<string, mixed>,

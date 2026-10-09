@@ -25,10 +25,6 @@ use function LangGraph\Pregel\interrupt;
  * Not ported, with reasons:
  *  - the `SlowInMemoryCache` variant of "multiple interrupts with cache": it differs from the
  *    plain cache only by an artificial `await` delay, which a synchronous port cannot express.
- *  - `getState().tasks`: `Pregel::getState()` throws a TypeError for an entrypoint
- *    (`StateSnapshot::$values` is array-typed; the output channel is empty or scalar), so pending
- *    interrupts are read from the saver's pending writes and the post-resume "no tasks left"
- *    assertion is not ported.
  */
 #[CoversClass(Func::class)]
 final class InterruptHandlingTest extends FuncTestCase
@@ -111,9 +107,13 @@ final class InterruptHandlingTest extends FuncTestCase
         self::assertNotNull($interrupts[0]['id']);
         self::assertSame(1, $taskCallCount);
         self::assertSame(1, $graphCallCount);
-        self::assertCount(1, self::pendingInterrupts($saver, $config));
+
+        $currTasks = $graph->getState($config)->tasks;
+        self::assertCount(1, $currTasks[0]->interrupts);
 
         $result = $graph->invoke(new Command(resume: 'answer'), $config);
+
+        self::assertCount(0, $graph->getState($config)->tasks);
 
         self::assertSame('the correct answer', $result);
         self::assertSame(2, $taskCallCount);
@@ -254,6 +254,11 @@ final class InterruptHandlingTest extends FuncTestCase
         self::assertSame('Hey do you want to add James?', $first[0]['value']);
         self::assertNotNull($first[0]['id']);
 
+        $currTasks = $program->getState($config)->tasks;
+        self::assertCount(1, $currTasks[0]->interrupts);
+        self::assertSame('Hey do you want to add James?', $currTasks[0]->interrupts[0]['value']);
+        self::assertNotNull($currTasks[0]->interrupts[0]['id']);
+
         // The graph-wide resume answers James's interrupt only; Will's task asks its own question.
         $second = self::interruptsOf($program, new Command(resume: true), $config);
         self::assertCount(1, $second);
@@ -261,7 +266,13 @@ final class InterruptHandlingTest extends FuncTestCase
         self::assertNotNull($second[0]['id']);
         self::assertNotSame($first[0]['id'], $second[0]['id']);
 
+        $currTasks = $program->getState($config)->tasks;
+        self::assertCount(1, $currTasks[0]->interrupts);
+        self::assertSame('Hey do you want to add Will?', $currTasks[0]->interrupts[0]['value']);
+        self::assertNotNull($currTasks[0]->interrupts[0]['id']);
+
         self::assertSame(['Added James!', 'Added Will!'], $program->invoke(new Command(resume: true), $config));
+        self::assertCount(0, $program->getState($config)->tasks);
     }
 
     public function testMultipleInterruptsWithCache(): void
@@ -309,8 +320,7 @@ final class InterruptHandlingTest extends FuncTestCase
         self::assertSame($expected, $runThread('2'));
         self::assertSame(3, $counter);
 
-        // `graph.clearCache()` upstream; the cache is cleared directly (see PORT_STATUS).
-        $cache->clear([]);
+        $graph->clearCache();
 
         self::assertSame($expected, $runThread('3'));
         self::assertSame(6, $counter);

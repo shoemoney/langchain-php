@@ -971,6 +971,17 @@ class Pregel extends Runnable
     }
 
     /**
+     * Empty the node cache.
+     *
+     * Port of `clearCache`: `await this.cache?.clear([])`. A graph compiled without a cache has
+     * nothing to clear, so this is a no-op for it.
+     */
+    public function clearCache(): void
+    {
+        $this->cache?->clear([]);
+    }
+
+    /**
      * The checkpoints saved for a thread, newest first.
      *
      * Port of `getStateHistory`. Useful for debugging, for time travel (feed an entry's `config`

@@ -90,29 +90,4 @@ abstract class FuncTestCase extends TestCase
 
         return $out;
     }
-
-    /**
-     * Interrupts pending on the head checkpoint, from the saver's pending writes.
-     *
-     * Upstream reads `getState().tasks[].interrupts`. `Pregel::getState()` cannot snapshot an
-     * entrypoint (its `StateSnapshot::$values` is array-typed and an entrypoint's output channel
-     * is empty or scalar), so the pending `__interrupt__` writes are read straight from the saver.
-     * A task that interrupts and the task that awaited it record the same interrupt, so the list
-     * is de-duplicated to one entry per interrupt.
-     *
-     * @return list<array{id: string|null, value: mixed}>
-     */
-    protected static function pendingInterrupts(MemorySaver $saver, RunnableConfig $config): array
-    {
-        $tuple = $saver->getTuple(['configurable' => $config->configurable]);
-
-        $out = [];
-        foreach ($tuple->pendingWrites ?? [] as [, $channel, $value]) {
-            if ($channel === Constants::INTERRUPT) {
-                $out[json_encode($value)] = $value;
-            }
-        }
-
-        return array_values($out);
-    }
 }
