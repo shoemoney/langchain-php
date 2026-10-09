@@ -458,8 +458,8 @@ final class ReactAgent
             return $model;
         }
 
-        if ($llm instanceof ConfigurableModelInterface) {
-            $model = self::simpleBindTools($llm->model(), $toolClasses);
+        if ($llm instanceof \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface) {
+            $model = self::simpleBindTools($llm->getModelInstance(), $toolClasses);
             if ($model !== null) {
                 return $model;
             }
@@ -553,7 +553,7 @@ final class ReactAgent
     /** Whether `$step` is something a model can hide behind. */
     private static function isModelStep(mixed $step): bool
     {
-        return $step instanceof RunnableBinding || self::isChatModel($step) || $step instanceof ConfigurableModelInterface;
+        return $step instanceof RunnableBinding || self::isChatModel($step) || $step instanceof \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface;
     }
 
     private static function modelStepIndex(RunnableSequence $sequence): ?int
@@ -576,8 +576,8 @@ final class ReactAgent
             $model = $index === null ? $model : $model->steps[$index];
         }
 
-        if ($model instanceof ConfigurableModelInterface) {
-            $model = $model->model();
+        if ($model instanceof \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface) {
+            $model = $model->getModelInstance();
         }
 
         return $model;

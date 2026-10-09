@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Prebuilt;
 
-use LangChain\Runnables\RunnableInterface;
-
 /**
  * A model that resolves to the real chat model lazily.
  *
@@ -13,18 +11,12 @@ use LangChain\Runnables\RunnableInterface;
  * `_queuedMethodOperations` and `_model` (what `initChatModel` returns). `ReactAgent` looks through such a
  * model to the one it wraps before deciding whether tools still need binding.
  *
- * It does not extend `RunnableInterface`: an implementing class is a runnable already (a chat model), and
- * re-inheriting the interface alongside `Runnable` makes its shared constants ambiguous.
+ * The members (`getQueuedMethodOperations()`, `getModelInstance()`) are declared by the LangChain-layer
+ * interface that `initChatModel`'s class implements; the layering guard forbids a `use` of
+ * `LangChain\LanguageModels` here, so the parent is named by its FQCN. It does not extend
+ * `RunnableInterface`: an implementing class is a runnable already (a chat model), and re-inheriting the
+ * interface alongside `Runnable` makes its shared constants ambiguous.
  */
-interface ConfigurableModelInterface
+interface ConfigurableModelInterface extends \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface
 {
-    /**
-     * The method calls (`bindTools`, ...) queued on the wrapper, keyed by method name.
-     *
-     * @return array<string, mixed>
-     */
-    public function queuedMethodOperations(): array;
-
-    /** The underlying model, with any queued operations applied. */
-    public function model(): RunnableInterface;
 }
