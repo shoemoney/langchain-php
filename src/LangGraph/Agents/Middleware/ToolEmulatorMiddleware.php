@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware;
 
-use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Runnables\RunnableConfig;
@@ -24,7 +23,7 @@ use LangGraph\Pregel\Utils\Config;
  *
  * `model` is a chat model instance, or a "provider:model" string resolved lazily on the first emulated call
  * (upstream defaults the documented string to `anthropic:claude-sonnet-4-5-20250929`) resolved through
- * {@see InitChatModel::init()} with `temperature` 1; without it the agent's own model does the emulating. When
+ * {@see \LangChain\LanguageModels\Chat\Universal\InitChatModel::init()} with `temperature` 1; without it the agent's own model does the emulating. When
  * the string cannot be resolved the error is logged and the agent model is used instead, as upstream does.
  *
  * ```
@@ -152,7 +151,7 @@ final class ToolEmulatorMiddleware
     private static function initEmulatorModel(string $model, ?RunnableInterface $agentModel): RunnableInterface
     {
         try {
-            $resolved = InitChatModel::init($model, ['temperature' => 1]);
+            $resolved = \LangChain\LanguageModels\Chat\Universal\InitChatModel::init($model, ['temperature' => 1]);
         } catch (\Throwable $error) {
             error_log('Error initializing emulator model, using agent model: ' . $error->getMessage());
             $resolved = null;

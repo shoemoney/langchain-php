@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware;
 
-use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\HumanMessage;
@@ -32,7 +31,7 @@ use LangGraph\Pregel\PregelScratchpad;
  * Options (all can also be overridden per run through the run context):
  *
  *  - `model` (required): the summarization model, an instance with `invoke($prompt, RunnableConfig)`, or a
- *    "provider:model" string resolved through {@see InitChatModel::init()};
+ *    "provider:model" string resolved through {@see \LangChain\LanguageModels\Chat\Universal\InitChatModel::init()};
  *  - `trigger`: a context size array, or a list of them (any one may fire); within one array every property
  *    must hold. Properties: `tokens`, `messages`, `fraction` (of the model's `maxInputTokens`). No trigger
  *    disables summarization;
@@ -402,7 +401,7 @@ PROMPT;
 
         $model = $userOptions['model'] ?? null;
         if (\is_string($model)) {
-            $model = InitChatModel::init($model);
+            $model = \LangChain\LanguageModels\Chat\Universal\InitChatModel::init($model);
         }
         if (!\is_object($model)) {
             throw new \InvalidArgumentException('SummarizationMiddleware requires a "model".');

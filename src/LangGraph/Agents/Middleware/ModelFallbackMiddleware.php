@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware;
 
-use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangGraph\Agents\Middleware;
 
 /**
@@ -14,7 +13,7 @@ use LangGraph\Agents\Middleware;
  *
  * The fallbacks are tried in order after the primary model throws; the first success wins, and when the last
  * fallback fails too its error is thrown. A model is a chat model instance or a "provider:model" string, resolved
- * through {@see InitChatModel::init()}; a string that cannot be resolved counts as a failed fallback.
+ * through {@see \LangChain\LanguageModels\Chat\Universal\InitChatModel::init()}; a string that cannot be resolved counts as a failed fallback.
  *
  * ```
  * $agent = Agent::create([
@@ -46,7 +45,7 @@ final class ModelFallbackMiddleware
                     $last = \count($fallbackModels) - 1;
                     foreach ($fallbackModels as $i => $fallbackModel) {
                         try {
-                            $model = \is_string($fallbackModel) ? InitChatModel::init($fallbackModel) : $fallbackModel;
+                            $model = \is_string($fallbackModel) ? \LangChain\LanguageModels\Chat\Universal\InitChatModel::init($fallbackModel) : $fallbackModel;
 
                             return $handler([...$request, 'model' => $model]);
                         } catch (\Throwable $fallbackError) {

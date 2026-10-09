@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware\Provider\OpenAI;
 
-use LangChain\LanguageModels\Chat\Universal\ConfigurableModel;
-use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\HumanMessage;
@@ -22,7 +20,7 @@ use LangGraph\Agents\Middleware;
  * with a violation message, "error" throws an {@see OpenAIModerationError}, "replace" swaps the flagged
  * message's content for the violation message and carries on.
  *
- * Options: `model` (an OpenAI chat model, or a model string resolved lazily with {@see InitChatModel::init()}
+ * Options: `model` (an OpenAI chat model, or a model string resolved lazily with {@see \LangChain\LanguageModels\Chat\Universal\InitChatModel::init()}
  * the first time a check runs), `moderationModel` (default "omni-moderation-latest"), `checkInput` (true),
  * `checkOutput` (true), `checkToolResults` (false), `exitBehavior`, and `violationMessage`, a template with the
  * placeholders `{categories}`, `{category_scores}` and `{original_content}`.
@@ -204,10 +202,10 @@ final class ModerationMiddleware
     private static function initModerationClient(string|object $model): ModerationClient
     {
         if (\is_string($model)) {
-            $model = InitChatModel::init($model);
+            $model = \LangChain\LanguageModels\Chat\Universal\InitChatModel::init($model);
         }
         // `init()` wraps the client; moderation needs the client's own credentials and transport.
-        if ($model instanceof ConfigurableModel) {
+        if ($model instanceof \LangChain\LanguageModels\Chat\Universal\ConfigurableModel) {
             $model = $model->getModelInstance();
         }
 

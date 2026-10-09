@@ -38,7 +38,7 @@ use LangGraph\Pregel\Command;
  * Options (upstream `AgentNodeOptions`):
  *
  *  - `model` (required): a runnable chat model. A model-id string is only resolved when the node runs, through
- *    `initChatModel`, which this port does not have yet (WP-20), so it raises then;
+ *    `InitChatModel::init()` (with `useResponsesApi` for `openai:` strings, as upstream);
  *  - `systemMessage` (required): the {@see SystemMessage} (empty when there is no prompt);
  *  - `toolClasses`: every tool the agent offers (client tools are runnables, anything else is a provider tool);
  *  - `shouldReturnDirect`: names of the tools whose result ends the run (a list of names, or a name-keyed map);

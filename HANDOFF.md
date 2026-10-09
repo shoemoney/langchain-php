@@ -34,8 +34,8 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **15851 tests (15281 passing, 570 skipped), 37841 assertions** |
-| Size | 617 src files / 100,692 lines · 540 test files / 118,254 lines |
+| Tests | **15856 tests (15288 passing, 568 skipped), 37882 assertions** |
+| Size | 617 src files / 100,641 lines · 540 test files / 118,442 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
@@ -419,13 +419,7 @@ Unresolved, recorded so they are not re-discovered:
 - **NEW (Wave 4), `ConfigurableModel::generate()` does not pass the call config** to `getModelInstance()` where upstream passes the
   options. It is effectively unreachable because `invoke` / `batch` are overridden and delegate first. The cache key also covers only
   `configurable` where upstream stringifies the whole config (declared in the docblock).
-- **NEW (Wave 4), string models still do not resolve through `initChatModel` in three middleware.** `ToolEmulatorMiddleware` and
-  `ModerationMiddleware` look up a placeholder class `LangChain\ChatModels\InitChatModel::initChatModel()` (their `INIT_CHAT_MODEL`
-  constant) that does not exist, and `ModelFallbackMiddleware` still raises `model id strings need initChatModel, which is not ported
-  yet`. Point them at `LangChain\LanguageModels\Chat\Universal\InitChatModel::init()` (the way `SummarizationMiddleware` and
-  `LlmToolSelectorMiddleware` already do), then rewrite the `StubInitChatModel`-based separate-process tests and the
-  `markTestSkipped` guards that say `initChatModel is ported now` in `ToolEmulatorMiddlewareTest` and `ModerationMiddlewareTest`.
-  `AgentNode`'s class docblock (around line 41) also still says `initChatModel` is not ported.
+- ~~**NEW (Wave 4), string models still do not resolve through `initChatModel` in three middleware.**~~ **FIXED** (`chore(integrate)` after Wave 4): `ToolEmulatorMiddleware` (temperature 1), `ModelFallbackMiddleware`, OpenAI `ModerationMiddleware` (unwraps the `ConfigurableModel` to its client), `LlmToolSelectorMiddleware` and `SummarizationMiddleware` all call `\LangChain\LanguageModels\Chat\Universal\InitChatModel::init()` by FQCN (the layering guard still forbids the `use` form). `StubInitChatModel` is gone; the string-model tests drive a real `ollama:` / `langsmith:` client against `tests/Unit/Agents/Support/LocalProviderServer` (a throwaway `php -S` on 127.0.0.1) via `OLLAMA_BASE_URL` / `LANGSMITH_GATEWAY`.
 - **NEW (Wave 4), `ChatAnthropic` ignores `cache_control` bound through `bindTools()`.** `invocationParams()` reads it only from per-call
   options, so `PromptCachingMiddleware`'s `modelSettings.cache_control` never reaches the request body. Fix it in the Anthropic client,
   then un-skip `PromptCachingMiddlewareTest::testTheRealAnthropicClientForwardsTheBoundCacheControlOnTheRequestBody`.
@@ -509,7 +503,7 @@ Unresolved, recorded so they are not re-discovered:
 
 Recommended order, and why. Waves 0, 1, 2, 3 and 4 of `.loop/COMPLETION_PLAN.md` have landed. **Wave 4 was the last planned wave, and the port is not complete**: the 🟡 rows in `PORT_STATUS.md` and the NOT-ported list above are the remaining work. Wave 4 landed WP-20, WP-22a/b/c, WP-10 (three stores), WP-25 (conversion layer only) and four follow-up fixes; every one of the nine work packages is 🟡.
 
-1. **Close the Wave 4 follow-ups in Open observations first, they are cheap:** point `ToolEmulatorMiddleware`, `ModerationMiddleware` and `ModelFallbackMiddleware` at the real `InitChatModel`, fix `Agents\Model::isConfigurableModel()`, make `ChatAnthropic` honour bound `cache_control` (then un-skip its test), and have `ToolNode` unwrap a `[Command, artifact]` tuple.
+1. **Close the Wave 4 follow-ups in Open observations first, they are cheap:** fix `Agents\Model::isConfigurableModel()`, make `ChatAnthropic` honour bound `cache_control` (then un-skip its test), and have `ToolNode` unwrap a `[Command, artifact]` tuple.
 2. **Older open follow-ups:** `ParentCommand` handling in the runner (then drop `ParentCommandBridge`), `LangGraph\Errors\RemoteException`, and `ContextOverflowError` in the core errors (then un-skip the modelRetry case).
 3. **Backlog candidates:** a production MongoDB driver adapter (then run both Mongo specs against a real server), an MCP client with transports behind `McpClientInterface`, the xAI Responses API, `ThreadsClient::stream()` (v2) with the v3 run stream and the remaining `RemoteGraphRunStream` projections (which would also un-skip the v3 middleware cases), a real-server run of `drawMermaidPng`, and then the NOT-ported list.
 
