@@ -192,11 +192,12 @@ final class PhpRedisClient implements RedisClientInterface
     {
         // FT.INFO labels its fields with simple-string replies, which phpredis flattens to `true`
         // unless asked for the literal text. Restore the option so no other command is affected.
+        $previous = $this->redis->getOption(\Redis::OPT_REPLY_LITERAL);
         $this->redis->setOption(\Redis::OPT_REPLY_LITERAL, true);
         try {
             $reply = $this->raw('FT.INFO', $index);
         } finally {
-            $this->redis->setOption(\Redis::OPT_REPLY_LITERAL, false);
+            $this->redis->setOption(\Redis::OPT_REPLY_LITERAL, $previous);
         }
 
         $info = [];

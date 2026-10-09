@@ -110,7 +110,7 @@ final class Constants
     {
         if (\is_array($retryOn) && array_is_list($retryOn)) {
             foreach ($retryOn as $class) {
-                if (!\is_string($class) || !class_exists($class)) {
+                if (!\is_string($class) || !(class_exists($class) || interface_exists($class))) {
                     return \is_callable($retryOn) ? $retryOn : null;
                 }
             }

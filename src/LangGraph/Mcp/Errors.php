@@ -91,7 +91,7 @@ final class Errors
             return $error;
         }
         if ($error instanceof \Throwable) {
-            return [...get_object_vars($error), 'message' => $error->getMessage()];
+            return ['code' => $error->getCode(), ...get_object_vars($error), 'message' => $error->getMessage()];
         }
         if (is_object($error)) {
             return get_object_vars($error);
