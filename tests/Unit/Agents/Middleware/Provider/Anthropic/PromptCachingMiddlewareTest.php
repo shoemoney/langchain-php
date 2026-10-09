@@ -264,11 +264,14 @@ final class PromptCachingMiddlewareTest extends TestCase
 
     public function testTheRealAnthropicClientForwardsTheBoundCacheControlOnTheRequestBody(): void
     {
-        self::markTestSkipped(
-            'ChatAnthropic::invocationParams() forwards a top-level cache_control from per-call options only, not from the '
-            . 'kwargs bindTools() stores, so the middleware (whose only seam is modelSettings -> bindTools) cannot reach the '
-            . 'request body yet. Provider gap outside the WP-22c-2 territory; un-skip once the client reads bound cache_control.',
-        );
+        $http = new FakeHttpClient([FakeHttpClient::json(200, self::anthropicReply())]);
+        $model = new ChatAnthropic(['apiKey' => 'sk-test', 'model' => 'claude-sonnet-4-5', 'httpClient' => $http]);
+        $agent = Agent::create(['model' => $model, 'middleware' => [PromptCachingMiddleware::create(['ttl' => '1h', 'minMessagesToCache' => 3])]]);
+
+        $agent->invoke(['messages' => [new HumanMessage('one'), new AIMessage('two'), new HumanMessage('three')]]);
+
+        self::assertCount(1, $http->requests);
+        self::assertSame(['type' => 'ephemeral', 'ttl' => '1h'], $http->lastRequestBody()['cache_control']);
     }
 
     public function testTheRealAnthropicClientSendsNoCacheControlBelowTheThreshold(): void
