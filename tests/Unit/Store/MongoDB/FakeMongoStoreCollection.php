@@ -38,6 +38,9 @@ final class FakeMongoStoreCollection implements MongoStoreCollectionInterface
     /** @var list<array<string, mixed>> Definitions passed to createSearchIndex. */
     public array $searchIndexes = [];
 
+    /** When set, createSearchIndex throws it (to exercise setup's error handling). */
+    public ?\Throwable $searchIndexFailure = null;
+
     public function find(array $filter = [], array $sort = [], ?int $limit = null): array
     {
         $this->calls[] = ['method' => 'find', 'args' => ['filter' => $filter, 'sort' => $sort, 'limit' => $limit]];
@@ -141,6 +144,10 @@ final class FakeMongoStoreCollection implements MongoStoreCollectionInterface
     public function createSearchIndex(array $definition): string
     {
         $this->calls[] = ['method' => 'createSearchIndex', 'args' => ['definition' => $definition]];
+
+        if ($this->searchIndexFailure !== null) {
+            throw $this->searchIndexFailure;
+        }
 
         $name = (string) $definition['name'];
         foreach ($this->searchIndexes as $existing) {
