@@ -148,12 +148,9 @@ final class ReactAgentToolNodeTest extends TestCase
             ['name' => 'weather', 'description' => 'Weather tool', 'schema' => Schema::object(['location' => ['type' => 'string']])],
         );
 
-        // Upstream makes two calls (weather, human_assistance). Two queued `Send`s trip `Topic::fromCheckpoint()`,
-        // which reads a two-element list of arrays as the `unique: true` `[seen, values]` shape and so loses the
-        // packets on resume (see the report for WP-03); a second weather call keeps the case to three.
+        // The Wave 3 Topic fix made resuming with two queued Sends safe; this case now exercises it.
         $toolCalls = [
             ReactAgentFixtures::toolCall('weather', 'get_weather', ['location' => 'sf']),
-            ReactAgentFixtures::toolCall('weather', 'get_weather_2', ['location' => 'ny']),
             ReactAgentFixtures::toolCall('human_assistance', 'get_help', ['query' => 'help me']),
         ];
         $agent = ReactAgent::create([
@@ -175,7 +172,7 @@ final class ReactAgentToolNodeTest extends TestCase
         $last = end($values);
         // The weather task finished; the human task is waiting.
         self::assertSame(
-            ['Get user assistance and also check the weather', 'ai response', "It's sunny in sf", "It's sunny in ny"],
+            ['Get user assistance and also check the weather', 'ai response', "It's sunny in sf"],
             ReactAgentFixtures::texts($last['messages']),
         );
         $interrupts = [];
@@ -190,7 +187,7 @@ final class ReactAgentToolNodeTest extends TestCase
         $resumed = $agent->invoke(new Command(resume: ['data' => 'Resumed!']), self::thread());
 
         self::assertSame(
-            ['Get user assistance and also check the weather', 'ai response', "It's sunny in sf", "It's sunny in ny", 'Resumed!', 'final response'],
+            ['Get user assistance and also check the weather', 'ai response', "It's sunny in sf", 'Resumed!', 'final response'],
             ReactAgentFixtures::texts($resumed['messages']),
         );
         self::assertSame($toolCalls, array_map(
