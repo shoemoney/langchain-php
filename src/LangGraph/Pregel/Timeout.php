@@ -105,6 +105,7 @@ final class Timeout
      *
      * @template T
      * @param callable(RunnableConfig): T $invoke
+     * @param (callable(): float)|null $clock monotonic ms source; defaults to `hrtime`
      * @return T
      */
     public static function runAttemptWithTimeout(
@@ -112,11 +113,12 @@ final class Timeout
         RunnableConfig $config,
         TimeoutPolicy $policy,
         callable $invoke,
+        ?callable $clock = null,
     ): mixed {
-        $scope = new TimedAttemptScope($policy->refreshOn);
+        $scope = new TimedAttemptScope($policy->refreshOn, $clock);
         $scopedConfig = self::wrapConfig($config, $scope, $policy, $task->name);
 
-        $start = TimedAttemptScope::now();
+        $start = $scope->read();
         $value = null;
         $error = null;
         try {
@@ -125,7 +127,7 @@ final class Timeout
             $error = $e;
         }
 
-        $now = TimedAttemptScope::now();
+        $now = $scope->read();
         $kind = null;
         if ($policy->runTimeout !== null && $now - $start >= $policy->runTimeout) {
             $kind = 'run';

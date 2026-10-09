@@ -31,8 +31,9 @@ use PHPUnit\Framework\TestCase;
  * upstream's; the pre-emption is not. Upstream itself re-checks wall-clock time after its race for
  * synchronous CPU-bound nodes (its timers cannot fire there either), so the CPU-bound cases below
  * are the ones that port one to one. A node is made "slow" by BURNING CPU for a measured interval
- * ({@see self::burn()}), never by sleeping and never by faking the clock: the clock the code reads is
- * the real one.
+ * ({@see self::burn()}), never by sleeping. The progress-channel cases instead drive an injected fake clock
+ * ({@see self::attemptOnFakeClock()}), the analogue of upstream's fake timers, so the budget
+ * comparison is exact under load.
  *
  * Not ported, and why:
  *  - "aborts the node's signal when the timeout fires", "does not surface an unhandled rejection
@@ -330,6 +331,44 @@ final class TimeoutTest extends TestCase
         self::assertSame('idle', $error->kind);
     }
 
+    /**
+     * Run one attempt against a fake clock the node advances itself.
+     *
+     * @param callable(RunnableConfig, \Closure(float): void): mixed $func receives the config and an `advance(ms)`
+     * @param array<string, mixed>                                    $timeout
+     * @param array<string, mixed>                                    $options  extra `config->options`
+     * @return array{0: mixed, 1: ?\Throwable, 2: PregelExecutableTask}
+     */
+    private static function attemptOnFakeClock(callable $func, array $timeout, string $name, array $options = []): array
+    {
+        $now = 0.0;
+        $clock = static function () use (&$now): float {
+            return $now;
+        };
+        $advance = static function (float $ms) use (&$now): void {
+            $now += $ms;
+        };
+        $task = self::task($name);
+        $policy = Timeout::coerceTimeoutPolicy($timeout);
+        self::assertNotNull($policy);
+        $config = self::configFor($task);
+        $config->options = [...$config->options, ...$options];
+
+        try {
+            $result = Timeout::runAttemptWithTimeout(
+                $task,
+                $config,
+                $policy,
+                static fn (RunnableConfig $scoped): mixed => $func($scoped, $advance),
+                $clock,
+            );
+
+            return [$result, null, $task];
+        } catch (\Throwable $e) {
+            return [null, $e, $task];
+        }
+    }
+
     public function testCallbackEventsRefreshTheIdleClockUnderAuto(): void
     {
         $fire = static function (RunnableConfig $config): void {
@@ -340,9 +379,11 @@ final class TimeoutTest extends TestCase
             }
         };
 
-        [$result, $error] = self::attempt(static function (RunnableConfig $config) use ($fire): string {
+        // Four 40 ms stretches (160 ms total) against a 150 ms idle budget: each callback event
+        // resets the clock, so the longest gap is exactly 40 ms.
+        [$result, $error] = self::attemptOnFakeClock(static function (RunnableConfig $config, \Closure $advance) use ($fire): string {
             for ($i = 0; $i < 4; $i++) {
-                self::burn(40);
+                $advance(40);
                 $fire($config);
             }
 
@@ -351,40 +392,57 @@ final class TimeoutTest extends TestCase
         self::assertNull($error);
         self::assertSame('ok', $result);
 
-        // Under `heartbeat` the handler is not even attached.
-        [, $strictError] = self::attempt(static function (RunnableConfig $config) use ($fire): string {
+        // Same schedule under `heartbeat`: the handler is not attached, the gap is 160 ms.
+        [, $strictError] = self::attemptOnFakeClock(static function (RunnableConfig $config, \Closure $advance) use ($fire): string {
             self::assertSame([], $config->callbacks);
             for ($i = 0; $i < 4; $i++) {
-                self::burn(40);
+                $advance(40);
                 $fire($config);
             }
 
             return 'ok';
         }, ['idleTimeout' => 150, 'refreshOn' => 'heartbeat'], 'callbacks-strict');
         self::assertInstanceOf(NodeTimeoutError::class, $strictError);
+        self::assertSame('idle', $strictError->kind);
     }
 
     public function testTheCustomStreamWriterCountsAsProgress(): void
     {
-        $task = self::task('writer-progress');
-        $policy = Timeout::coerceTimeoutPolicy(['idleTimeout' => 150]);
         $sent = [];
-        $config = self::configFor($task);
-        $config->options['writer'] = static function (mixed $chunk) use (&$sent): void {
+        $options = ['writer' => static function (mixed $chunk) use (&$sent): void {
             $sent[] = $chunk;
-        };
-
-        $result = Timeout::runAttemptWithTimeout($task, $config, $policy, static function (RunnableConfig $scoped): string {
+        }];
+        $node = static function (RunnableConfig $scoped, \Closure $advance): string {
             for ($i = 0; $i < 4; $i++) {
-                self::burn(40);
+                $advance(40);
                 $scoped->options['writer']($i);
             }
 
             return 'ok';
-        });
+        };
 
+        [$result, $error] = self::attemptOnFakeClock($node, ['idleTimeout' => 150], 'writer-progress', $options);
+        self::assertNull($error);
         self::assertSame('ok', $result);
         self::assertSame([0, 1, 2, 3], $sent);
+
+        // Under strict `heartbeat` the writer is not progress, so the same schedule times out.
+        [, $strictError] = self::attemptOnFakeClock($node, ['idleTimeout' => 150, 'refreshOn' => 'heartbeat'], 'writer-strict', $options);
+        self::assertInstanceOf(NodeTimeoutError::class, $strictError);
+        self::assertSame('idle', $strictError->kind);
+    }
+
+    public function testTheScopeMeasuresGapsThroughTheInjectedClock(): void
+    {
+        $t = 0.0;
+        $scope = new \LangGraph\Pregel\TimedAttemptScope('auto', static function () use (&$t): float {
+            return $t;
+        });
+        $t = 5000.0;
+        $scope->touch();
+        self::assertSame(5000.0, $scope->longestIdleGap($t));
+        $t = 5010.0;
+        self::assertSame(5000.0, $scope->longestIdleGap($t));
     }
 
     public function testHeartbeatIsANoOpWithoutAnIdleTimeout(): void
