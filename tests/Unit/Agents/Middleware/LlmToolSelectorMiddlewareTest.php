@@ -14,6 +14,7 @@ use LangChain\Messages\HumanMessage;
 use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Runnables\RunnableLambda;
+use LangChain\Tests\Unit\Agents\Support\LocalProviderServer;
 use LangChain\Tests\Unit\Prebuilt\ReactAgentFixtures;
 use LangChain\Tests\Unit\Prebuilt\SpyingToolCallingChatModel;
 use LangChain\Tools\Schema;
@@ -312,18 +313,44 @@ final class LlmToolSelectorMiddlewareTest extends TestCase
         );
     }
 
-    public function testAStringModelNeedsInitChatModel(): void
+    public function testAStringModelIsResolvedThroughInitChatModelAndMakesTheSelection(): void
     {
-        $middleware = LlmToolSelectorMiddleware::create(['model' => 'openai:gpt-4o-mini']);
+        $server = LocalProviderServer::start(['/api/chat' => LocalProviderServer::ollamaReply('{"tools":["toolB"]}')]);
+        putenv('OLLAMA_BASE_URL=' . $server->baseUrl);
+        try {
+            $agentModel = ReactAgentFixtures::spy([new AIMessage('Response from model')]);
+            $middleware = LlmToolSelectorMiddleware::create(['model' => 'ollama:llama3', 'maxTools' => 1]);
+            $seen = null;
+
+            $middleware['wrapModelCall'](
+                ['model' => $agentModel, 'messages' => [new HumanMessage('Use tool B')], 'tools' => $this->allTools, 'runtime' => null],
+                static function (array $request) use (&$seen): AIMessage {
+                    $seen = $request;
+
+                    return new AIMessage('ok');
+                },
+            );
+
+            self::assertSame(['toolB'], self::names($seen['tools']), 'the string model chose the tools');
+            self::assertSame([], $agentModel->structuredOutputCalls, 'the agent model did not make the selection');
+            self::assertCount(1, $server->requests());
+            $sent = $server->body(0);
+            self::assertSame('llama3', $sent['model']);
+            self::assertStringContainsString('toolA', json_encode($sent), 'the selector offered the tool names to the model');
+        } finally {
+            putenv('OLLAMA_BASE_URL');
+            $server->stop();
+        }
+    }
+
+    public function testAStringModelTheRegistryCannotResolveSurfacesTheInitChatModelError(): void
+    {
+        $middleware = LlmToolSelectorMiddleware::create(['model' => 'nosuchprovider:model']);
         $handler = static fn (array $request): AIMessage => new AIMessage('ok');
         $request = ['model' => null, 'messages' => [new HumanMessage('hi')], 'tools' => $this->allTools, 'runtime' => null];
 
-        if (class_exists('LangChain\LanguageModels\Chat\Universal\InitChatModel')) {
-            self::markTestSkipped('InitChatModel is available; resolving a real provider model needs credentials.');
-        }
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Cannot resolve the model "openai:gpt-4o-mini"');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unable to infer model provider for { model: nosuchprovider:model }');
 
         $middleware['wrapModelCall']($request, $handler);
     }

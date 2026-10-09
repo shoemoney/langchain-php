@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware;
 
+use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangGraph\Agents\Middleware;
 
 /**
@@ -12,9 +13,8 @@ use LangGraph\Agents\Middleware;
  * Port of `modelFallbackMiddleware` from `langchain/src/agents/middleware/modelFallback.ts`.
  *
  * The fallbacks are tried in order after the primary model throws; the first success wins, and when the last
- * fallback fails too its error is thrown. A model is a chat model instance; a "provider:model" string needs
- * `initChatModel`, which this port does not have yet (WP-20), so it fails the same way `Agent::create` does
- * and counts as a failed fallback.
+ * fallback fails too its error is thrown. A model is a chat model instance or a "provider:model" string, resolved
+ * through {@see InitChatModel::init()}; a string that cannot be resolved counts as a failed fallback.
  *
  * ```
  * $agent = Agent::create([
@@ -46,14 +46,9 @@ final class ModelFallbackMiddleware
                     $last = \count($fallbackModels) - 1;
                     foreach ($fallbackModels as $i => $fallbackModel) {
                         try {
-                            if (\is_string($fallbackModel)) {
-                                throw new \RuntimeException(\sprintf(
-                                    'Cannot resolve the model "%s": model id strings need initChatModel, which is not ported yet. Pass a chat model instance.',
-                                    $fallbackModel,
-                                ));
-                            }
+                            $model = \is_string($fallbackModel) ? InitChatModel::init($fallbackModel) : $fallbackModel;
 
-                            return $handler([...$request, 'model' => $fallbackModel]);
+                            return $handler([...$request, 'model' => $model]);
                         } catch (\Throwable $fallbackError) {
                             if ($i === $last) {
                                 throw $fallbackError;

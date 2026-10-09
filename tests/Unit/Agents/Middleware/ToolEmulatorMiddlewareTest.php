@@ -9,7 +9,7 @@ use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Tests\Unit\Agents\Support\AgentAssertions;
 use LangChain\Tests\Unit\Agents\Support\FlakyChatModel;
-use LangChain\Tests\Unit\Agents\Support\StubInitChatModel;
+use LangChain\Tests\Unit\Agents\Support\LocalProviderServer;
 use LangChain\Tools\Schema;
 use LangChain\Tools\StructuredTool;
 use LangChain\Utils\Testing\FakeToolCallingChatModel;
@@ -17,8 +17,6 @@ use LangGraph\Agents\Agent;
 use LangGraph\Agents\Middleware\ToolEmulatorMiddleware;
 use LangGraph\Agents\Runtime;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 use function LangChain\Tools\tool;
@@ -277,46 +275,35 @@ final class ToolEmulatorMiddlewareTest extends TestCase
 
     // ---- Beyond the upstream cases: a model string -----------------------------------------------
 
-    public function testAModelStringFailsClearlyWhileInitChatModelIsNotPorted(): void
-    {
-        if (class_exists('LangChain\\ChatModels\\InitChatModel')) {
-            self::markTestSkipped('initChatModel is ported: the string model resolves now.');
-        }
-        $middleware = ToolEmulatorMiddleware::create(['model' => 'anthropic:claude-sonnet-4-5-20250929']);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('model id strings need initChatModel');
-
-        $middleware['wrapToolCall'](self::toolRequest('1', 'search', ['query' => 'test'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
-    }
-
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
     public function testAModelStringIsResolvedLazilyOnceWithTemperatureOne(): void
     {
-        if (!StubInitChatModel::install()) {
-            self::markTestSkipped('initChatModel is ported now: this stub-based case needs a rewrite against the real one.');
+        $server = LocalProviderServer::start(['/api/chat' => LocalProviderServer::ollamaReply('From the string model')]);
+        putenv('OLLAMA_BASE_URL=' . $server->baseUrl);
+        try {
+            $agentModel = new FlakyChatModel(['responses' => [new AIMessage('Not used')]]);
+            $middleware = ToolEmulatorMiddleware::create(['model' => 'ollama:llama3']);
+            self::assertSame([], $server->requests(), 'creating the middleware resolves nothing');
+            $middleware['wrapModelCall'](['model' => $agentModel], static fn (array $request): AIMessage => new AIMessage('ok'));
+
+            $first = $middleware['wrapToolCall'](self::toolRequest('1', 'search', ['query' => 'a'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
+            $second = $middleware['wrapToolCall'](self::toolRequest('2', 'search', ['query' => 'b'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
+
+            self::assertSame('From the string model', $first->content);
+            self::assertSame('From the string model', $second->content);
+            self::assertCount(2, $server->requests());
+            $sent = $server->body(0);
+            self::assertSame('llama3', $sent['model'], 'the string resolved to the ollama model it names');
+            self::assertEquals(1, $sent['options']['temperature'], 'initChatModel(model, { temperature: 1 })');
+            self::assertStringContainsString('Tool: search', $sent['messages'][0]['content']);
+            self::assertSame([], $agentModel->invokeCalls(), 'the agent model did none of the emulating');
+        } finally {
+            putenv('OLLAMA_BASE_URL');
+            $server->stop();
         }
-        StubInitChatModel::$result = self::fake([new AIMessage('From the string model')]);
-        $middleware = ToolEmulatorMiddleware::create(['model' => 'anthropic:claude-sonnet-4-5-20250929']);
-        self::assertSame([], StubInitChatModel::$calls, 'creating the middleware resolves nothing');
-
-        $first = $middleware['wrapToolCall'](self::toolRequest('1', 'search', ['query' => 'a'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
-        $second = $middleware['wrapToolCall'](self::toolRequest('2', 'search', ['query' => 'b'], $this->searchTool()), static fn (): never => throw new \LogicException('not called'));
-
-        self::assertSame('From the string model', $first->content);
-        self::assertSame('From the string model', $second->content);
-        self::assertSame([['anthropic:claude-sonnet-4-5-20250929', ['temperature' => 1]]], StubInitChatModel::$calls);
     }
 
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
     public function testAModelStringThatCannotBeInitializedFallsBackToTheAgentModel(): void
     {
-        if (!StubInitChatModel::install()) {
-            self::markTestSkipped('initChatModel is ported now: this stub-based case needs a rewrite against the real one.');
-        }
-        StubInitChatModel::$result = new \RuntimeException('no such provider');
         ini_set('error_log', sys_get_temp_dir() . '/tool-emulator-' . getmypid() . '.log');
         $model = self::fake([
             new AIMessage(['content' => '', 'tool_calls' => [['id' => '1', 'name' => 'search', 'args' => ['query' => 'test']]]]),

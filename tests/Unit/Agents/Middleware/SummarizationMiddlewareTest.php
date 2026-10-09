@@ -11,6 +11,7 @@ use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Tests\Unit\Agents\Support\AgentAssertions;
+use LangChain\Tests\Unit\Agents\Support\LocalProviderServer;
 use LangChain\Tracers\StreamEvent;
 use LangChain\Utils\Testing\FakeToolCallingChatModel;
 use LangGraph\Agents\Agent;
@@ -535,15 +536,47 @@ final class SummarizationMiddlewareTest extends TestCase
 
     public function testCanBeCreatedUsingAModelString(): void
     {
-        if (class_exists('\\LangChain\\LanguageModels\\Chat\\Universal\\InitChatModel')) {
-            self::markTestSkipped('Upstream mocks the anthropic provider package; this port has no provider mock for initChatModel.');
+        // Upstream mocks the anthropic package; here the real InitChatModel builds a ChatAnthropic, which needs a key.
+        $previous = getenv('ANTHROPIC_API_KEY');
+        putenv('ANTHROPIC_API_KEY=sk-ant-test');
+        try {
+            $middleware = SummarizationMiddleware::create(['model' => 'anthropic:claude-sonnet-4-20250514', 'trigger' => ['tokens' => 100], 'keep' => ['messages' => 2]]);
+
+            self::assertSame('SummarizationMiddleware', $middleware['name']);
+            // The string resolves when the hook runs; below the trigger it leaves the conversation alone.
+            self::assertNull(self::runBeforeModel($middleware, [new HumanMessage('hi')], new Runtime(context: [])));
+        } finally {
+            putenv($previous === false ? 'ANTHROPIC_API_KEY' : 'ANTHROPIC_API_KEY=' . $previous);
         }
+    }
 
-        // Without initChatModel the string cannot be resolved, and says so when the hook runs.
-        $middleware = SummarizationMiddleware::create(['model' => 'anthropic:claude-sonnet-4-20250514', 'trigger' => ['tokens' => 100], 'keep' => ['messages' => 2]]);
+    public function testAModelStringWritesTheSummaryItsResolvedModelReturns(): void
+    {
+        $server = LocalProviderServer::start(['/api/chat' => LocalProviderServer::ollamaReply('Summary from the string model.')]);
+        putenv('OLLAMA_BASE_URL=' . $server->baseUrl);
+        try {
+            $middleware = SummarizationMiddleware::create(['model' => 'ollama:llama3', 'trigger' => ['messages' => 4], 'keep' => ['messages' => 2]]);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('initChatModel is not available');
+            $result = self::runBeforeModel($middleware, self::longConversation(), new Runtime(context: []));
+
+            self::assertSame(1, \count($server->requests()));
+            self::assertSame('llama3', $server->body(0)['model']);
+            self::assertStringContainsString('Messages to summarize:', json_encode($server->body(0)));
+            $summary = array_values(array_filter($result['messages'], static fn (mixed $m): bool => $m instanceof HumanMessage && ($m->additional_kwargs['lc_source'] ?? null) === 'summarization'));
+            self::assertCount(1, $summary);
+            self::assertStringContainsString('Summary from the string model.', self::content($summary[0]));
+        } finally {
+            putenv('OLLAMA_BASE_URL');
+            $server->stop();
+        }
+    }
+
+    public function testAModelStringTheRegistryCannotResolveFailsWhenTheHookRuns(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unable to infer model provider for { model: nosuchprovider:model }');
+
+        $middleware = SummarizationMiddleware::create(['model' => 'nosuchprovider:model', 'trigger' => ['tokens' => 100], 'keep' => ['messages' => 2]]);
 
         self::runBeforeModel($middleware, [new HumanMessage('hi')], new Runtime(context: []));
     }

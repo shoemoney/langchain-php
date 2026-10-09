@@ -8,7 +8,7 @@ use LangChain\LanguageModels\Chat\OpenAI\ChatOpenAI;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
-use LangChain\Tests\Unit\Agents\Support\StubInitChatModel;
+use LangChain\Tests\Unit\Agents\Support\LocalProviderServer;
 use LangChain\Tools\Schema;
 use LangChain\Utils\Http\HttpException;
 use LangChain\Utils\Http\HttpResponse;
@@ -21,8 +21,6 @@ use LangGraph\Agents\Middleware\Provider\OpenAI\OpenAIModerationError;
 use LangGraph\Agents\Middleware\Utils;
 use LangGraph\Agents\Runtime;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 use function LangChain\Tools\tool;
@@ -32,7 +30,7 @@ use function LangChain\Tools\tool;
  *
  * The mocked `client.moderations.create` is a {@see FakeHttpClient} behind a real `ChatOpenAI`, so every case also
  * pins the request the {@see ModerationClient} posts: the `/moderations` URL, the bearer key and the
- * `{input, model}` body. The mocked `initChatModel` is {@see StubInitChatModel}, aliased in a separate process.
+ * `{input, model}` body. String models go through the real `InitChatModel`, with a {@see LocalProviderServer} as the provider.
  */
 #[CoversClass(ModerationMiddleware::class)]
 #[CoversClass(ModerationClient::class)]
@@ -461,27 +459,42 @@ final class ModerationMiddlewareTest extends TestCase
     }
 
     // ---- String model support ------------------------------------------------------------------
+    //
+    // A string goes through the real `InitChatModel::init()`. Its only transport seam is the environment:
+    // `langsmith:` builds a `ChatOpenAI` whose base URL and key come from `LANGSMITH_GATEWAY` and
+    // `LANGSMITH_GATEWAY_API_KEY`, so the `/moderations` post lands on a local server that logs it.
 
-    private function installInitChatModel(mixed $result): void
+    private ?LocalProviderServer $server = null;
+
+    protected function tearDown(): void
     {
-        if (!StubInitChatModel::install()) {
-            self::markTestSkipped('initChatModel is ported now: this stub-based case needs a rewrite against the real one.');
-        }
-        StubInitChatModel::$result = $result;
+        putenv('LANGSMITH_GATEWAY');
+        putenv('LANGSMITH_GATEWAY_API_KEY');
+        $this->server?->stop();
+        $this->server = null;
     }
 
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
+    private function serveModeration(array $reply): LocalProviderServer
+    {
+        $this->server = LocalProviderServer::start(['/moderations' => $reply]);
+        putenv('LANGSMITH_GATEWAY=' . $this->server->baseUrl);
+        putenv('LANGSMITH_GATEWAY_API_KEY=ls-gateway-key');
+
+        return $this->server;
+    }
+
     public function testShouldAcceptStringModelNameForInputModeration(): void
     {
-        $this->installInitChatModel($this->mockModel);
-        $this->http->responses = [self::flagged(['violence' => true], ['violence' => 0.8], 'modr-100')];
-        $middleware = ModerationMiddleware::create(['model' => 'gpt-4o-mini', 'checkInput' => true, 'exitBehavior' => 'end']);
+        $server = $this->serveModeration(LocalProviderServer::moderationReply(true, ['violence' => true]));
+        $middleware = ModerationMiddleware::create(['model' => 'langsmith:gpt-4o-mini', 'checkInput' => true, 'exitBehavior' => 'end']);
 
         $result = self::before($middleware, ['messages' => [new HumanMessage('Violent content')]]);
 
-        self::assertSame([['gpt-4o-mini', []]], StubInitChatModel::$calls);
-        $this->assertModerated(0, 'Violent content');
+        $requests = $server->requests();
+        self::assertCount(1, $requests);
+        self::assertStringEndsWith('/moderations', $requests[0]['path']);
+        self::assertSame('Bearer ls-gateway-key', $requests[0]['headers']['authorization'], 'the key the resolved ChatOpenAI carries');
+        self::assertSame(['input' => 'Violent content', 'model' => 'omni-moderation-latest'], $server->body(0));
         self::assertSame('end', $result['jumpTo']);
         self::assertSame(
             "I'm sorry, but I can't comply with that request. It was flagged for violence.",
@@ -489,84 +502,48 @@ final class ModerationMiddlewareTest extends TestCase
         );
     }
 
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
     public function testShouldLazilyInitializeModelOnlyWhenNeeded(): void
     {
-        $this->installInitChatModel($this->mockModel);
-        $middleware = ModerationMiddleware::create(['model' => 'gpt-4o-mini', 'checkInput' => false, 'checkOutput' => false, 'checkToolResults' => false]);
+        // Resolving this string would throw, so a clean run shows nothing resolved it.
+        $middleware = ModerationMiddleware::create(['model' => 'nosuchprovider:model', 'checkInput' => false, 'checkOutput' => false, 'checkToolResults' => false]);
 
         self::before($middleware, ['messages' => [new HumanMessage('Some input')]]);
+        self::after($middleware, ['messages' => [new AIMessage('Some output')]]);
 
-        // The model is not initialized when no moderation check is enabled.
-        self::assertSame([], StubInitChatModel::$calls);
+        $this->expectNotToPerformAssertions();
     }
 
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
-    public function testShouldCacheInitializedModelInstance(): void
+    public function testShouldUseTheInitializedModelForEveryCheck(): void
     {
-        $this->installInitChatModel($this->mockModel);
-        $this->http->responses = [
-            self::flagged(['violence' => true], ['violence' => 0.8], 'modr-104'),
-            self::flagged(['violence' => true], ['violence' => 0.8], 'modr-105'),
-        ];
-        $middleware = ModerationMiddleware::create(['model' => 'gpt-4o-mini', 'checkInput' => true, 'checkOutput' => true, 'exitBehavior' => 'end']);
+        $server = $this->serveModeration(LocalProviderServer::moderationReply(true, ['violence' => true]));
+        $middleware = ModerationMiddleware::create(['model' => 'langsmith:gpt-4o-mini', 'checkInput' => true, 'checkOutput' => true, 'exitBehavior' => 'end']);
 
         self::before($middleware, ['messages' => [new HumanMessage('Violent input')]]);
         self::after($middleware, ['messages' => [new HumanMessage('Safe input'), new AIMessage('Violent output')]]);
 
-        self::assertCount(2, $this->http->requests);
-        self::assertSame([['gpt-4o-mini', []]], StubInitChatModel::$calls, 'initChatModel is called once; the model is cached');
+        self::assertCount(2, $server->requests());
+        self::assertSame('Violent input', $server->body(0)['input']);
+        self::assertSame('Violent output', $server->body(1)['input']);
     }
 
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
     public function testShouldThrowErrorIfStringModelDoesNotResolveToOpenAIModel(): void
     {
-        $this->installInitChatModel(new class () {
-            public function getName(): string
-            {
-                return 'SomeOtherModel';
-            }
-        });
-        $middleware = ModerationMiddleware::create(['model' => 'non-openai-model', 'checkInput' => true]);
+        $middleware = ModerationMiddleware::create(['model' => 'ollama:llama3', 'checkInput' => true]);
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Model must be an OpenAI model');
-
-        self::before($middleware, ['messages' => [new HumanMessage('Test input')]]);
-    }
-
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
-    public function testShouldThrowErrorIfStringModelResolvesToModelWithoutModerationSupport(): void
-    {
-        $this->installInitChatModel(new class () {
-            public function getName(): string
-            {
-                return 'ChatOpenAI';
-            }
-        });
-        $middleware = ModerationMiddleware::create(['model' => 'gpt-4o-mini', 'checkInput' => true]);
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Model must support moderation');
+        $this->expectExceptionMessage('Model must be an OpenAI model to use moderation middleware. Got: ChatOllama');
 
         self::before($middleware, ['messages' => [new HumanMessage('Test input')]]);
     }
 
     // ---- Beyond the upstream cases -------------------------------------------------------------
 
-    public function testAStringModelFailsClearlyWhileInitChatModelIsNotPorted(): void
+    public function testAStringTheRegistryCannotResolveSurfacesTheInitChatModelError(): void
     {
-        if (class_exists('LangChain\\ChatModels\\InitChatModel')) {
-            self::markTestSkipped('initChatModel is ported: the string model resolves now.');
-        }
-        $middleware = ModerationMiddleware::create(['model' => 'gpt-4o-mini', 'checkInput' => true]);
+        $middleware = ModerationMiddleware::create(['model' => 'nosuchprovider:model', 'checkInput' => true]);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('model id strings need initChatModel');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unable to infer model provider for { model: nosuchprovider:model }');
 
         self::before($middleware, ['messages' => [new HumanMessage('Hello')]]);
     }

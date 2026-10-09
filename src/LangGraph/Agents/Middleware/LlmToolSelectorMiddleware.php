@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware;
 
+use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangChain\Messages\HumanMessage;
 use LangChain\Messages\SystemMessage;
 use LangChain\Runnables\RunnableConfig;
@@ -26,7 +27,7 @@ use LangGraph\Agents\Middleware;
  * Options (the run context can carry the same four and wins for `model`, `maxTools`, `alwaysInclude` and
  * `systemPrompt` when the request is prepared):
  *  - `model`: the selection model, a chat model or a "provider:model" string (resolved through
- *    `LangChain\LanguageModels\Chat\Universal\InitChatModel`, once that class exists). Defaults to the agent's model;
+ *    {@see InitChatModel::init()}). Defaults to the agent's model;
  *  - `systemPrompt`: instructions for the selection model;
  *  - `maxTools`: how many tools to keep; the model is told to list them most relevant first and only the first
  *    `maxTools` are used. No limit when absent;
@@ -45,9 +46,6 @@ use LangGraph\Agents\Middleware;
 final class LlmToolSelectorMiddleware
 {
     private const DEFAULT_SYSTEM_PROMPT = "Your goal is to select the most relevant tools for answering the user's query.";
-
-    /** Where `initChatModel` lives. Named as a string, since this package may not import `LangChain\LanguageModels`. */
-    private const INIT_CHAT_MODEL = 'LangChain\LanguageModels\Chat\Universal\InitChatModel';
 
     private function __construct()
     {
@@ -274,15 +272,7 @@ final class LlmToolSelectorMiddleware
             return $model;
         }
 
-        $class = self::INIT_CHAT_MODEL;
-        if (!class_exists($class)) {
-            throw new \RuntimeException(\sprintf(
-                'Cannot resolve the model "%s": model id strings need initChatModel, which is not available. Pass a chat model instance.',
-                $model,
-            ));
-        }
-
-        return $class::init($model);
+        return InitChatModel::init($model);
     }
 
     /** A tool with a string `name` and a `description` (a tool object or a tool definition array). */

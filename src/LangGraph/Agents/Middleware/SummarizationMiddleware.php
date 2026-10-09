@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware;
 
+use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\HumanMessage;
@@ -31,7 +32,7 @@ use LangGraph\Pregel\PregelScratchpad;
  * Options (all can also be overridden per run through the run context):
  *
  *  - `model` (required): the summarization model, an instance with `invoke($prompt, RunnableConfig)`, or a
- *    "provider:model" string resolved through `\LangChain\LanguageModels\Chat\Universal\InitChatModel::init()`;
+ *    "provider:model" string resolved through {@see InitChatModel::init()};
  *  - `trigger`: a context size array, or a list of them (any one may fire); within one array every property
  *    must hold. Properties: `tokens`, `messages`, `fraction` (of the model's `maxInputTokens`). No trigger
  *    disables summarization;
@@ -401,7 +402,7 @@ PROMPT;
 
         $model = $userOptions['model'] ?? null;
         if (\is_string($model)) {
-            $model = self::initChatModel($model);
+            $model = InitChatModel::init($model);
         }
         if (!\is_object($model)) {
             throw new \InvalidArgumentException('SummarizationMiddleware requires a "model".');
@@ -485,22 +486,6 @@ PROMPT;
         $context = $runtime instanceof Runtime ? $runtime->context : (\is_object($runtime) ? ($runtime->context ?? null) : ($runtime['context'] ?? null));
 
         return \is_array($context) ? $context : (\is_object($context) ? get_object_vars($context) : []);
-    }
-
-    /**
-     * Resolve a "provider:model" string, by class name because the universal model initialiser lives in a
-     * layer this one does not import.
-     */
-    private static function initChatModel(string $model): object
-    {
-        $class = '\\LangChain\\LanguageModels\\Chat\\Universal\\InitChatModel';
-        if (!class_exists($class)) {
-            throw new \RuntimeException(
-                "SummarizationMiddleware cannot resolve the model \"{$model}\": initChatModel is not available in this build. Pass a chat model instance instead.",
-            );
-        }
-
-        return $class::init($model);
     }
 
     /**

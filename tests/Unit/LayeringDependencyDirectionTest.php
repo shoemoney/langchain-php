@@ -31,6 +31,15 @@ final class LayeringDependencyDirectionTest extends TestCase
         'LangChain\Providers',
     ];
 
+    /**
+     * The provider-agnostic `initChatModel` port and the wrapper it returns. They name no provider; the
+     * registry behind them is the one place a "provider:model" string becomes a client.
+     */
+    private const ALLOWED = [
+        'LangChain\\LanguageModels\\Chat\\Universal\\InitChatModel;',
+        'LangChain\\LanguageModels\\Chat\\Universal\\ConfigurableModel;',
+    ];
+
     public function testLangGraphImportsNoProviderNamespace(): void
     {
         $root = dirname(__DIR__, 2) . '/src/LangGraph';
@@ -42,7 +51,11 @@ final class LayeringDependencyDirectionTest extends TestCase
             if (!$file->isFile() || $file->getExtension() !== 'php') {
                 continue;
             }
-            $source = (string) file_get_contents($file->getPathname());
+            $source = str_replace(
+                array_map(static fn (string $allowed): string => 'use ' . $allowed, self::ALLOWED),
+                '',
+                (string) file_get_contents($file->getPathname()),
+            );
             foreach (self::FORBIDDEN as $needle) {
                 if (str_contains($source, 'use ' . $needle)) {
                     $offenders[] = basename($file->getPathname()) . ' -> ' . $needle;
