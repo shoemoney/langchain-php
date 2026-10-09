@@ -6,6 +6,8 @@ namespace LangGraph\Pregel;
 
 use LangGraph\Errors\GraphInterrupt;
 use LangGraph\Errors\Guard;
+use LangGraph\Errors\ParentCommand;
+use LangGraph\Pregel\Utils\Config;
 
 /**
  * Runs a superstep's tasks and routes whatever they raise.
@@ -258,6 +260,13 @@ class PregelRunner
 
                 return null;
             } catch (\Throwable $e) {
+                if ($e instanceof ParentCommand) {
+                    $e = $this->routeParentCommand($task, $config, $e);
+                    if ($e === null) {
+                        return null;
+                    }
+                }
+
                 // A bubble-up is control flow, not a failure: never retried.
                 if (Guard::isGraphBubbleUp($e)) {
                     return $e;
@@ -299,5 +308,38 @@ class PregelRunner
                 $firstAttempt = false;
             }
         }
+    }
+
+    /**
+     * Deliver a `ParentCommand` the way upstream `_runWithRetry` does.
+     *
+     * A command addressed to this task's own namespace is applied with the task's writers and the
+     * task counts as succeeded (null). A `Command::PARENT` command is re-addressed to the enclosing
+     * namespace and the exception is returned for the caller to surface; anything else passes through.
+     */
+    private function routeParentCommand(PregelExecutableTask $task, \LangChain\Runnables\RunnableConfig $config, ParentCommand $error): ?ParentCommand
+    {
+        $ns = $config->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] ?? '';
+        $ns = \is_string($ns) ? $ns : '';
+        $command = $error->command;
+
+        if ($command->graph === $ns) {
+            foreach ($task->writers as $writer) {
+                $writer->invoke($command, $config);
+            }
+
+            return null;
+        }
+
+        if ($command->graph === Command::PARENT) {
+            return new ParentCommand(new Command(
+                graph: Config::getParentCheckpointNamespace($ns),
+                update: $command->update,
+                resume: $command->resume,
+                goto: $command->goto,
+            ));
+        }
+
+        return $error;
     }
 }

@@ -170,7 +170,8 @@ final class SupervisorHandoffTest extends TestCase
             $agent->invoke(['messages' => [new HumanMessage('go')]]);
             self::fail('expected the handoff to leave the agent graph');
         } catch (ParentCommand $e) {
-            self::assertSame(Command::PARENT, $e->command->graph);
+            // The runner re-addressed it from PARENT to the (root) parent namespace, as upstream does.
+            self::assertSame('', $e->command->graph);
             self::assertSame('research_expert', $e->command->goto);
             self::assertSame(['human', 'ai', 'tool'], array_map(static fn ($m) => $m->getType(), $e->command->update['messages']));
         }

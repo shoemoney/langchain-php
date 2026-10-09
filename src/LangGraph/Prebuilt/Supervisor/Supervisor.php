@@ -122,7 +122,7 @@ final class Supervisor
 
         $builder = new StateGraph($schema, $params['contextSchema'] ?? null);
         $builder
-            ->addNode($supervisorName, ParentCommandBridge::wrap($supervisorAgent), ['ends' => $agentNames, 'subgraphs' => [$supervisorAgent]])
+            ->addNode($supervisorName, $supervisorAgent, ['ends' => $agentNames, 'subgraphs' => [$supervisorAgent]])
             ->addEdge(Constants::START, $supervisorName);
 
         foreach ($agents as $agent) {
