@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LangGraph\Agents\Middleware;
 
 use LangChain\Tools\ToolUtils;
-use LangGraph\Agents\ConfigurableModelInterface;
 use LangGraph\Agents\Middleware;
 
 /**
@@ -146,14 +145,20 @@ final class ProviderToolSearchMiddleware
         }
 
         $name = $model->getName();
-        if ($model instanceof ConfigurableModelInterface) {
+        if ($model instanceof \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface) {
+            $configured = property_exists($model, 'defaultConfig') && \is_array($model->defaultConfig)
+                ? ($model->defaultConfig['modelProvider'] ?? null)
+                : null;
+            if ($configured === 'anthropic' || $configured === 'openai') {
+                return $configured;
+            }
             $name = $model->getModelInstance()->getName();
         }
 
         return match ($name) {
             'ChatAnthropic' => 'anthropic',
             'ChatOpenAI' => 'openai',
-            default => $name,
+            default => 'other',
         };
     }
 

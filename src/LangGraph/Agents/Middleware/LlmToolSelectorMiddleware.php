@@ -264,7 +264,7 @@ final class LlmToolSelectorMiddleware
 
     private static function resolveModel(mixed $model, mixed $requestModel): object
     {
-        if ($model === null) {
+        if ($model === null || $model === '') {
             return $requestModel;
         }
         if (!\is_string($model)) {

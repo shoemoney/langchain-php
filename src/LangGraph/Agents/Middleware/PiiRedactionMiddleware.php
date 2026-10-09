@@ -125,13 +125,13 @@ final class PiiRedactionMiddleware
                 if ($isStructuredResponseToolCall) {
                     ['message' => $restoredSecondLastMessage, 'changed' => $changedSecondLastMessage] = self::restoreMessage($secondLastMessage, $redactionMap);
                     $redactedArgs = self::findExtractCall($secondLastMessage)['args'] ?? null;
-                    $toolStructuredResponse = $redactedArgs !== null && $redactedArgs !== []
+                    $toolStructuredResponse = $redactedArgs !== null
                         ? json_decode(self::restoreRedactedValues(self::encode($redactedArgs), $redactionMap), true, 512, \JSON_THROW_ON_ERROR)
                         : null;
 
                     if ($changed || $changedSecondLastMessage) {
                         return [
-                            ...($toolStructuredResponse ? ['structuredResponse' => $toolStructuredResponse] : []),
+                            ...($toolStructuredResponse !== null ? ['structuredResponse' => $toolStructuredResponse] : []),
                             'messages' => [
                                 new RemoveMessage(['id' => (string) $secondLastMessage->id]),
                                 new RemoveMessage(['id' => (string) $lastMessage->id]),
