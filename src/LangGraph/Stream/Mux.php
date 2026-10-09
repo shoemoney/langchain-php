@@ -245,7 +245,7 @@ final class Mux
         $this->closed = true;
         foreach ($this->latestValues as $key => $values) {
             $ns = $key === '' ? [] : explode("\x00", (string) $key);
-            $this->streamMap[Types::nsKey($ns)]?->resolveValues($values);
+            ($this->streamMap[Types::nsKey($ns)] ?? null)?->resolveValues($values);
         }
 
         foreach ($this->transformers as $transformer) {
