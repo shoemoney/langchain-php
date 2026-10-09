@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware;
 
+use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangChain\Messages\HumanMessage;
 use LangChain\Messages\ToolMessage;
 use LangChain\Runnables\RunnableConfig;
@@ -22,10 +23,9 @@ use LangGraph\Pregel\Utils\Config;
  * {@see Constants::INTERNAL_CALL_TAG} so it stays out of the messages stream.
  *
  * `model` is a chat model instance, or a "provider:model" string resolved lazily on the first emulated call
- * (upstream defaults the documented string to `anthropic:claude-sonnet-4-5-20250929`); without it the agent's
- * own model does the emulating. A string needs `initChatModel` (WP-20): while that class is absent the first
- * emulated call fails with a clear exception, and when it exists but cannot build the model the agent model
- * is used instead, as upstream does.
+ * (upstream defaults the documented string to `anthropic:claude-sonnet-4-5-20250929`) resolved through
+ * {@see InitChatModel::init()} with `temperature` 1; without it the agent's own model does the emulating. When
+ * the string cannot be resolved the error is logged and the agent model is used instead, as upstream does.
  *
  * ```
  * $agent = Agent::create([
@@ -37,9 +37,6 @@ use LangGraph\Pregel\Utils\Config;
  */
 final class ToolEmulatorMiddleware
 {
-    /** The class `initChatModel` is ported as (WP-20); looked up lazily so this middleware loads without it. */
-    private const INIT_CHAT_MODEL = 'LangChain\\ChatModels\\InitChatModel';
-
     private function __construct()
     {
     }
@@ -154,16 +151,8 @@ final class ToolEmulatorMiddleware
 
     private static function initEmulatorModel(string $model, ?RunnableInterface $agentModel): RunnableInterface
     {
-        $init = self::INIT_CHAT_MODEL;
-        if (!class_exists($init) || !method_exists($init, 'initChatModel')) {
-            throw new \RuntimeException(\sprintf(
-                'Cannot resolve the emulator model "%s": model id strings need initChatModel, which is not ported yet. Pass a chat model instance.',
-                $model,
-            ));
-        }
-
         try {
-            $resolved = $init::initChatModel($model, ['temperature' => 1]);
+            $resolved = InitChatModel::init($model, ['temperature' => 1]);
         } catch (\Throwable $error) {
             error_log('Error initializing emulator model, using agent model: ' . $error->getMessage());
             $resolved = null;

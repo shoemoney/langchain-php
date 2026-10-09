@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangGraph\Agents\Middleware\Provider\OpenAI;
 
+use LangChain\LanguageModels\Chat\Universal\ConfigurableModel;
+use LangChain\LanguageModels\Chat\Universal\InitChatModel;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\HumanMessage;
@@ -20,7 +22,7 @@ use LangGraph\Agents\Middleware;
  * with a violation message, "error" throws an {@see OpenAIModerationError}, "replace" swaps the flagged
  * message's content for the violation message and carries on.
  *
- * Options: `model` (an OpenAI chat model, or a model string resolved lazily with `initChatModel` (WP-20)
+ * Options: `model` (an OpenAI chat model, or a model string resolved lazily with {@see InitChatModel::init()}
  * the first time a check runs), `moderationModel` (default "omni-moderation-latest"), `checkInput` (true),
  * `checkOutput` (true), `checkToolResults` (false), `exitBehavior`, and `violationMessage`, a template with the
  * placeholders `{categories}`, `{category_scores}` and `{original_content}`.
@@ -38,9 +40,6 @@ use LangGraph\Agents\Middleware;
 final class ModerationMiddleware
 {
     private const DEFAULT_VIOLATION_TEMPLATE = "I'm sorry, but I can't comply with that request. It was flagged for {categories}.";
-
-    /** The class `initChatModel` is ported as (WP-20); looked up lazily so this middleware loads without it. */
-    private const INIT_CHAT_MODEL = 'LangChain\\ChatModels\\InitChatModel';
 
     private function __construct()
     {
@@ -205,14 +204,11 @@ final class ModerationMiddleware
     private static function initModerationClient(string|object $model): ModerationClient
     {
         if (\is_string($model)) {
-            $init = self::INIT_CHAT_MODEL;
-            if (!class_exists($init) || !method_exists($init, 'initChatModel')) {
-                throw new \RuntimeException(\sprintf(
-                    'Cannot resolve the moderation model "%s": model id strings need initChatModel, which is not ported yet. Pass a chat model instance.',
-                    $model,
-                ));
-            }
-            $model = $init::initChatModel($model);
+            $model = InitChatModel::init($model);
+        }
+        // `init()` wraps the client; moderation needs the client's own credentials and transport.
+        if ($model instanceof ConfigurableModel) {
+            $model = $model->getModelInstance();
         }
 
         $name = \is_object($model) && method_exists($model, 'getName') ? (string) $model->getName() : get_debug_type($model);
