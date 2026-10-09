@@ -455,13 +455,13 @@ final class ConnectionConfig
 
         $command = $value['command'] ?? null;
         if (!is_string($command)) {
-            $issues[] = $at('Invalid input: expected string, received ' . Hooks::describe($command), 'command');
+            $issues[] = $at('Invalid input: expected string, received ' . ($command === null ? 'undefined' : Hooks::describe($command)), 'command');
         }
         $resolved['command'] = $command;
 
         $args = $value['args'] ?? null;
         if (!is_array($args) || !array_is_list($args) || array_filter($args, static fn (mixed $arg): bool => !is_string($arg)) !== []) {
-            $issues[] = $at('Invalid input: expected array of strings, received ' . Hooks::describe($args), 'args');
+            $issues[] = $at('Invalid input: expected array of strings, received ' . ($args === null ? 'undefined' : Hooks::describe($args)), 'args');
         }
         $resolved['args'] = $args;
 
@@ -507,7 +507,7 @@ final class ConnectionConfig
 
         $url = $value['url'] ?? null;
         if (!is_string($url) || !self::isUrl($url)) {
-            $issues[] = $at(is_string($url) ? 'Invalid URL' : 'Invalid input: expected string, received ' . Hooks::describe($url), 'url');
+            $issues[] = $at(is_string($url) ? 'Invalid URL' : 'Invalid input: expected string, received ' . ($url === null ? 'undefined' : Hooks::describe($url)), 'url');
         }
         $resolved['url'] = $url;
 
