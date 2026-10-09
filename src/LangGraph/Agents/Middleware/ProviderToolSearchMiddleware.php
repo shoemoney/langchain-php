@@ -136,7 +136,7 @@ final class ProviderToolSearchMiddleware
 
     /**
      * The provider behind a model, by the name it reports (`ChatAnthropic`, `ChatOpenAI`) or, for a
-     * configurable model, the model it resolves to.
+     * configurable model, its defaultConfig modelProvider (anything else is `other`, like upstream).
      */
     private static function modelProvider(mixed $model): string
     {
@@ -144,18 +144,15 @@ final class ProviderToolSearchMiddleware
             return 'other';
         }
 
-        $name = $model->getName();
         if ($model instanceof \LangChain\LanguageModels\Chat\Universal\ConfigurableModelInterface) {
             $configured = property_exists($model, 'defaultConfig') && \is_array($model->defaultConfig)
                 ? ($model->defaultConfig['modelProvider'] ?? null)
                 : null;
-            if ($configured === 'anthropic' || $configured === 'openai') {
-                return $configured;
-            }
-            $name = $model->getModelInstance()->getName();
+
+            return $configured === 'anthropic' || $configured === 'openai' ? $configured : 'other';
         }
 
-        return match ($name) {
+        return match ($model->getName()) {
             'ChatAnthropic' => 'anthropic',
             'ChatOpenAI' => 'openai',
             default => 'other',

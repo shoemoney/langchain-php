@@ -51,7 +51,7 @@ final class ReviewerNitsTest extends TestCase
         ModelRetryMiddleware::create(['retryOn' => ['Not\\A\\Thing']]);
     }
 
-    public function testAnInterfaceRetryOnRunsThroughARealAgent(): void
+    public function testAnInterfaceRetryOnIsAcceptedByARealAgentConfig(): void
     {
         $model = ReactAgentFixtures::spy([new AIMessage('done')]);
         $agent = Agent::create(['model' => $model, 'tools' => [], 'middleware' => [ModelRetryMiddleware::create(['retryOn' => [\Throwable::class], 'maxRetries' => 1, 'initialDelayMs' => 0, 'jitter' => false])]]);
@@ -68,6 +68,17 @@ final class ReviewerNitsTest extends TestCase
         $this->expectExceptionMessageMatches('/but got other$/');
         $middleware['wrapModelCall'](
             ['model' => new BindRecordingModel('ChatMistralAI', ['responses' => [new AIMessage('x')]]), 'tools' => [self::sendEmail()], 'messages' => []],
+            static fn (array $request): AIMessage => new AIMessage('ok'),
+        );
+    }
+
+    public function testAConfigurableModelWithoutAModelProviderIsOtherLikeUpstream(): void
+    {
+        $middleware = ProviderToolSearchMiddleware::create(['searchableTools' => ['send_email']]);
+
+        $this->expectExceptionMessageMatches('/but got other$/');
+        $middleware['wrapModelCall'](
+            ['model' => new ConfigurableModel(['defaultConfig' => ['model' => 'claude-sonnet-4-5']]), 'tools' => [self::sendEmail()], 'messages' => []],
             static fn (array $request): AIMessage => new AIMessage('ok'),
         );
     }
