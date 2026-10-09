@@ -47,6 +47,9 @@ final class FakeServerTransport implements TransportInterface
 
     public ?\Throwable $startError = null;
 
+    /** @var (callable(): void)|null runs when the transport closes for the first time */
+    public $onClose = null;
+
     /** @var (callable(string, array<string, mixed>): void)|null */
     public $onRequest = null;
 
@@ -155,6 +158,9 @@ final class FakeServerTransport implements TransportInterface
         }
 
         ++$this->closes;
+        if ($this->onClose !== null) {
+            ($this->onClose)();
+        }
         if ($this->closeError !== null) {
             throw $this->closeError;
         }
