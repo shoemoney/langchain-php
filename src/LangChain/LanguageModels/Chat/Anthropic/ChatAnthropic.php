@@ -641,7 +641,7 @@ class ChatAnthropic extends BaseChatModel
             yield $generation;
 
             if ($text !== '') {
-                $runManager?->handleLLMNewToken($text, ['chunk' => $generation]);
+                $runManager?->handleLLMNewToken($text, null, ['chunk' => $generation]);
             }
         }
     }

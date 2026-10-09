@@ -261,10 +261,12 @@ class ChatDeepSeek extends ChatOpenAICompletions
                 );
                 $text = is_string($delta['content'] ?? null) ? $delta['content'] : '';
 
-                yield new ChatGenerationChunk($chunk, $text, $generationInfo);
+                $generationChunk = new ChatGenerationChunk($chunk, $text, $generationInfo);
+
+                yield $generationChunk;
 
                 if ($text !== '') {
-                    $runManager?->handleLLMNewToken($text, ['chunk' => $chunk]);
+                    $runManager?->handleLLMNewToken($text, null, ['chunk' => $generationChunk]);
                 }
             }
         }
