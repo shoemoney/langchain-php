@@ -290,9 +290,21 @@ there is marked done **only if its tests exist and pass**.
   - **WP-11 Supervisor and Swarm**: `LangGraph\Prebuilt\{Supervisor\Supervisor,Swarm\Swarm}` with `::create(array $params)`. No remote-graph branch. The engine does not handle `ParentCommand` (`StateGraph::controlBranch` throws it for `Command(graph: PARENT)`), so each agent node runs through `Supervisor\ParentCommandBridge`; handling it in `PregelRunner` would make the bridge removable.
   - **WP-17a**: Azure OpenAI chat (`Chat\OpenAI\Azure\*`, completions and responses), OpenAI `Profiles`, `OpenAIEmbeddings` / `AzureOpenAIEmbeddings`, legacy `LLMs\{OpenAI,AzureOpenAI}`. Non-exact: the Azure responses URL is built by string cutting.
   - **WP-17b**: OpenAI hosted-tool builders, `Chat\OpenAI\Tools\*`. **WP-18b**: Anthropic hosted-tool builders, `Chat\Anthropic\Tools\*`, with server-tool passthrough in `MessageInputs::convertTool`.
-  - **WP-19a**: `ChatFireworks`, `ChatTogetherAI`, `ChatDeepSeek` plus their embeddings and LLMs. Known gap: Fireworks and Together drop streamed `reasoning_content` (see Open observations). **WP-19b**: `ChatXAI` (Chat Completions only) and `ChatOpenRouter` (`withStructuredOutput` does not validate the reply).
+  - **WP-19a**: `ChatFireworks`, `ChatTogetherAI`, `ChatDeepSeek` plus their embeddings and LLMs. ~~Known gap: Fireworks and Together drop streamed `reasoning_content`~~ **FIXED in Wave 4**. **WP-19b**: `ChatXAI` (Chat Completions only) and `ChatOpenRouter` (`withStructuredOutput` does not validate the reply).
   - **WP-21b**: `Agent::create` (`createAgent`, returns `ReactAgent`), `Middleware::create`, and `AgentNode` + the Before/After nodes under `LangGraph\Agents`. The graph-structure tests compare against upstream's snapshot data. **WP-21c**: structured responses (`ToolStrategy` / `ProviderStrategy`) and the tool-call / subagent transformers; the v3 run-stream cases are not ported.
   - **WP-26 `RemoteGraph` (PARTIAL)**: `LangGraph\Pregel\{RemoteGraph,RemoteRunStream}` over `runs->create` + `joinStream`, because `ThreadsClient::stream()` (v2) is not ported; only part of `RemoteGraphRunStream` is ported; the signal is a polled callable.
+- **Wave 4 (13 merges: nine work packages plus four follow-up fixes; 15851 tests of which 570 are env-skipped)** — landed 2026-10-08. **Wave 4 is the last wave in `.loop/COMPLETION_PLAN.md`, and the port is still not complete**: every item below except the fixes is 🟡, non-exact behaviours are in `PORT_STATUS.md`, and nothing here has touched a live provider, MongoDB or MCP server.
+  - **WP-20 `initChatModel`** 🟡: `LangChain\LanguageModels\Chat\Universal\{InitChatModel,ConfigurableModel,ConfigurableModelInterface,ModelProviders}`. `InitChatModel::init(?string $model, array $fields)` returns a `ConfigurableModel` that builds the real client lazily. The registry holds nine providers (`openai`, `anthropic`, `azure_openai`, `langsmith`, `ollama`, `deepseek`, `xai`, `fireworks`, `together`); any other is refused with an `Unsupported { modelProvider }` error. `AgentNode` resolves `provider:model` strings through it and passes `useResponsesApi` for `openai:` strings, as upstream does. The layering guard forbids `use LangChain\LanguageModels` in `src/LangGraph`, so LangGraph code reaches it by FQCN.
+  - **WP-22a/b/c pre-built middleware** 🟡: all under `LangGraph\Agents\Middleware`, each a static `create()` that returns the `Middleware::create` array (`ClearToolUsesEdit` is `new ClearToolUsesEdit([...])`).
+    - 22a: `ModelCallLimitMiddleware`, `ToolCallLimitMiddleware`, `ModelRetryMiddleware`, `ToolRetryMiddleware`, `ModelFallbackMiddleware`, `ToolErrorMiddleware`, `DynamicSystemPromptMiddleware`, plus `Constants` (`INTERNAL_CALL_TAG = 'nostream'`) and the error classes.
+    - 22b: `HumanInTheLoopMiddleware`, `SummarizationMiddleware`, `ContextEditingMiddleware` / `ClearToolUsesEdit` / `ContextEdit`.
+    - 22c-1: `PiiMiddleware`, `PiiDetectors`, `PiiDetectionError`, `PiiRedactionMiddleware`, `TodoListMiddleware`, `LlmToolSelectorMiddleware`.
+    - 22c-2: `ToolEmulatorMiddleware`, `ProviderToolSearchMiddleware`, `Provider\Anthropic\PromptCachingMiddleware`, `Provider\OpenAI\{ModerationMiddleware,ModerationClient}`.
+    - **Honest partials:** the v3 stream-transformer cases (`run.messages`) are skipped, `ContextOverflowError` is absent from the port's core errors (one modelRetry case skipped), and the Anthropic `cache_control` set by `PromptCachingMiddleware` reaches `bindTools` but not the request body (see Open observations).
+    - Things worth knowing: HITL wire shapes are plain arrays (request `['actionRequests' => [...], 'reviewConfigs' => [...]]`, resume `['decisions' => [...]]`) and `Prebuilt\HumanInterrupt` is an older, different protocol. `ContextEditingMiddleware` returns a `Command` state update when an edit changed something (PHP arrays are values, so upstream's in-place mutation cannot persist), which skips `AgentNode`'s agent-name stamp for that reply. The summarizer, tool emulator and tool selector model calls carry the `nostream` tag and `lc_source` metadata so `stream(messages)` does not leak them. Deprecated options raise `E_USER_DEPRECATED`, so tests trap them with a scoped `set_error_handler` (`PiiRedactionMiddleware` triggers one on every `create()`). `Runtime` carries no callbacks, tags or metadata, so the tool selector's call is not nested under the agent's trace. Scripted fake models stamp a fresh run id on every reply, so replaying one `AIMessage` appends where upstream's single object (id assigned once) replaces; the modelCallLimit thread tests give the message an explicit id. `Agent::create` takes no stream-mode option, so tests set `streamMode` on the compiled graph. A test helper must not be named `run()` or `status()` (final on PHPUnit `TestCase`).
+  - **WP-10 store backends** 🟡: `LangGraph\Store\Postgres\{PostgresStore,...}` (PDO, migrations, filters, TTL, pgvector), `LangGraph\Store\Redis\{RedisStore,FilterBuilder,RedisStoreIndexConfig}` (shares the Redis saver's client seam, which gained `ftInfo()`, `ftSearch` RETURN / PARAMS / DIALECT and VECTOR fields) and `LangGraph\Store\MongoDB\{MongoDBStore,MongoStoreCollectionInterface,...}`. Postgres is env-gated on `LANGGRAPH_PG_DSN` with a local-socket fallback (so it ran live in the final measured run), Redis on `LANGGRAPH_REDIS_URL` plus ext-redis, MongoDB on `LANGGRAPH_MONGO_URI` plus ext-mongodb. **Partials:** `MongoDBStore` has no `fromConnString` / `ownsClient` (`stop()` is a no-op), and has never run against a real MongoDB or Atlas (no production driver adapter, no composer dependency); `RedisStore` dropped `fromCluster`. `FakeMongoStoreCollection` is standalone because `FakeMongoCollection` is final.
+  - **WP-25 MCP adapters** 🟡 (stretch): `LangGraph\Mcp\*` is a **conversion layer over `McpClientInterface`, not an MCP client**. `client.ts` / `connection.ts` / the client-config types are **not ported**: there is no `MultiServerMCPClient`, no stdio, HTTP or SSE transport, and no live-server test. Entry points: `McpTools::loadMcpTools($serverName, $client, $options)`, `Content::convertCallToolResult`, `Hooks::parse*`, `Elicitation::*` (drives `interrupt()`; a resume re-runs the tool from round one, so effects must be idempotent) and `Errors::*`. `JsonSchemaValidator` is an in-house draft-07 / 2020-12 subset validator. 211 tests over a `FakeMcpClient`.
+  - **Follow-up fixes (all FIXED):** `handleLLMNewToken` now receives the streamed chunk in its `$fields` slot at 8 call sites; the `__handled__` marker no longer appears in debug `task_result` payloads (`PregelRunner::taskResult()` skips `Constants::HANDLED`, the marker stays in `task->writes`); `Completions::deltaToChunk` and `choiceToMessage` keep streamed `reasoning_content`, so Fireworks and Together carry it and both upstream `streams reasoning` tests are converted; `ReactAgentToolNodeTest` is back to upstream's two-call form.
 
 ---
 
@@ -321,8 +333,10 @@ rather than completing it.
 1. **Agents.** 🟡 `ToolNode`, `toolsCondition` and `agentName` (WP-02), `ReactAgent::create`
    (`createReactAgent`, WP-03), the `LangGraph\Agents` foundations (WP-21a), `createAgent` with
    middleware (WP-21b), structured responses and transformers (WP-21c), and Supervisor / Swarm
-   (WP-11) landed. **Not ported:** the pre-built middleware sets (WP-22a/b/c), `initChatModel`
-   (WP-20), and the v3 run stream the transformers would plug into.
+   (WP-11) landed, and in Wave 4 the pre-built middleware sets (WP-22a/b/c) and `initChatModel` (WP-20),
+   all 🟡. **Not ported:** the v3 run stream the transformers would plug into (so the v3 `run.messages`
+   middleware cases are skipped), `ContextOverflowError`, and string-model resolution in
+   `ModelFallbackMiddleware`, `ToolEmulatorMiddleware` and `ModerationMiddleware` (see Open observations).
 2. **Finish the provider clients.** 🟡 `ChatOpenAI` (Chat Completions and Responses), Azure
    OpenAI and OpenAI `Profiles`, `ChatAnthropic`, `ChatOllama`, `ChatFireworks`, `ChatTogetherAI`,
    `ChatDeepSeek`, `ChatXAI` (Completions only), `ChatOpenRouter`, and the OpenAI / Anthropic
@@ -337,8 +351,9 @@ rather than completing it.
    concrete memory classes. ⬜ The base layer plus `MemoryVectorStore` landed (WP-13a/b);
    the concrete embeddings are `OpenAIEmbeddings`, `AzureOpenAIEmbeddings`, `FireworksEmbeddings`,
    `TogetherAIEmbeddings` and `OllamaEmbeddings`.
-5. MongoDB checkpoint saver. 🟡 `MongoDBSaver` landed over a collection seam (WP-09c) but
-   has **never run against a real MongoDB** and has no production driver adapter. Postgres
+5. MongoDB checkpoint saver and store. 🟡 `MongoDBSaver` landed over a collection seam (WP-09c) and
+   `MongoDBStore` in Wave 4 (WP-10c, no `fromConnString` / `ownsClient`); neither has **ever run against a
+   real MongoDB** and there is no production driver adapter. Postgres
    (spec-verified, env-gated in CI) and Redis (fake-verified; real server env-gated on
    `LANGGRAPH_REDIS_URL`) landed in Wave 1.
 6. `langgraph/graph` — 🟡 `Graph`, `CompiledGraph`, `Branch`, `MessageGraph` (WP-04),
@@ -350,6 +365,9 @@ rather than completing it.
 9. `load/import_map`. ⬜ (`structured_query` landed in WP-14; `indexing` and `example_selectors` in WP-13a, minus the `FewShot*` prompt templates.)
 10. `streamEvents` v3 protocol layer, the `custom`/`checkpoints`/`tasks` stream modes,
     and the Wave 1 partials (WP-12a, WP-15). 🟡
+11. MCP client and transports. ⬜ WP-25 ported only the conversion layer (`LangGraph\Mcp\*`) over
+    `McpClientInterface`; `MultiServerMCPClient`, stdio / HTTP / SSE transports and OAuth are not ported, and
+    no live MCP server has ever been talked to.
 
 ### Deliberately out of scope
 
@@ -392,6 +410,44 @@ Each is pinned by a test, documented rather than papered over. See the
 
 Unresolved, recorded so they are not re-discovered:
 
+- **NEW (Wave 4), `Agents\Model::isConfigurableModel()` does not recognise the real `ConfigurableModel`.**
+  `src/LangGraph/Agents/Model.php` checks the LangGraph sub-interface (`LangGraph\Agents\ConfigurableModelInterface`), and the
+  real `LangChain\LanguageModels\Chat\Universal\ConfigurableModel` implements only the LangChain one, so the check misses it at
+  `AgentNode.php:580` and `Utils.php:297` / `:374`. Behaviour is currently equivalent (`ConfigurableModel` has its own `bindTools`, so
+  `simpleBindTools` handles it first, and `profile()` delegates to the built model). Fix per the WP-20 reviewer: check the LangChain
+  interface by FQCN (the layering guard forbids a `use`).
+- **NEW (Wave 4), `ConfigurableModel::generate()` does not pass the call config** to `getModelInstance()` where upstream passes the
+  options. It is effectively unreachable because `invoke` / `batch` are overridden and delegate first. The cache key also covers only
+  `configurable` where upstream stringifies the whole config (declared in the docblock).
+- **NEW (Wave 4), string models still do not resolve through `initChatModel` in three middleware.** `ToolEmulatorMiddleware` and
+  `ModerationMiddleware` look up a placeholder class `LangChain\ChatModels\InitChatModel::initChatModel()` (their `INIT_CHAT_MODEL`
+  constant) that does not exist, and `ModelFallbackMiddleware` still raises `model id strings need initChatModel, which is not ported
+  yet`. Point them at `LangChain\LanguageModels\Chat\Universal\InitChatModel::init()` (the way `SummarizationMiddleware` and
+  `LlmToolSelectorMiddleware` already do), then rewrite the `StubInitChatModel`-based separate-process tests and the
+  `markTestSkipped` guards that say `initChatModel is ported now` in `ToolEmulatorMiddlewareTest` and `ModerationMiddlewareTest`.
+  `AgentNode`'s class docblock (around line 41) also still says `initChatModel` is not ported.
+- **NEW (Wave 4), `ChatAnthropic` ignores `cache_control` bound through `bindTools()`.** `invocationParams()` reads it only from per-call
+  options, so `PromptCachingMiddleware`'s `modelSettings.cache_control` never reaches the request body. Fix it in the Anthropic client,
+  then un-skip `PromptCachingMiddlewareTest::testTheRealAnthropicClientForwardsTheBoundCacheControlOnTheRequestBody`.
+- **NEW (Wave 4), a `Command` from an MCP `afterToolCall` hook is JSON-stringified under `ToolNode`.** Reported by the WP-25 implementer and
+  not re-probed here: a tool built with `content_and_artifact` returns a `[Command, artifacts]` tuple that `CommandPassthroughTool`
+  captures instead of the `Command`. Upstream returns the `Command` directly. Fix: `ToolNode` should unwrap a `[Command, artifact]` tuple.
+  Also reported: a refused elicitation resume value is recorded against the task, so a second resume on one thread replays the first refusal.
+- **NEW (Wave 4), flaky wall-clock tests under load.** `Unit\Pregel\TimeoutTest::testCallbackEventsRefreshTheIdleClockUnderAuto` and
+  `testTheCustomStreamWriterCountsAsProgress` failed once during landing under heavy machine load (the 150ms idle budget elapsed at 289ms);
+  the next run was green. The WP-22b implementer separately saw `testTheCustomStreamWriterCountsAsProgress` flake on a loaded machine. The WP-22a backoff tests also keep upstream's
+  wall-clock upper bounds and may flake the same way. Rerun before blaming a change; a real fix would inject the clock or widen the budget.
+- **NEW (Wave 4), small middleware gaps from the reviewers (none blocking):** `Constants::normaliseRetryOn` uses `class_exists`, so a
+  `retryOn` of `[\Throwable::class]` (an interface) is rejected; an explicit null numeric option falls back to the default where Zod would
+  reject it; `ProviderToolSearchMiddleware` falls through with the model's name (`default => $name`) where upstream says `other`;
+  `PiiRedactionMiddleware` yields null instead of `{}` for an `extract-*` call with empty args; `LlmToolSelectorMiddleware` only treats
+  `null`, not an empty string, as `use the request model`; `PhpRedisClient::ftInfo` resets `OPT_REPLY_LITERAL` to `false` instead of its
+  previous value; `Errors::fields()` in the MCP layer never reads `getCode()`, so an exception carrying an HTTP status only in its code is
+  not seen by `getHttpErrorCode`; `PostgresStore` `inner_product` search deliberately ranks best-first where upstream ranks by the raw
+  `<#>` value (a fix of an upstream bug, listed in the non-exact table).
+- **NEW (Wave 4), no production MongoDB driver adapter and no MCP client.** Both are known gaps rather than bugs: model the former on
+  the test-only `MongoDBStoreDriver*` classes; the latter needs an MCP SDK for PHP (or an in-house client) behind `McpClientInterface`.
+
 - **One nondeterministic hang.** During Wave 1 landing a single full-suite run hung at test
   ~1853/6325 (about `ProviderClientRegressionTest::testAnthropicStreamingFailureBecomesAnAnthropicException`)
   until composer's 300s timeout. It did not reproduce in 3 full runs, 15 isolated runs, or any
@@ -411,18 +467,18 @@ Unresolved, recorded so they are not re-discovered:
   `tests/Unit/Channels/TopicTwoSendsRegressionTest.php` are controls; the reproducing case is
   `testTwoParallelToolCallsWithAnInterruptSurviveCheckpointAndResume`, mutation-checked by removing the guard. The port
   **deliberately drops** upstream's legacy pre-flat `[seen, values]` read for non-unique topics (it has no legacy
-  pre-flat checkpoints). Leftover: `tests/Unit/Prebuilt/ReactAgentToolNodeTest.php` still runs upstream's two-call case with
-  three calls under a now-stale comment.
+  pre-flat checkpoints). ~~Leftover: `tests/Unit/Prebuilt/ReactAgentToolNodeTest.php` still runs upstream's two-call case with
+  three calls under a now-stale comment.~~ **FIXED (Wave 4):** the test is back to upstream's two-call form (weather / human_assistance).
 - ~~**WP-05 follow-up: skip `PregelLoop::cacheTaskWrites` for writes produced by an error handler.**~~ **FIXED (Wave 3,
   2026-10-08).** A handler outcome now carries a reserved `Constants::HANDLED` (`__handled__`) write, appended by
   `StateGraph::getUpdates`, and `cacheTaskWrites` returns early if any write has that key (upstream never caches a failed
   task, `loop.ts:838-853`). The pin was inverted to `NodeErrorHandlerTest::testAHandledFailureIsNotCachedUnderTheFailedNodesKey`.
   Still open: a node with an error handler gets `compiledRetry = null`, so a graph-level `retryPolicy` could re-run the whole
   wrapper (node plus handler).
-- **NEW, `PregelRunner::taskResult` leaks the marker.** It copies every write except `NO_WRITES` into the debug-mode
+- ~~**NEW, `PregelRunner::taskResult` leaks the marker.**~~ **FIXED (Wave 4):** `taskResult()` now skips `Constants::HANDLED` as it does `NO_WRITES`, pinned by `tests/Unit/Pregel/DebugTaskResultHandledMarkerTest.php`. Original report: it copies every write except `NO_WRITES` into the debug-mode
   `task_result` payload, so a handled node shows `{"foo":"h","__handled__":true}` in the `debug` stream. Channel state, `updates`
   and `values` are unaffected, and no test pins the leak. A one-line filter on `Constants::HANDLED` (as for `NO_WRITES`) closes it.
-- **NEW, `Completions::deltaToChunk` drops streamed `reasoning_content`.** `ChatFireworks` and `ChatTogetherAI` subclass
+- ~~**NEW, `Completions::deltaToChunk` drops streamed `reasoning_content`.**~~ **FIXED (Wave 4):** `deltaToChunk` and `choiceToMessage` copy it into `additional_kwargs`; both Fireworks / Together `streams reasoning` tests are converted (`CompletionsReasoningContentTest` has the unit cases). Original report: `ChatFireworks` and `ChatTogetherAI` subclass
   `ChatOpenAICompletions` unmodified, so they lose reasoning deltas while streaming (`ChatDeepSeek` and `ChatOpenRouter` carry
   it themselves); two upstream stream-reasoning tests are not converted for that reason. Fix it in
   `src/LangChain/LanguageModels/Chat/OpenAI/Utils/Completions.php` and the two Fireworks / Together tests can follow.
@@ -431,12 +487,14 @@ Unresolved, recorded so they are not re-discovered:
   subgraph kills the run. WP-11 works around it with `Supervisor\ParentCommandBridge`; handling it in the runner as upstream's
   `_runWithRetry` does would make the bridge removable.
 - **Other Wave 3 gaps:** `LangGraph\Errors\RemoteException` does not exist, so `RemoteGraph` throws a plain `\RuntimeException` on a server
-  `error` event; `ChatOllama` and `ChatOpenAICompletions` call `handleLLMNewToken($text, ['chunk' => $chunk])`, which puts the fields array in
-  the `$idx` position (`ChatOpenRouter` does it correctly); the messages reducer treats equal message ids as an update, so a scripted
+  `error` event; ~~`ChatOllama` and `ChatOpenAICompletions` call `handleLLMNewToken($text, ['chunk' => $chunk])`, which puts the fields array in
+  the `$idx` position~~ **FIXED (Wave 4):** 8 call sites now pass the chunk in `$fields` (pinned by `LLMNewTokenChunkFieldsTest`); the messages reducer treats equal message ids as an update, so a scripted
   provider reusing one response id collapses the AI messages in an agent loop; `AzureChatOpenAIResponses::url()` builds its URL by string cutting.
-- **455 skipped tests are the MongoDB integration spec** (`MongoDBSaverIntegrationTest`, gated on
-  `LANGGRAPH_MONGO_URI` plus `ext-mongodb`). They inflate the Skipped count in `composer test`, and the saver has
-  never been exercised against a real server.
+- **570 skipped tests are env-gated suites and declared skips** (measured in the final Wave 4 run): 455 are
+  `MongoDBSaverIntegrationTest` (gated on `LANGGRAPH_MONGO_URI` plus `ext-mongodb`), 75 `RedisStoreIntegrationTest`
+  (`LANGGRAPH_REDIS_URL` plus ext-redis), 29 `MongoDBStoreIntegrationTest` and 4 `MongoDBStoreContractTest` (Mongo again),
+  and 7 single-test skips in the middleware suites (3 summarization, 1 each for HITL, LLM tool selector, prompt caching and
+  tool emulator). They inflate the Skipped count in `composer test`; neither MongoDB class has ever been exercised against a real server.
 - **Other Wave 2 gaps owned by later work:** `Pregel::validate()` is not auto-run; `StateGraph::compile(['checkpointer' => true])` becomes a base `MemorySaver`; `Signals::mergeSignals` has no `src` caller until
   `BaseClient::prepareFetchOptions` gets the timeout-signal merge; `tests/Unit/Sdk/Support/RecordingTransport`'s
   "Streaming is WP-23b" message is stale; `Runtime.writer` / `Runtime.interrupt` in `Agents` read config keys
@@ -449,14 +507,11 @@ Unresolved, recorded so they are not re-discovered:
 
 ## Where to start
 
-Recommended order, and why. Waves 0, 1, 2 and 3 of `.loop/COMPLETION_PLAN.md` have landed (Wave 3: WP-06, 11, 17a, 17b, 18b, 19a, 19b, 21b, 21c, 26 plus the Topic and handler-cache engine fixes; several are 🟡, see above). **Next is Wave 4**:
+Recommended order, and why. Waves 0, 1, 2, 3 and 4 of `.loop/COMPLETION_PLAN.md` have landed. **Wave 4 was the last planned wave, and the port is not complete**: the 🟡 rows in `PORT_STATUS.md` and the NOT-ported list above are the remaining work. Wave 4 landed WP-20, WP-22a/b/c, WP-10 (three stores), WP-25 (conversion layer only) and four follow-up fixes; every one of the nine work packages is 🟡.
 
-1. **WP-20 `initChatModel`.**
-2. **WP-22a / WP-22b / WP-22c**, the pre-built middleware sets that sit on the WP-21b `Middleware::create` foundation.
-3. **WP-10, the store backends (three of them).**
-4. **WP-25 MCP adapters**, as a stretch item.
-5. **Close the open follow-ups first if they are cheap** (see Open observations): the `PregelRunner::taskResult` `__handled__` debug leak (one line), `Completions::deltaToChunk` dropping `reasoning_content` (then convert the two Fireworks / Together reasoning tests), `ParentCommand` handling in the runner (then drop `ParentCommandBridge`), `LangGraph\Errors\RemoteException`, and `ReactAgentToolNodeTest` back to upstream's two-call form.
-6. **Backlog candidates:** the xAI Responses API, `ThreadsClient::stream()` (v2) with the v3 run stream and the remaining `RemoteGraphRunStream` projections, a real-server run of `drawMermaidPng`, and then the NOT-ported list.
+1. **Close the Wave 4 follow-ups in Open observations first, they are cheap:** point `ToolEmulatorMiddleware`, `ModerationMiddleware` and `ModelFallbackMiddleware` at the real `InitChatModel`, fix `Agents\Model::isConfigurableModel()`, make `ChatAnthropic` honour bound `cache_control` (then un-skip its test), and have `ToolNode` unwrap a `[Command, artifact]` tuple.
+2. **Older open follow-ups:** `ParentCommand` handling in the runner (then drop `ParentCommandBridge`), `LangGraph\Errors\RemoteException`, and `ContextOverflowError` in the core errors (then un-skip the modelRetry case).
+3. **Backlog candidates:** a production MongoDB driver adapter (then run both Mongo specs against a real server), an MCP client with transports behind `McpClientInterface`, the xAI Responses API, `ThreadsClient::stream()` (v2) with the v3 run stream and the remaining `RemoteGraphRunStream` projections (which would also un-skip the v3 middleware cases), a real-server run of `drawMermaidPng`, and then the NOT-ported list.
 
 `Pregel`/`CompiledStateGraph` carry a `checkpointerDisabled` flag set by `StateGraph::compile`.
 
