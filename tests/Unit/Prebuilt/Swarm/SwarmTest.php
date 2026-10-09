@@ -113,7 +113,7 @@ final class SwarmTest extends TestCase
             $command = $e->command;
         }
 
-        self::assertSame(Command::PARENT, $command->graph);
+        self::assertSame('', $command->graph); // re-addressed to the root parent namespace by the runner
         self::assertSame('Bob', $command->goto);
         self::assertSame('Bob', $command->update['activeAgent']);
         $types = array_map(static fn ($m) => $m->getType(), $command->update['messages']);
