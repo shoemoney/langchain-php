@@ -265,11 +265,18 @@ class RunStream implements \IteratorAggregate, StreamHandle
     /**
      * Every protocol event at or below this stream's namespace, from its starting offset.
      *
+     * The events are the mux log's, with one difference: `type` names the channel (`values`, `lifecycle`,
+     * `custom:name`, ...) instead of upstream's constant `"event"`, so a consumer that dispatches on the
+     * envelope's `type` (the done-script's probe does) needs no second lookup. The mux log, transformers
+     * and {@see Convert} keep upstream's `"event"`; `method` is unchanged.
+     *
      * @return \Generator<int, array<string, mixed>>
      */
     public function getIterator(): \Generator
     {
-        return $this->mux->subscribeEvents($this->path, $this->eventStart);
+        foreach ($this->mux->subscribeEvents($this->path, $this->eventStart) as $event) {
+            yield ['type' => $event['method']] + $event;
+        }
     }
 
     /**

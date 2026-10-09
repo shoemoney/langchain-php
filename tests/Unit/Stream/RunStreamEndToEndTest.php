@@ -87,6 +87,18 @@ final class RunStreamEndToEndTest extends TestCase
         $this->assertSame([], $events[0]['params']['namespace']);
     }
 
+    public function testIteratedEventsNameTheirChannelInTypeWhileTheMuxLogKeepsEvent(): void
+    {
+        $run = RunStream::create(self::counterGraph(), ['v' => 1]);
+
+        $events = self::collect($run);
+
+        $this->assertSame(array_column($events, 'method'), array_column($events, 'type'));
+        $this->assertContains('lifecycle', array_column($events, 'type'));
+        $this->assertContains('values', array_column($events, 'type'));
+        $this->assertContains('updates', array_column($events, 'type'));
+    }
+
     public function testOutputIsTheFinalStateAndValuesYieldsEverySnapshot(): void
     {
         $run = RunStream::create(self::counterGraph(), ['v' => 1]);
