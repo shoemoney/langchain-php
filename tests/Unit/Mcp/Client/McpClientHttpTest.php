@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\Mcp\Client;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\FnStream;
+use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\Utils;
 use LangChain\Tests\Unit\Mcp\Client\Fixtures\HttpServerProcess;
 use LangGraph\Mcp\Client\McpClient;
 use LangGraph\Mcp\Client\Transport\HttpStatusException;
@@ -255,6 +262,50 @@ final class McpClientHttpTest extends TestCase
         $this->expectException(McpClientError::class);
 
         new StreamableHttpTransport(['url' => '']);
+    }
+
+    public function testAReplyToAServerRequestMidStreamLeavesTheToolCallStreamOpen(): void
+    {
+        $sse = static fn (array $message): string => "event: message\ndata: " . json_encode($message) . "\n\n";
+        $json = ['Content-Type' => 'application/json'];
+        $events = [
+            $sse(['jsonrpc' => '2.0', 'id' => 'srv-1', 'method' => 'elicitation/create', 'params' => ['message' => 'Approve?', 'requestedSchema' => ['type' => 'object', 'properties' => []]]]),
+            $sse(['jsonrpc' => '2.0', 'method' => 'ping-notification-noise']),
+            $sse(['jsonrpc' => '2.0', 'id' => 2, 'result' => ['content' => [['type' => 'text', 'text' => 'tool-result']]]]),
+        ];
+        $body = FnStream::decorate(Utils::streamFor(''), [
+            'read' => static fn (): string => array_shift($events) ?? '',
+            'eof' => static function () use (&$events): bool {
+                return $events === [];
+            },
+        ]);
+
+        $history = [];
+        $mock = new MockHandler([
+            new Response(200, $json, json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => ['protocolVersion' => '2025-06-18', 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'mock', 'version' => '1']]])),
+            new Response(202),
+            new Response(200, ['Content-Type' => 'text/event-stream'], $body),
+            new Response(202),
+        ]);
+        $stack = HandlerStack::create($mock);
+        $stack->push(Middleware::history($history));
+
+        $answered = [];
+        $client = new McpClient(new StreamableHttpTransport(['url' => 'http://mock.test/mcp', 'client' => new Client(['handler' => $stack])]));
+        $client->setElicitationHandler(static function (array $params) use (&$answered): array {
+            $answered[] = $params['message'];
+
+            return ['action' => 'accept', 'content' => []];
+        });
+        $this->clients[] = $client;
+
+        $result = $client->callTool('approve', []);
+
+        self::assertSame(['Approve?'], $answered);
+        self::assertSame('tool-result', $result['content'][0]['text']);
+        $reply = json_decode((string) $history[3]['request']->getBody(), true);
+        self::assertSame('srv-1', $reply['id']);
+        self::assertSame('accept', $reply['result']['action']);
     }
 
     private function thrownBy(callable $fn): \Throwable

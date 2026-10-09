@@ -16,7 +16,7 @@ use LangGraph\Mcp\McpClientError;
  */
 final class StdioTransport implements TransportInterface
 {
-    private const DEFAULT_ENV_KEYS = ['HOME', 'LOGNAME', 'PATH', 'SHELL', 'TERM', 'USER', 'TMPDIR'];
+    private const DEFAULT_ENV_KEYS = ['HOME', 'LOGNAME', 'PATH', 'SHELL', 'TERM', 'USER'];
 
     private const SHUTDOWN_GRACE_SECONDS = 2.0;
 

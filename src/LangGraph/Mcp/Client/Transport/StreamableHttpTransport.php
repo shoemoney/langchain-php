@@ -21,6 +21,9 @@ use Psr\Http\Message\StreamInterface;
  * on {@see self::close()}. A stream that ends before its response arrived is resumed with a GET
  * carrying `Last-Event-ID`, up to `reconnect.maxRetries` times with exponential backoff.
  *
+ * Only a JSON-RPC request replaces the in-flight response stream: replies to server requests and
+ * notifications are POSTed without disturbing it.
+ *
  * The optional standalone server-to-client GET stream is not opened.
  *
  * Config: `url`, `headers`, `reconnect` (`maxRetries` 2, `initialReconnectionDelay` 1000,
@@ -111,14 +114,16 @@ final class StreamableHttpTransport implements TransportInterface
     public function send(array $message): void
     {
         $this->assertStarted();
-        $this->dropStream();
+        $expectsResponse = JsonRpc::isRequest($message);
+        if ($expectsResponse) {
+            $this->dropStream();
+        }
 
         $response = $this->request('POST', [
             'headers' => $this->requestHeaders(['Content-Type' => 'application/json', 'Accept' => 'application/json, text/event-stream']),
             'body' => JsonRpc::encode($message),
         ]);
 
-        $expectsResponse = JsonRpc::isRequest($message);
         $session = $response->getHeaderLine('mcp-session-id');
         if ($session !== '') {
             $this->sessionId = $session;
@@ -135,6 +140,12 @@ final class StreamableHttpTransport implements TransportInterface
 
         $type = strtolower($response->getHeaderLine('content-type'));
         if (str_starts_with($type, 'text/event-stream')) {
+            if (!$expectsResponse) {
+                // A reply or notification never owns a stream; the in-flight request's stream stays untouched.
+                $response->getBody()->close();
+
+                return;
+            }
             $this->openStream($response->getBody(), $expectsResponse ? $message['id'] : null);
 
             return;
