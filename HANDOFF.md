@@ -34,8 +34,8 @@ know before you start.
 | Repo | `github.com/shoemoney/langchain-php` (public) |
 | Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
 | PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **14548 tests (14060 passing, 488 skipped), 34856 assertions** |
-| Size | 567 src files / 90,359 lines · 496 test files / 105,016 lines |
+| Tests | **15851 tests (15281 passing, 570 skipped), 37841 assertions** |
+| Size | 617 src files / 100,692 lines · 540 test files / 118,254 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
