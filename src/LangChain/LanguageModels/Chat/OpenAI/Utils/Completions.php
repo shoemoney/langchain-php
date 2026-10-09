@@ -336,6 +336,10 @@ final class Completions
             $fields['additional_kwargs']['function_call'] = $delta['function_call'];
         }
 
+        if (isset($delta['reasoning_content'])) {
+            $fields['additional_kwargs']['reasoning_content'] = $delta['reasoning_content'];
+        }
+
         $fields['additional_kwargs'] = array_filter(
             $fields['additional_kwargs'] + ['completion_index' => $index],
             static fn (mixed $v): bool => $v !== null,
@@ -384,6 +388,7 @@ final class Completions
             'function_call' => $message['function_call'] ?? null,
             'tool_calls' => $rawToolCalls !== [] ? $rawToolCalls : null,
             'refusal' => $message['refusal'] ?? null,
+            'reasoning_content' => $message['reasoning_content'] ?? null,
         ], static fn (mixed $v): bool => $v !== null);
 
         return new AIMessage([
