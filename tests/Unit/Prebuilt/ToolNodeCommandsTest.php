@@ -287,4 +287,48 @@ final class ToolNodeCommandsTest extends TestCase
 
         self::assertSame('user said: Ada', end($done['messages'])->content);
     }
+
+    private static function steerTool(string $format = 'content_and_artifact'): StructuredTool
+    {
+        return tool(
+            static fn (array $in): array => [
+                new Command(update: ['messages' => [new ToolMessage(['content' => 'cmd', 'tool_call_id' => 'c1', 'name' => 'steer'])]]),
+                ['a' => 1],
+            ],
+            ['name' => 'steer', 'description' => 'steer', 'schema' => Schema::object([]), 'responseFormat' => $format],
+        );
+    }
+
+    public function testContentAndArtifactToolReturningACommandTupleYieldsTheCommand(): void
+    {
+        $result = (new ToolNode([self::steerTool()]))->invoke(['messages' => [self::ai(self::call('steer', [], 'c1'))]]);
+
+        self::assertCount(1, $result);
+        self::assertInstanceOf(Command::class, $result[0]);
+        self::assertSame('cmd', $result[0]->update['messages'][0]->content);
+    }
+
+    public function testPlainContentAndArtifactToolStillBecomesAToolMessageWithArtifact(): void
+    {
+        $plain = tool(
+            static fn (array $in): array => ['hello', ['a' => 1]],
+            ['name' => 'plain', 'description' => 'p', 'schema' => Schema::object([]), 'responseFormat' => 'content_and_artifact'],
+        );
+        $result = (new ToolNode([$plain]))->invoke(['messages' => [self::ai(self::call('plain', [], 'c2'))]]);
+
+        self::assertSame('hello', $result['messages'][0]->content);
+        self::assertSame(['a' => 1], $result['messages'][0]->artifact);
+    }
+
+    public function testCommandTupleSteersARealGraph(): void
+    {
+        $graph = (new StateGraph(MessagesAnnotation::root()))
+            ->addNode('tools', new ToolNode([self::steerTool()]))
+            ->addEdge(Constants::START, 'tools')
+            ->compile();
+
+        $out = $graph->invoke(['messages' => [self::ai(self::call('steer', [], 'c1'))]]);
+
+        self::assertSame('cmd', end($out['messages'])->content);
+    }
 }

@@ -7,6 +7,7 @@ namespace LangGraph\Prebuilt;
 use LangChain\Runnables\RunnableConfig;
 use LangChain\Tools\StructuredTool;
 use LangChain\Tracers\CallbackManagerForToolRun;
+use LangGraph\Pregel\Command;
 
 /**
  * Runs another tool unchanged while remembering exactly what its body returned.
@@ -56,15 +57,33 @@ final class CommandPassthroughTool extends StructuredTool
         if ($raw instanceof \Generator) {
             return (function () use ($raw) {
                 $result = yield from $raw;
-                $this->captured = $result;
+                $this->captured = $this->unwrapCommandTuple($result);
                 $this->didCapture = true;
 
                 return $result;
             })();
         }
 
-        $this->captured = $raw;
+        $this->captured = $this->unwrapCommandTuple($raw);
         $this->didCapture = true;
+
+        return $raw;
+    }
+
+    /**
+     * A `content_and_artifact` tool that returns `[Command, artifact]` (as an MCP `afterToolCall` hook does)
+     * steers the graph with that Command; the artifact is dropped, as upstream does (`[result, []]`).
+     */
+    private function unwrapCommandTuple(mixed $raw): mixed
+    {
+        if ($this->responseFormat === 'content_and_artifact'
+            && \is_array($raw)
+            && array_is_list($raw)
+            && \count($raw) === 2
+            && Command::isCommand($raw[0])
+        ) {
+            return $raw[0];
+        }
 
         return $raw;
     }
