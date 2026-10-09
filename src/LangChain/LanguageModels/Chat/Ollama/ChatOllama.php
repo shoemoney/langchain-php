@@ -403,7 +403,7 @@ class ChatOllama extends BaseChatModel
             yield $generation;
 
             if ($generation->text !== '') {
-                $runManager?->handleLLMNewToken($generation->text, ['chunk' => $generation]);
+                $runManager?->handleLLMNewToken($generation->text, null, ['chunk' => $generation]);
             }
         }
 

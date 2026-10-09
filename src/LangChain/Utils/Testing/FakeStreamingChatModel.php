@@ -236,6 +236,7 @@ final class FakeStreamingChatModel extends BaseChatModel
                 yield $cg;
                 $runManager?->handleLLMNewToken(
                     is_string($msgChunk->content) ? $msgChunk->content : '',
+                    null,
                     ['chunk' => $cg],
                 );
             }
@@ -253,7 +254,7 @@ final class FakeStreamingChatModel extends BaseChatModel
 
             $cg = new ChatGenerationChunk(new AIMessageChunk($char), $char);
             yield $cg;
-            $runManager?->handleLLMNewToken($char, ['chunk' => $cg]);
+            $runManager?->handleLLMNewToken($char, null, ['chunk' => $cg]);
         }
     }
 }

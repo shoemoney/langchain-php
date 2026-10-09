@@ -268,7 +268,7 @@ class ChatOpenAIResponses extends BaseChatOpenAI
 
             yield $chunk;
 
-            $runManager?->handleLLMNewToken($chunk->text, ['chunk' => $chunk]);
+            $runManager?->handleLLMNewToken($chunk->text, null, ['chunk' => $chunk]);
         }
     }
 
