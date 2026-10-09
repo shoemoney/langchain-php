@@ -109,6 +109,37 @@ final class ChatXAIResponsesEndToEndTest extends TestCase
         self::assertSame(['mode' => 'on'], $body['search_parameters']);
     }
 
+    public function testBindToolsRejectsFunctionTools(): void
+    {
+        $model = self::model([]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $model->bindTools([static fn (int $a): int => $a]);
+    }
+
+    public function testBindToolsRejectsFunctionTypeArrays(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        self::model([])->bindTools([['type' => 'function', 'name' => 'add', 'parameters' => []]]);
+    }
+
+    public function testWithStructuredOutputThrowsLikeUpstream(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Chat model must implement ".bindTools()" to use withStructuredOutput.');
+        self::model([])->withStructuredOutput(['type' => 'object', 'properties' => []]);
+    }
+
+    public function testNonStreamingLlmOutputCarriesEstimatedTokenUsage(): void
+    {
+        $model = self::model([FakeHttpClient::json(200, self::RESPONSE)]);
+
+        $result = $model->generateMessages([[new \LangChain\Messages\HumanMessage('hi')]]);
+
+        self::assertSame(['promptTokens' => 9, 'completionTokens' => 3, 'totalTokens' => 12], $result->llmOutput['estimatedTokenUsage'] ?? null);
+        self::assertArrayNotHasKey('tokenUsage', $result->llmOutput);
+    }
+
     public function testCallOptionsAndPriorTurnsAreConverted(): void
     {
         $model = self::model([FakeHttpClient::json(200, self::RESPONSE)]);

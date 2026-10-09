@@ -277,8 +277,63 @@ class ChatXAIResponses extends ChatOpenAIResponses
         return new ChatResult(
             [new ChatGeneration($message, Responses::extractTextFromOutput($response['output'] ?? []))],
             array_filter(['id' => $response['id'] ?? null], static fn (mixed $v): bool => $v !== null)
-                + $this->llmOutputFromUsage($message),
+                + $this->estimatedUsageOutput($message),
         );
+    }
+
+    /**
+     * Upstream's non-streaming `llmOutput` is `{id, estimatedTokenUsage:{promptTokens, completionTokens, totalTokens}}`.
+     *
+     * @return array<string, mixed>
+     */
+    private function estimatedUsageOutput(BaseMessage $message): array
+    {
+        $usage = $this->llmOutputFromUsage($message)['tokenUsage'] ?? null;
+
+        return $usage === null ? [] : ['estimatedTokenUsage' => $usage];
+    }
+
+    /**
+     * Upstream `ChatXAIResponses` has no `bindTools()`: xAI's built-in tools ride the `tools` option as-is. This
+     * port keeps that: raw built-in tool arrays (and the `XAI\Tools` builders, which return arrays) are bound
+     * unchanged. Function tools (`StructuredTool`, callables, `type: function` arrays) are refused, because the
+     * inherited OpenAI conversion would emit the nested Chat Completions shape on a Responses wire, and the xAI
+     * response converter does not surface `function_call` items.
+     *
+     * @param list<mixed>          $tools
+     * @param array<string, mixed> $kwargs
+     */
+    public function bindTools(array $tools, array $kwargs = []): static
+    {
+        foreach ($tools as $tool) {
+            if (!is_array($tool) || ($tool['type'] ?? null) === 'function' || !isset($tool['type'])) {
+                throw new \InvalidArgumentException(
+                    'ChatXAIResponses.bindTools() only accepts xAI built-in tool arrays (e.g. WebSearch::create()); '
+                    . 'function tools are not supported by the xAI Responses client.'
+                );
+            }
+        }
+
+        $next = clone $this;
+        $next->kwargs['tools'] = array_values($tools);
+        foreach ($kwargs as $key => $value) {
+            if ($key !== 'tools') {
+                $next->kwargs[$key] = $value;
+            }
+        }
+
+        return $next;
+    }
+
+    /**
+     * Upstream inherits core `BaseChatModel.withStructuredOutput`, which throws because this class has no `bindTools`.
+     *
+     * @param array<string, mixed> $schema
+     * @param array<string, mixed> $config
+     */
+    public function withStructuredOutput(array $schema, array $config = []): \LangChain\Runnables\Runnable
+    {
+        throw new \RuntimeException('Chat model must implement ".bindTools()" to use withStructuredOutput.');
     }
 
     /**
