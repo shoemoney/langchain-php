@@ -118,6 +118,14 @@ final class PhpRedisClient implements RedisClientInterface
         $args = ['FT.CREATE', $index, 'ON', 'JSON', 'PREFIX', '1', $prefix, 'SCHEMA'];
         foreach ($schema as $path => $field) {
             array_push($args, $path, 'AS', $field['as'], $field['type']);
+            if (isset($field['algorithm'])) {
+                $attributes = $field['attributes'] ?? [];
+                $args[] = $field['algorithm'];
+                $args[] = (string) (count($attributes) * 2);
+                foreach ($attributes as $name => $value) {
+                    array_push($args, (string) $name, (string) $value);
+                }
+            }
         }
         $this->raw(...$args);
     }
@@ -129,27 +137,46 @@ final class PhpRedisClient implements RedisClientInterface
         int $size,
         string $sortBy,
         bool $descending,
+        ?array $return = null,
+        array $params = [],
+        ?int $dialect = null,
     ): array {
-        $reply = $this->raw(
-            'FT.SEARCH',
-            $index,
-            $query,
-            'SORTBY',
-            $sortBy,
-            $descending ? 'DESC' : 'ASC',
-            'LIMIT',
-            (string) $offset,
-            (string) $size,
-        );
+        $args = ['FT.SEARCH', $index, $query];
+        if ($sortBy !== '') {
+            array_push($args, 'SORTBY', $sortBy, $descending ? 'DESC' : 'ASC');
+        }
+        array_push($args, 'LIMIT', (string) $offset, (string) $size);
+        if ($return !== null) {
+            array_push($args, 'RETURN', (string) count($return), ...$return);
+        }
+        if ($params !== []) {
+            $args[] = 'PARAMS';
+            $args[] = (string) (count($params) * 2);
+            foreach ($params as $name => $value) {
+                array_push($args, (string) $name, $value);
+            }
+        }
+        if ($dialect !== null) {
+            array_push($args, 'DIALECT', (string) $dialect);
+        }
+        $reply = $this->raw(...$args);
 
         $hits = [];
         if (!is_array($reply)) {
             return $hits;
         }
         // [total, key, [field, value, ...], key, [...], ...]; a JSON index returns the whole
-        // document under the field `$`.
+        // document under the field `$`, and only the named fields under RETURN.
         for ($i = 1; $i + 1 < count($reply); $i += 2) {
             $fields = (array) $reply[$i + 1];
+            if ($return !== null) {
+                $picked = [];
+                for ($f = 0; $f + 1 < count($fields); $f += 2) {
+                    $picked[(string) $fields[$f]] = (string) $fields[$f + 1];
+                }
+                $hits[] = ['id' => (string) $reply[$i], 'value' => json_encode($picked, JSON_THROW_ON_ERROR | JSON_FORCE_OBJECT)];
+                continue;
+            }
             for ($f = 0; $f + 1 < count($fields); $f += 2) {
                 if ($fields[$f] === '$') {
                     $hits[] = ['id' => (string) $reply[$i], 'value' => (string) $fields[$f + 1]];
@@ -159,6 +186,27 @@ final class PhpRedisClient implements RedisClientInterface
         }
 
         return $hits;
+    }
+
+    public function ftInfo(string $index): array
+    {
+        // FT.INFO labels its fields with simple-string replies, which phpredis flattens to `true`
+        // unless asked for the literal text. Restore the option so no other command is affected.
+        $this->redis->setOption(\Redis::OPT_REPLY_LITERAL, true);
+        try {
+            $reply = $this->raw('FT.INFO', $index);
+        } finally {
+            $this->redis->setOption(\Redis::OPT_REPLY_LITERAL, false);
+        }
+
+        $info = [];
+        if (is_array($reply)) {
+            for ($i = 0; $i + 1 < count($reply); $i += 2) {
+                $info[(string) $reply[$i]] = $reply[$i + 1];
+            }
+        }
+
+        return $info;
     }
 
     public function quit(): void
