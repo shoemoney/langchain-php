@@ -255,8 +255,10 @@ class ChatAnthropic extends BaseChatModel
             }
         }
 
-        // Forwarded as a top-level request field (automatic prompt caching), call options only.
-        $cacheControl = $options['cache_control'] ?? $options['cacheControl'] ?? null;
+        // Forwarded as a top-level request field (automatic prompt caching). A per-call option wins
+        // over the value bound through bindTools() (how PromptCachingMiddleware's modelSettings arrive).
+        $cacheControl = $options['cache_control'] ?? $options['cacheControl']
+            ?? $bound['cache_control'] ?? $bound['cacheControl'] ?? null;
         if (is_array($cacheControl)) {
             $params['cache_control'] = $cacheControl;
         }

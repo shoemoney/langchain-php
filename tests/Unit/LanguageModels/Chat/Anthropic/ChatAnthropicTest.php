@@ -472,6 +472,25 @@ final class ChatAnthropicTest extends TestCase
         self::assertCount(2, $http->requests);
     }
 
+    public function testBoundCacheControlReachesInvocationParamsButPerCallOptionWins(): void
+    {
+        $model = new ChatAnthropic(['apiKey' => 'sk-test', 'model' => 'claude-sonnet-4-5']);
+        $tool = tool(static fn (array $i): string => 'x', ['name' => 'noop', 'description' => 'noop', 'schema' => Schema::object([])]);
+        $bound = $model->bindTools([$tool], ['cache_control' => ['type' => 'ephemeral', 'ttl' => '1h']]);
+
+        self::assertSame(['type' => 'ephemeral', 'ttl' => '1h'], $bound->invocationParams()['cache_control']);
+        self::assertSame(['type' => 'ephemeral', 'ttl' => '5m'], $bound->invocationParams(['cache_control' => ['type' => 'ephemeral', 'ttl' => '5m']])['cache_control']);
+        self::assertArrayNotHasKey('cache_control', $model->invocationParams());
+    }
+
+    public function testBoundCamelCaseCacheControlIsForwardedAndANonArrayValueIsIgnored(): void
+    {
+        $model = new ChatAnthropic(['apiKey' => 'sk-test', 'model' => 'claude-sonnet-4-5']);
+
+        self::assertSame(['type' => 'ephemeral'], $model->bindTools([], ['cacheControl' => ['type' => 'ephemeral']])->invocationParams()['cache_control']);
+        self::assertArrayNotHasKey('cache_control', $model->bindTools([], ['cache_control' => 'ephemeral'])->invocationParams());
+    }
+
     /**
      * Folding must not mutate a message the caller still owns.
      *
