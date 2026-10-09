@@ -69,7 +69,8 @@ final class FakeServerTransport implements TransportInterface
     /** @var list<array<string, mixed>> */
     private array $outbox = [];
 
-    private ?float $requestTimeout = null;
+    /** @var list<float> every request timeout the client set, in seconds */
+    public array $requestTimeouts = [];
 
     /**
      * @param array<string, mixed> $options the connection options the factory was asked to build for
@@ -136,7 +137,7 @@ final class FakeServerTransport implements TransportInterface
 
     public function setRequestTimeout(float $seconds): void
     {
-        $this->requestTimeout = $seconds;
+        $this->requestTimeouts[] = $seconds;
     }
 
     public function setProtocolVersion(string $version): void
