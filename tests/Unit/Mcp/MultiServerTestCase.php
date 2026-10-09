@@ -45,12 +45,15 @@ abstract class MultiServerTestCase extends TestCase
     /**
      * @param array<string, mixed> $config
      */
-    protected function adapter(array $config, ?FakeTransportFactory $factory = null): MultiServerMcpClient
+    protected function adapter(array $config, ?FakeTransportFactory $factory = null, ?callable $duringSleep = null): MultiServerMcpClient
     {
         $client = new MultiServerMcpClient($config, [
             'transportFactory' => $factory ?? $this->factory,
-            'sleep' => function (int $milliseconds): void {
+            'sleep' => function (int $milliseconds) use ($duringSleep): void {
                 $this->sleeps[] = $milliseconds;
+                if ($duringSleep !== null) {
+                    $duringSleep($milliseconds);
+                }
             },
         ]);
         $this->clients[] = $client;
@@ -85,6 +88,24 @@ abstract class MultiServerTestCase extends TestCase
     protected static function http(array $extra = []): array
     {
         return [...['mode' => 'legacy', 'transport' => 'http', 'url' => 'http://localhost:8000/mcp', 'automaticSSEFallback' => false], ...$extra];
+    }
+
+    /**
+     * Queue one scripted server per connection, in the order the servers are declared, each
+     * advertising its own tools.
+     *
+     * @param list<string> ...$toolsPerServer tool names
+     */
+    protected function serversWithTools(array ...$toolsPerServer): void
+    {
+        foreach ($toolsPerServer as $names) {
+            $this->factory->script(static function (FakeServerTransport $transport) use ($names): void {
+                $transport->tools = array_map(
+                    static fn (string $name): array => ['name' => $name, 'description' => ucfirst($name), 'inputSchema' => []],
+                    $names,
+                );
+            });
+        }
     }
 
     /** @return list<string> */

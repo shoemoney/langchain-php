@@ -358,8 +358,9 @@ final class MultiServerMcpClient
                 }
 
                 // A login can complete later, so an authentication failure must not block the
-                // server for this client's lifetime.
-                if (!Errors::isAuthenticationError($error)) {
+                // server for this client's lifetime. Neither does a failure that a restart
+                // already repaired while it was being raised: the server is connected again.
+                if (!Errors::isAuthenticationError($error) && !$this->clientConnections->has($this->transportOptions($serverName, $options))) {
                     $this->failedServers[$key] = true;
                 }
             }
