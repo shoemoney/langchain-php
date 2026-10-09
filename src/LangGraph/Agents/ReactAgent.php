@@ -17,6 +17,7 @@ use LangGraph\Agents\Nodes\BeforeModelNode;
 use LangGraph\Agents\Nodes\MiddlewareNode;
 use LangGraph\Agents\Nodes\ToolNode;
 use LangGraph\Agents\Nodes\Utils as NodeUtils;
+use LangGraph\Agents\Transformers\AgentRunStream;
 use LangGraph\Agents\Transformers\SubagentTransformer;
 use LangGraph\Agents\Transformers\ToolCallTransformer;
 use LangGraph\Pregel\Command;
@@ -887,7 +888,7 @@ final class ReactAgent
     /**
      * Stream events from the compiled graph.
      *
-     * `v1` / `v2` yield the event stream of the compiled graph. `v3` returns a {@see RunStream}: protocol events
+     * `v1` / `v2` yield the event stream of the compiled graph. `v3` returns an {@see AgentRunStream}: protocol events
      * plus the `messages()`, `values()`, `output()`, `lifecycle()` and `subgraphs()` projections, the agent's own
      * `toolCalls` and `subagents` (read as properties) and the `extensions` of every registered stream
      * transformer. Transformers register in this order: the built-in {@see ToolCallTransformer} and
@@ -898,9 +899,9 @@ final class ReactAgent
      * @param array<string, mixed>|Command|null        $state
      * @param RunnableConfig|array<string, mixed>|null $config `transformers` (v3 only) adds call-site stream transformers
      * @param array<string, mixed>                     $streamOptions
-     * @return \Generator<int, mixed>|RunStream
+     * @return \Generator<int, mixed>|AgentRunStream
      */
-    public function streamEvents(mixed $state, RunnableConfig|array|null $config = null, string $version = 'v2', array $streamOptions = []): \Generator|RunStream
+    public function streamEvents(mixed $state, RunnableConfig|array|null $config = null, string $version = 'v2', array $streamOptions = []): \Generator|AgentRunStream
     {
         if ($version === 'v3' && $streamOptions === []) {
             $callSiteTransformers = [];
@@ -911,7 +912,7 @@ final class ReactAgent
             $mergedConfig = $this->configForRun($config);
             $initializedState = $this->initializeMiddlewareStates($state, $mergedConfig);
 
-            return RunStream::create($this->compiled, $initializedState, $mergedConfig, [
+            return AgentRunStream::create($this->compiled, $initializedState, $mergedConfig, [
                 ...$this->streamTransformers(),
                 ...$callSiteTransformers,
             ]);

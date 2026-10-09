@@ -11,9 +11,10 @@ use LangChain\Tools\Schema;
 use LangGraph\Agents\Agent;
 use LangGraph\Agents\Middleware;
 use LangGraph\Agents\ReactAgent;
+use LangGraph\Agents\Transformers\AgentMessageStream;
+use LangGraph\Agents\Transformers\AgentRunStream;
 use LangGraph\Agents\Transformers\ToolCallStream;
 use LangGraph\Stream\AbstractStreamTransformer;
-use LangGraph\Stream\ChatModelStream;
 use LangGraph\Stream\RunStream;
 use LangGraph\Stream\StreamChannel;
 use LangGraph\Stream\StreamTransformer;
@@ -90,9 +91,10 @@ final class ReactAgentStreamV3Test extends TestCase
     {
         $run = self::weatherAgent()->streamEvents(self::input(), null, 'v3');
 
+        self::assertInstanceOf(AgentRunStream::class, $run);
         self::assertInstanceOf(RunStream::class, $run);
 
-        $texts = array_map(static fn (ChatModelStream $m): string => $m->text(), iterator_to_array($run->messages(), false));
+        $texts = array_map(static fn (AgentMessageStream $m): string => $m->text(), iterator_to_array($run->messages(), false));
         self::assertSame(['', 'It is sunny in Tokyo.'], $texts);
 
         $toolCalls = iterator_to_array($run->toolCalls, false);
@@ -112,6 +114,33 @@ final class ReactAgentStreamV3Test extends TestCase
         self::assertSame(['human', 'ai', 'tool', 'ai'], array_map(static fn ($m): string => $m->type, $final['messages']));
         self::assertSame('It is sunny in Tokyo.', $final['messages'][3]->content);
         self::assertFalse($run->interrupted());
+    }
+
+    public function testMessagesReadLikeMessagesAndLikeChatModelStreams(): void
+    {
+        $run = self::weatherAgent()->streamEvents(self::input(), null, 'v3');
+
+        $messages = iterator_to_array($run->messages(), false);
+
+        self::assertCount(2, $messages);
+        self::assertContainsOnlyInstancesOf(AgentMessageStream::class, $messages);
+        self::assertTrue(isset($messages[1]->content));
+        self::assertSame('It is sunny in Tokyo.', $messages[1]->content);
+        self::assertSame($messages[1]->text(), $messages[1]->content);
+        self::assertSame(['model_request'], [$messages[1]->node()]);
+        self::assertSame('message-start', iterator_to_array($messages[1], false)[0]['event']);
+        self::assertFalse(isset($messages[1]->nothing));
+    }
+
+    public function testMessagesFromNarrowsToOneNode(): void
+    {
+        $run = self::weatherAgent()->streamEvents(self::input(), null, 'v3');
+
+        $fromModel = iterator_to_array($run->messagesFrom('model_request'), false);
+        $fromTools = iterator_to_array($run->messagesFrom('tools'), false);
+
+        self::assertSame(['', 'It is sunny in Tokyo.'], array_map(static fn (AgentMessageStream $m): string => $m->content, $fromModel));
+        self::assertSame([], $fromTools);
     }
 
     public function testEventsCarryTheAgentsNodesAndTheToolLifecycle(): void
