@@ -38,6 +38,9 @@ final class Runtime
      *
      * The store reaches the config through `configurable['__pregel_store']`, the key the engine uses
      * (spelled out here because upstream reads `config.store`, which this port keeps under that key).
+     * The writer is the function `Pregel::stream()` publishes under `options['writer']` (upstream's
+     * `config.writer`), with `configurable['writer']` as the fallback `Config::getWriter()` also honours;
+     * it is a callable, or null when the config carries none.
      */
     public static function fromConfig(?RunnableConfig $config): self
     {
@@ -46,12 +49,13 @@ final class Runtime
         }
 
         $store = $config->configurable['__pregel_store'] ?? null;
+        $writer = $config->options['writer'] ?? $config->configurable['writer'] ?? null;
         $toolCallId = \is_array($config->toolCall) ? ($config->toolCall['id'] ?? null) : null;
 
         return new self(
             context: $config->context,
             store: \is_object($store) ? $store : null,
-            writer: $config->configurable['writer'] ?? null,
+            writer: \is_callable($writer) ? $writer : null,
             interrupt: $config->configurable['interrupt'] ?? null,
             signal: $config->signal,
             toolCallId: $toolCallId,

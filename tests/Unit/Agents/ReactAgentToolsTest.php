@@ -22,8 +22,7 @@ use function LangChain\Tools\tool;
 /**
  * `langchain/src/agents/tests/tools.test.ts`.
  *
- * Not asserted from the first case: `runtime.writer` being a function (nothing injects a stream writer into a
- * tool runtime in this port yet) and the store's class name (`AsyncBatchedStore` upstream).
+ * Not asserted from the first case: the store's class name (`AsyncBatchedStore` upstream).
  */
 #[CoversClass(ReactAgent::class)]
 final class ReactAgentToolsTest extends TestCase
@@ -67,6 +66,7 @@ final class ReactAgentToolsTest extends TestCase
         self::assertSame('baz', $runtimes[0]->state['bar']);
         self::assertSame(['foo' => 'bar'], $runtimes[0]->context);
         self::assertSame('1', $runtimes[0]->toolCallId);
+        self::assertIsCallable($runtimes[0]->writer);
         self::assertIsObject($runtimes[0]->store);
     }
 
