@@ -168,6 +168,9 @@ final class ThreadStream
                     // are observable side-channel failures, not stream closure.
                     if (($event['id'] ?? null) === null) {
                         $this->fireError(new ProtocolError($event));
+                        if ($this->closed || $this->source === null) {
+                            return false;
+                        }
                     }
                     continue;
                 }
@@ -517,7 +520,7 @@ final class ThreadStream
                 ? [$event['params']['data']['payload'] ?? null] : []);
     }
 
-    /** Source onError registration; callbacks run synchronously during pulls. */
+    /** Synchronous observers may close; do not drive this stream through pull/output/projection reads while its generator runs. */
     public function onError(callable $listener): \Closure
     {
         $id = array_search($listener, $this->errorListeners, true);
