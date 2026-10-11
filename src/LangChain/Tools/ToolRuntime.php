@@ -29,7 +29,8 @@ final class ToolRuntime
      *                                        graph's `LangGraph\Store\BaseStore`. It is typed `object` because
      *                                        `@langchain/core` does not depend on the graph package, and its own
      *                                        `BaseStore` (`stores.ts`) is a different, key-value, interface.
-     * @param callable|null        $writer    Stream writer for progressive output.
+     * @param callable|null        $writer    Stream writer for progressive output: inside a graph run, calling it
+     *                                        emits a `custom` stream chunk. Null when no callable is supplied.
      */
     public function __construct(
         public array $state = [],
@@ -55,6 +56,12 @@ final class ToolRuntime
             return null;
         }
 
+        // The graph engine publishes its custom-stream writer under `options['writer']` on every run, and
+        // `configurable['writer']` is the fallback for a caller that set it there (the lookup
+        // `Config::getWriter()` makes). Plain keys again, so this package still imports nothing from the
+        // graph package. Without a supplied callable, the writer stays null.
+        $writer = $config->options['writer'] ?? $config->configurable['writer'] ?? null;
+
         return new self(
             state: (array) ($config->configurable['__state'] ?? []),
             toolCallId: is_string($config->toolCall['id'] ?? null) ? $config->toolCall['id'] : '',
@@ -63,11 +70,11 @@ final class ToolRuntime
             context: $config->context,
             // The graph engine publishes its store under `__pregel_store` (`Constants::CONFIG_KEY_STORE`)
             // on the task config; a tool run outside a graph has none. The key is spelled out because
-            // this package must not import the graph package. `writer` stays at its default: nothing
-            // injects one yet.
+            // this package must not import the graph package.
             store: is_object($config->configurable['__pregel_store'] ?? null)
                 ? $config->configurable['__pregel_store']
                 : null,
+            writer: is_callable($writer) ? $writer : null,
         );
     }
 }
