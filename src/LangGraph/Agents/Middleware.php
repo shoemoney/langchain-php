@@ -33,8 +33,8 @@ use LangGraph\Agents\Middleware\Types;
  *  - `stateSchema`: the middleware state, persisted between invocations;
  *  - `contextSchema`: the middleware context, read-only and not persisted;
  *  - `tools`: additional tools registered by the middleware;
- *  - `streamTransformers`: stream transformer factories registered by the middleware (recorded on the
- *    middleware; this port has no transformer protocol to merge them into, see `ReactAgent`);
+ *  - `streamTransformers`: stream transformer factories registered by the middleware on each v3 run stream,
+ *    before agent-option and call-site transformers (see `ReactAgent`);
  *  - `wrapToolCall`: `fn(array $request, callable $handler): ToolMessage|Command`. Wraps tool execution, to
  *    modify the call, handle errors and retry, post-process the result, cache, log, or return a `Command`.
  *    `$request` is `['toolCall' => …, 'tool' => …, 'state' => …, 'runtime' => Runtime]`;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\Mcp;
 
+use LangChain\Utils\JsonSchemaValidator as CoreJsonSchemaValidator;
 use LangGraph\Mcp\JsonSchemaValidator;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -14,6 +15,7 @@ use PHPUnit\Framework\TestCase;
  * tools and elicitation answers depend on.
  */
 #[CoversClass(JsonSchemaValidator::class)]
+#[CoversClass(\LangChain\Utils\JsonSchemaValidator::class)]
 final class JsonSchemaValidatorTest extends TestCase
 {
     /** @return array<string, array{0: mixed, 1: mixed, 2: bool}> */
@@ -79,7 +81,10 @@ final class JsonSchemaValidatorTest extends TestCase
     #[DataProvider('cases')]
     public function testValidates(mixed $value, mixed $schema, bool $valid): void
     {
-        self::assertSame($valid, JsonSchemaValidator::validate($value, $schema) === []);
+        $issues = JsonSchemaValidator::validate($value, $schema);
+
+        self::assertSame($valid, $issues === []);
+        self::assertSame(CoreJsonSchemaValidator::validate($value, $schema), $issues, 'MCP must preserve every core issue and its order');
     }
 
     public function testMessagesAreAjvStyleWithAnInstancePointer(): void

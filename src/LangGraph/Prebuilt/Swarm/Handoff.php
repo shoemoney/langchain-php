@@ -83,15 +83,14 @@ final class Handoff
     /**
      * The agents an agent can hand off to, read from the metadata of the tools on its `tools` node.
      *
-     * Port of `getHandoffDestinations`. Upstream goes through `agent.getGraph()`, which this port does not
-     * have yet (WP-06), so the node is read from `$agent->nodes` directly.
+     * Port of `getHandoffDestinations`: read the live tool node data from the public graph.
      *
      * @return list<string>
      */
     public static function getHandoffDestinations(CompiledStateGraph $agent, string $toolNodeName = ReactAgent::NODE_TOOLS): array
     {
-        $node = $agent->nodes[$toolNodeName] ?? null;
-        $toolNode = $node?->bound;
+        $node = $agent->getGraph()->nodes[$toolNodeName] ?? null;
+        $toolNode = $node?->data;
         if (!$toolNode instanceof ToolNode) {
             return [];
         }

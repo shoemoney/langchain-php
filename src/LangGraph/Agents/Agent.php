@@ -34,7 +34,7 @@ namespace LangGraph\Agents;
  *  - `includeAgentName`: `"inline"` to put the agent name into the message text the model sees;
  *  - `signal`: an abort signal (a callable returning `true`/a throwable once aborted, or an object with `aborted`);
  *  - `version`: `"v2"` (default) sends each tool call to the tools node on its own; `"v1"` runs all of a message's calls in one task;
- *  - `streamTransformers`: accepted for parity; there is no transformer protocol to merge them into.
+ *  - `streamTransformers`: transformers registered on v3 run streams after middleware transformers.
  */
 final class Agent
 {

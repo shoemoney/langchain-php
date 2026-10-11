@@ -306,10 +306,12 @@ abstract class BaseChatModel extends BaseLanguageModel
         ?array $callbacks,
         ?RunnableConfig $config,
     ): RunnableConfig {
-        return RunnableConfig::mergeConfigs(
-            new RunnableConfig(callbacks: $callbacks ?? []),
-            $config ?? new RunnableConfig(),
-        );
+        $merged = clone ($config ?? new RunnableConfig());
+        if ($merged->callbacks === []) {
+            $merged->callbacks = $callbacks ?? [];
+        }
+
+        return $merged;
     }
 
     /**
@@ -370,7 +372,7 @@ abstract class BaseChatModel extends BaseLanguageModel
         );
 
         $runManagers = $callbackManager?->handleChatModelStart(
-            new Serialized(static::lcId(), $this->kwargs()),
+            $callbackManager->handlers === [] ? new Serialized(static::lcId(), []) : Serialized::fromArray($this->toJson()),
             array_map(static fn (array $m): array => self::coerceMessages($m), $messageLists),
             $config?->runId[0] ?? null,
             ['options' => $options, 'invocation_params' => $invocationParams, 'batch_size' => 1],
@@ -537,7 +539,7 @@ abstract class BaseChatModel extends BaseLanguageModel
         );
 
         $runManagers = $callbackManager?->handleChatModelStart(
-            new Serialized(static::lcId(), $this->kwargs()),
+            $callbackManager->handlers === [] ? new Serialized(static::lcId(), []) : Serialized::fromArray($this->toJson()),
             [$messages],
             $config?->runId[0] ?? null,
             ['options' => $options, 'invocation_params' => $invocationParams, 'batch_size' => 1],

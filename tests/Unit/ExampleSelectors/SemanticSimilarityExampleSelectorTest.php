@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace LangChain\Tests\Unit\ExampleSelectors;
 
 use LangChain\ExampleSelectors\SemanticSimilarityExampleSelector;
+use LangChain\Prompts\FewShotPromptTemplate;
+use LangChain\Prompts\PromptTemplate;
 use LangChain\VectorStores\MemoryVectorStore;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -33,6 +35,20 @@ final class SemanticSimilarityExampleSelectorTest extends TestCase
 
         $this->assertSame([['input' => 'tall', 'output' => 'short']], $selector->selectExamples(['adjective' => 'short']));
         $this->assertSame([['input' => 'sunny', 'output' => 'gloomy']], $selector->selectExamples(['adjective' => 'gloomy']));
+    }
+
+    public function testARealFewShotPromptFormatsTheSelectedExample(): void
+    {
+        $selector = SemanticSimilarityExampleSelector::fromExamples(self::EXAMPLES, new KeywordEmbeddings(), MemoryVectorStore::class, ['k' => 1]);
+        $prompt = new FewShotPromptTemplate(
+            examplePrompt: PromptTemplate::fromTemplate("Input: {input}\nOutput: {output}"),
+            exampleSelector: $selector,
+            inputVariables: ['adjective'],
+            prefix: 'Give the antonym of every input',
+            suffix: "Input: {adjective}\nOutput:",
+        );
+
+        self::assertSame("Give the antonym of every input\n\nInput: tall\nOutput: short\n\nInput: short\nOutput:", $prompt->format(['adjective' => 'short']));
     }
 
     public function testKDefaultsToFour(): void

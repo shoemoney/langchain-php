@@ -64,7 +64,7 @@ final class Constants
             'initialDelayMs' => self::DEFAULT_INITIAL_DELAY_MS,
             'maxDelayMs' => self::DEFAULT_MAX_DELAY_MS,
         ] as $key => $default) {
-            $value = $config[$key] ?? $default;
+            $value = \array_key_exists($key, $config) ? $config[$key] : $default;
             if (!\is_int($value) && !\is_float($value)) {
                 $issues[] = [
                     'path' => [$key],
@@ -78,14 +78,14 @@ final class Constants
             }
         }
 
-        $jitter = $config['jitter'] ?? self::DEFAULT_JITTER;
+        $jitter = \array_key_exists('jitter', $config) ? $config['jitter'] : self::DEFAULT_JITTER;
         if (!\is_bool($jitter)) {
             $issues[] = ['path' => ['jitter'], 'code' => 'invalid_type', 'message' => 'Expected boolean, received ' . self::receivedType($jitter)];
         } else {
             $data['jitter'] = $jitter;
         }
 
-        $retryOn = $config['retryOn'] ?? self::defaultRetryOn();
+        $retryOn = \array_key_exists('retryOn', $config) ? $config['retryOn'] : self::defaultRetryOn();
         $normalised = self::normaliseRetryOn($retryOn);
         if ($normalised === null) {
             $issues[] = ['path' => ['retryOn'], 'code' => 'invalid_union', 'message' => 'Invalid input'];
@@ -125,7 +125,7 @@ final class Constants
     private static function receivedType(mixed $value): string
     {
         return match (true) {
-            $value === null => 'undefined',
+            $value === null => 'null',
             \is_string($value) => 'string',
             \is_bool($value) => 'boolean',
             \is_array($value) => 'array',

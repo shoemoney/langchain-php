@@ -62,6 +62,8 @@ class Fireworks extends LLM
 
     private AsyncCaller $caller;
 
+    private bool $serializationOrganizationResolved = false;
+
     /**
      * @param string|array<string, mixed> $modelOrFields A model name, or the full field bag.
      * @param array<string, mixed>        $fields        Used when the first argument is a model name.
@@ -82,6 +84,8 @@ class Fireworks extends LLM
         }
 
         $configuration = is_array($fields['configuration'] ?? null) ? $fields['configuration'] : [];
+        $this->serializationOrganizationResolved = ($configuration['organization'] ?? null) !== null
+            || Env::getEnvironmentVariable('OPENAI_ORGANIZATION') !== null;
 
         $this->apiKey = $apiKey;
         $this->fireworksApiKey = $apiKey;
@@ -130,6 +134,40 @@ class Fireworks extends LLM
     public static function lcSecrets(): array
     {
         return ['fireworksApiKey' => 'FIREWORKS_API_KEY', 'apiKey' => 'FIREWORKS_API_KEY'];
+    }
+
+    /** @return array<string, array{property: string, secret: string, key: string}>|null */
+    protected function credentialSerialization(): ?array
+    {
+        if (static::class !== self::class) {
+            return parent::credentialSerialization();
+        }
+
+        return [
+            'openAIApiKey' => ['property' => 'apiKey', 'secret' => 'OPENAI_API_KEY', 'key' => 'openai_api_key'],
+            'apiKey' => ['property' => 'apiKey', 'secret' => 'OPENAI_API_KEY', 'key' => 'openai_api_key'],
+            'fireworksApiKey' => ['property' => 'fireworksApiKey', 'secret' => 'FIREWORKS_API_KEY', 'key' => 'fireworks_api_key'],
+            'organization' => ['property' => 'serializationOrganization', 'secret' => 'OPENAI_ORGANIZATION', 'key' => 'organization'],
+        ];
+    }
+
+    protected function serializationCredentialIsResolved(string $property): bool
+    {
+        if ($property === 'serializationOrganization') {
+            return $this->serializationOrganizationResolved;
+        }
+
+        return parent::serializationCredentialIsResolved($property);
+    }
+
+    /** @return list<string> */
+    protected function credentialSerializationExcludedKeys(): array
+    {
+        if (static::class !== self::class) {
+            return [];
+        }
+
+        return ['openai_api_key', 'configuration'];
     }
 
     /**

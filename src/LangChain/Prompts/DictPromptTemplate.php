@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\Prompts;
 
+use LangChain\Load\Validation;
 use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableConfig;
 
@@ -169,11 +170,11 @@ class DictPromptTemplate extends Runnable implements \JsonSerializable
             'lc' => 1,
             'type' => 'constructor',
             'id' => static::lcId(),
-            'kwargs' => [
+            'kwargs' => Validation::escapeKwargs([
                 'input_variables' => $this->inputVariables,
                 'template' => $this->template,
                 'template_format' => $this->templateFormat,
-            ],
+            ], $this),
         ];
     }
 

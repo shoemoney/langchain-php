@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels\Chat\OpenAI\Azure;
 
+use LangChain\Tracers\CallbackManagerForLLMRun;
+use LangChain\LanguageModels\Chat\OpenAI\OpenAIException;
+use LangChain\LanguageModels\Chat\OpenAI\Utils\Azure;
 use LangChain\LanguageModels\Chat\OpenAI\Utils\ConfiguresAzureOpenAI;
+use LangChain\Messages\BaseMessage;
+use LangChain\Utils\Env;
+use LangChain\LanguageModels\Outputs\ChatResult;
 
 /**
  * What {@see AzureChatOpenAI}, {@see AzureChatOpenAICompletions} and
@@ -20,6 +26,9 @@ use LangChain\LanguageModels\Chat\OpenAI\Utils\ConfiguresAzureOpenAI;
 trait AzureChatModel
 {
     use ConfiguresAzureOpenAI;
+
+    /** @var array<string, mixed> SDK request options for this request's clone. */
+    protected array $azureRequestOptions = [];
 
     /** `AZURE_ALIASES`: constructor field name to serialized key. */
     public const AZURE_ALIASES = [
@@ -70,7 +79,8 @@ trait AzureChatModel
                 'model' => $modelOrFields,
                 'deploymentName' => $modelOrFields,
                 'azureOpenAIApiDeploymentName' => $modelOrFields,
-            ] + $fieldsArg;
+            ...$fieldsArg,
+            ];
         }
 
         return $modelOrFields ?? $fieldsArg;
@@ -100,19 +110,126 @@ trait AzureChatModel
     }
 
     /**
-     * @return array<string, string>
+     * Request options belong to a clone so suspended streams cannot leak them
+     * into another call on the same model.
+     *
+     * @param list<BaseMessage>    $messages
+     * @param array<string, mixed> $options
      */
-    protected function headers(): array
+    protected function generate(array $messages, array $options = [], ?CallbackManagerForLLMRun $runManager = null): ChatResult
     {
-        return ['Content-Type' => 'application/json'] + $this->azureHeaders();
+        $client = clone $this;
+        $client->azureRequestOptions = (array) ($options['options'] ?? []);
+
+        return $client->azureGenerate($messages, $options, $runManager);
+    }
+
+    /** @param list<BaseMessage> $messages
+     *  @param array<string, mixed> $options
+     */
+    private function azureGenerate(array $messages, array $options, ?CallbackManagerForLLMRun $runManager): ChatResult
+    {
+        return parent::generate($messages, $options, $runManager);
+    }
+
+    /** @param list<BaseMessage> $messages
+     *  @param array<string, mixed> $options
+     *  @return \Generator<int, \LangChain\LanguageModels\Outputs\ChatGenerationChunk>
+     */
+    protected function streamResponseChunks(array $messages, array $options = [], ?CallbackManagerForLLMRun $runManager = null): \Generator
+    {
+        $client = clone $this;
+        $client->azureRequestOptions = (array) ($options['options'] ?? []);
+
+        yield from $client->azureStreamResponseChunks($messages, $options, $runManager);
+    }
+
+    /** @param list<BaseMessage> $messages
+     *  @param array<string, mixed> $options
+     *  @return \Generator<int, \LangChain\LanguageModels\Outputs\ChatGenerationChunk>
+     */
+    private function azureStreamResponseChunks(array $messages, array $options, ?CallbackManagerForLLMRun $runManager): \Generator
+    {
+        yield from parent::streamResponseChunks($messages, $options, $runManager);
+    }
+
+    /** @return array<string, mixed> */
+    private function azureOptions(): array
+    {
+        return [...(array) ($this->azureConstructorFields['configuration'] ?? []), ...$this->azureRequestOptions];
     }
 
     /**
-     * @return array<string, mixed>
+     * SDK 7.10 inserts a deployment only for deployment-scoped operations,
+     * based on the client's generated root. Per-request baseURL is ignored.
+     *
+     * @param bool $deploymentScoped Whether the SDK injects a deployment path.
      */
+    protected function azureProtocolUrl(string $path, bool $deploymentScoped): string
+    {
+        $root = $this->azureRoot();
+        if ($deploymentScoped && !str_contains($root, '/deployments')) {
+            $path = '/deployments/' . ($this->azureOpenAIApiDeploymentName ?? $this->model) . $path;
+        }
+        if (!$deploymentScoped) {
+            // Azure's preview Responses REST route is resource scoped. Keep
+            // this provider-compatible correction to the pinned SDK's route.
+            $at = strpos($root, '/deployments/');
+            $root = $at === false ? $root : substr($root, 0, $at);
+        }
+
+        return $root . $path;
+    }
+
+    /** @return array<string, string> */
+    protected function headers(): array
+    {
+        $options = $this->azureOptions();
+        $headers = ['Content-Type' => 'application/json'];
+        if ($this->azureADTokenProvider !== null) {
+            $token = ($this->azureADTokenProvider)();
+            if (!is_string($token) || $token === '') {
+                throw new OpenAIException('azureADTokenProvider must return a non-empty string.', 0, '');
+            }
+            $headers['Authorization'] = 'Bearer ' . $token;
+        } elseif ($this->azureOpenAIApiKey === null || $this->azureOpenAIApiKey === '') {
+            // Retain the shared missing-credentials error.
+            return $headers + $this->azureHeaders();
+        }
+        $configuration = (array) ($this->azureConstructorFields['configuration'] ?? []);
+        $defaults = Azure::getHeadersWithUserAgent((array) ($configuration['defaultHeaders'] ?? []), true, Azure::AZURE_VERSION);
+        $requestHeaders = (array) ($options['headers'] ?? []);
+        if ($this->azureOpenAIApiKey !== null && $this->azureOpenAIApiKey !== '') {
+            $requestHeaders = ['api-key' => $this->azureOpenAIApiKey, ...$requestHeaders];
+        }
+        // HTTP header names are case-insensitive; request headers win.
+        foreach ([...$defaults, ...$requestHeaders] as $name => $value) {
+            foreach (array_keys($headers) as $existing) {
+                if (strcasecmp($existing, (string) $name) === 0) {
+                    unset($headers[$existing]);
+                }
+            }
+            if ($value !== null) {
+                $headers[(string) $name] = (string) $value;
+            }
+        }
+
+        return $headers;
+    }
+
+    /** @return array<string, mixed> */
     protected function query(): array
     {
-        return $this->azureQuery();
+        $options = $this->azureOptions();
+
+        $configuration = (array) ($this->azureConstructorFields['configuration'] ?? []);
+        $version = $configuration['apiVersion'] ?? $this->azureOpenAIApiVersion ?? Env::getEnvironmentVariable('OPENAI_API_VERSION');
+        $query = [...(array) ($configuration['defaultQuery'] ?? []), ...($version === null ? [] : ['api-version' => $version])];
+        if ($this->azureOpenAIApiKey !== null && $this->azureOpenAIApiKey !== '' && $this->azureOpenAIApiVersion !== null) {
+            $query = [...$query, ...$this->azureQuery()];
+        }
+
+        return [...$query, ...(array) ($options['query'] ?? [])];
     }
 
     /**

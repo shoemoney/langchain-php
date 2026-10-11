@@ -1,6 +1,8 @@
 # langchain-php completion plan
 
 Dependency-ordered work packages (WP) to finish the port. Planned 2026-10-07.
+Waves 0–5 are exhausted. The active continuation is
+[`COMPLETION_NEXT.md`](COMPLETION_NEXT.md), started 2026-10-09.
 Each WP is sized for one implementer session. Upstream reference sources are
 READ ONLY (never modify anything under `/Users/shoemoney/Projects/agentdesk`).
 

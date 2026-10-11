@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangGraph\Store;
 
+use LangChain\Utils\MathUtils;
+
 /**
  * Path, filter and similarity helpers shared by the stores.
  *
@@ -149,26 +151,7 @@ final class StoreUtils
      */
     public static function cosineSimilarity(array $vector1, array $vector2): float
     {
-        if (count($vector1) !== count($vector2)) {
-            throw new \InvalidArgumentException('Vectors must have the same length');
-        }
-
-        $dot = 0.0;
-        $mag1 = 0.0;
-        $mag2 = 0.0;
-        foreach ($vector1 as $i => $value) {
-            $dot += $value * $vector2[$i];
-            $mag1 += $value * $value;
-            $mag2 += $vector2[$i] * $vector2[$i];
-        }
-        $mag1 = sqrt($mag1);
-        $mag2 = sqrt($mag2);
-
-        if ($mag1 === 0.0 || $mag2 === 0.0) {
-            return 0.0;
-        }
-
-        return $dot / ($mag1 * $mag2);
+        return MathUtils::cosineSimilarityVectors($vector1, $vector2);
     }
 
     /**

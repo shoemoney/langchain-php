@@ -283,14 +283,14 @@ final class PregelStreamMessagesTest extends TestCase
         self::streamAll($graph);
     }
 
-    public function testMessagesAndToolsAreAcceptedButTasksStillRefused(): void
+    public function testMessagesAndToolsAreAcceptedAndUnknownModesStillRefused(): void
     {
         self::assertSame(['messages', 'tools'], Pregel::HANDLER_STREAM_MODES);
         self::assertNotContains('messages', Pregel::SUPPORTED_STREAM_MODES, 'the loop-emitted set is pinned elsewhere');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessageMatches('/Unsupported stream mode.*tasks/');
+        $this->expectExceptionMessageMatches('/Unsupported stream mode.*unknown_mode/');
 
-        self::streamAll(self::agentGraph(self::model(['x']), ['messages', 'tasks']));
+        self::streamAll(self::agentGraph(self::model(['x']), ['messages', 'unknown_mode']));
     }
 }

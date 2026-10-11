@@ -19,9 +19,6 @@ use LangChain\Utils\MathUtils;
  *  - results are sorted by a real stable descending sort. Upstream's comparator
  *    `(a > b ? -1 : 0)` is not a valid ordering and its own test pins the
  *    correct order, so that is what is ported;
- *  - `Document` has no `id` in this port, so a row's id is read from an `id`
- *    property when the document has one and is never written back onto the
- *    documents search returns.
  *
  * The filter is a `callable(Document): bool`.
  */
@@ -83,7 +80,7 @@ class MemoryVectorStore extends VectorStore
         $rows = [];
         $index = 0;
         foreach ($this->memoryVectors as $vector) {
-            if ($filter !== null && !$filter(new Document($vector->content, $vector->metadata))) {
+            if ($filter !== null && !$filter(new Document($vector->content, $vector->metadata, $vector->id))) {
                 continue;
             }
             $rows[] = [
@@ -104,7 +101,7 @@ class MemoryVectorStore extends VectorStore
     public function similaritySearchVectorWithScore(array $query, int $k, mixed $filter = null): array
     {
         return array_map(
-            static fn (array $search): array => [new Document($search['content'], $search['metadata']), $search['similarity']],
+            static fn (array $search): array => [new Document($search['content'], $search['metadata'], $search['id']), $search['similarity']],
             $this->queryVectors($query, $k, $filter),
         );
     }
@@ -133,7 +130,7 @@ class MemoryVectorStore extends VectorStore
         );
 
         return array_map(
-            static fn (int $idx): Document => new Document($searches[$idx]['content'], $searches[$idx]['metadata']),
+            static fn (int $idx): Document => new Document($searches[$idx]['content'], $searches[$idx]['metadata'], $searches[$idx]['id']),
             $mmrIndexes,
         );
     }

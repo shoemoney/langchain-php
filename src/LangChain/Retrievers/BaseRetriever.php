@@ -42,7 +42,7 @@ abstract class BaseRetriever extends BaseLangChain implements BaseRetrieverInter
      */
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
-        $config ??= new RunnableConfig();
+        $config = RunnableConfig::normalizeFields($config);
 
         $callbackManager = $this->callbackManagerFor($config);
         if ($callbackManager !== null) {

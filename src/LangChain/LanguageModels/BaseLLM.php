@@ -127,7 +127,7 @@ abstract class BaseLLM extends BaseLanguageModel
         );
 
         $runManagers = $callbackManager?->handleLLMStart(
-            new Serialized(static::lcId(), $this->kwargs()),
+            $callbackManager->handlers === [] ? new Serialized(static::lcId(), []) : Serialized::fromArray($this->toJson()),
             $prompts,
             $config?->runId[0] ?? null,
             ['options' => $options, 'invocation_params' => $invocationParams, 'batch_size' => count($prompts)],
@@ -257,7 +257,7 @@ abstract class BaseLLM extends BaseLanguageModel
         );
 
         $runManagers = $callbackManager?->handleLLMStart(
-            new Serialized(static::lcId(), $this->kwargs()),
+            $callbackManager->handlers === [] ? new Serialized(static::lcId(), []) : Serialized::fromArray($this->toJson()),
             [$prompt],
             $config?->runId[0] ?? null,
             ['options' => $options, 'invocation_params' => $invocationParams, 'batch_size' => 1],

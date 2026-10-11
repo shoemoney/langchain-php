@@ -97,6 +97,15 @@ class ChatXAI extends ChatOpenAICompletions
         $this->searchParameters = is_array($searchParameters) ? $searchParameters : null;
     }
 
+    /** @return array{lc: int, type: string, id: list<string>, kwargs: array<string, mixed>} */
+    public function toSerializedConstructor(): array
+    {
+        $result = parent::toSerializedConstructor();
+        unset($result['kwargs']['openai_api_key'], $result['kwargs']['configuration']);
+
+        return $result;
+    }
+
     public function llmType(): string
     {
         return 'xai';

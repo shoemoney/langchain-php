@@ -23,8 +23,8 @@ use LangGraph\Store\SearchOperation;
  *
  * Port of `MongoDBStore` from `@langchain/langgraph-checkpoint-mongodb` (`store.ts`), over
  * {@see MongoClientInterface} and {@see MongoStoreCollectionInterface} rather than the driver.
- * There is still no production driver adapter in this package: like {@see \LangGraph\Checkpoint\MongoDB\MongoDBSaver}
- * this class has not been run against a real MongoDB by the unit suite.
+ * Optional native adapters are available through {@see MongoDBDriverStoreClient}. Unit tests use
+ * native-shape fakes; native/library-version and real-server behaviour remain separate gates.
  *
  * ## Layout
  *
@@ -35,8 +35,12 @@ use LangGraph\Store\SearchOperation;
  *
  * ## Known non-exact behaviour
  *
- *  - `fromConnString` and client ownership are not ported: the seam has no connect/close, so
- *    `stop()` has nothing to close. {@see self::setup()} is the whole of upstream's `start()`.
+ *  - PHP has no native connect/close methods: `fromConnString` creates lazily during index setup,
+ *    requires an explicit nonempty dbName, and owns a non-persistent client. `stop()` releases the
+ *    lease's reference only; socket closure is not claimed and operations after stop are refused.
+ *    Failures after lease acquisition release once and rethrow the original error (PHP improvement).
+ *  - Owned handshake metadata uses caller driver-key precedence (a PHP adaptation); an already
+ *    created borrowed client cannot append metadata. Native dates lose sub-millisecond precision.
  *  - The seam's `find` has no `skip`, so a search fetches `offset + limit` documents and drops
  *    the first `offset` in PHP. Like upstream, a structured search has no sort order.
  *  - A field filter with several operators (`{$gt: 1, $lt: 5}`) keeps all of them; upstream's
@@ -53,6 +57,8 @@ class MongoDBStore extends BaseStore
 
     protected readonly bool $enableTimestamps;
 
+    private bool $ownsClient = false;
+
     public function __construct(
         protected readonly MongoClientInterface $client,
         ?string $dbName = null,
@@ -65,6 +71,61 @@ class MongoDBStore extends BaseStore
         $this->client->appendMetadata(['name' => 'langgraphjs_store']);
         $this->db = $this->client->db($dbName);
         $this->enableTimestamps = $enableTimestamps;
+    }
+
+    /**
+     * Create an owned optional mongodb/mongodb client and start the store's indexes.
+     * Native creation is lazy; there is no extra ping or claim of server readiness beyond start().
+     *
+     * @param array<string, mixed> $uriOptions
+     * @param array<string, mixed> $driverOptions
+     */
+    public static function fromConnString(
+        string $connString,
+        string $dbName,
+        string $collectionName = 'store',
+        bool $enableTimestamps = false,
+        ?MongoDBTtlConfig $ttl = null,
+        ?EmbeddingsInterface $embeddings = null,
+        ?MongoDBIndexConfig $indexConfig = null,
+        array $uriOptions = [],
+        array $driverOptions = [],
+    ): self {
+        if (array_key_exists('disableClientPersistence', $driverOptions) && $driverOptions['disableClientPersistence'] !== true) {
+            throw new \InvalidArgumentException('MongoDBStore::fromConnString() owns a non-persistent client; disableClientPersistence must be true.');
+        }
+        if (array_key_exists('driver', $driverOptions) && !is_array($driverOptions['driver'])) {
+            throw new \InvalidArgumentException('The "driver" driver option must be an array.');
+        }
+        $driverOptions['disableClientPersistence'] = true;
+
+        $client = static::ownedClient($connString, $uriOptions, $driverOptions);
+        try {
+            $store = new self($client, $dbName, $collectionName, $enableTimestamps, $ttl, $embeddings, $indexConfig);
+            $store->ownsClient = true;
+            $store->start();
+
+            return $store;
+        } catch (\Throwable $error) {
+            try {
+                $client->release();
+            } catch (\Throwable) {
+                // Cleanup cannot replace the original constructor/start error.
+            }
+
+            throw $error;
+        }
+    }
+
+    /** @param array<string, mixed> $uriOptions
+     *  @param array<string, mixed> $driverOptions
+     */
+    protected static function ownedClient(string $connString, array $uriOptions, array $driverOptions): MongoDBOwnedStoreClient
+    {
+        return new MongoDBOwnedStoreClient(
+            static fn (array $options): \MongoDB\Client => new \MongoDB\Client($connString, $uriOptions, $options),
+            $driverOptions,
+        );
     }
 
     /**
@@ -170,9 +231,12 @@ class MongoDBStore extends BaseStore
         $this->setup();
     }
 
-    /** Nothing to release: the caller owns the client. */
+    /** Release an owned lease; borrowed clients retain their caller-owned lifecycle. */
     public function stop(): void
     {
+        if ($this->ownsClient && $this->client instanceof MongoDBOwnedStoreClient) {
+            $this->client->release();
+        }
     }
 
     protected function collection(): MongoStoreCollectionInterface

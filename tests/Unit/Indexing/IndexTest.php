@@ -82,6 +82,26 @@ final class IndexTest extends TestCase
         $this->assertSame($expected, $this->store->memoryVectors[0]->id);
     }
 
+    public function testIndexingGeneratedIdsSurviveRetrievalCopiesAndSerialization(): void
+    {
+        // Core indexing uses content-derived UIDs, rather than a supplied
+        // Document.id, and requires an ids-aware store. This test's existing
+        // fixture provides that contract; vanilla MemoryVectorStore does not.
+        $document = new Document('one', ['source' => 's'], 'source-id');
+        $expected = HashedDocument::fromDocument($document)->uid;
+        $this->assertSame(self::counts(added: 1), $this->indexRun([$document]));
+        $this->assertSame('source-id', $document->id);
+        $this->assertNotSame('source-id', $expected);
+        $this->assertSame([[$expected]], $this->store->addCalls);
+
+        $retrieved = $this->store->similaritySearch('one', 1)[0];
+
+        $this->assertSame($expected, $retrieved->id);
+        $this->assertSame($expected, $retrieved->withPageContent('copy')->withMetadata('copy', true)->id);
+        $this->assertSame($expected, $retrieved->toJson()['kwargs']['id']);
+        $this->assertSame(self::counts(skipped: 1), $this->indexRun([$document]));
+    }
+
     public function testWithoutCleanupAChangedDocumentIsAddedAndTheOldOneStays(): void
     {
         $this->indexRun([self::doc('one'), self::doc('two')]);

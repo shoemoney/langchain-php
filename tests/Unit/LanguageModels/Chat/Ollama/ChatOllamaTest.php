@@ -27,12 +27,9 @@ use function LangChain\Tools\tool;
  * plus the wire-level assertions HANDOFF section 4 demands: `think`, `format`,
  * tool binding and `keep_alive` must reach the request BODY.
  *
- * What is NOT converted from `chat_models.test.ts`, and why: the four
- * "invalid output throws OutputParserException" cases for the Standard Schema
- * path. They exercise Zod / Standard Schema validation of the parsed value;
- * this port is JSON-Schema-native and has no schema-validating parser, so there
- * is no behaviour to assert. The matching "valid output parses" cases are
- * converted over a real NDJSON body instead of a mocked `invoke`.
+ * Standard Schema cases use the project's native JSON Schema representation.
+ * Valid output parses over real NDJSON instead of a mocked `invoke`; additional
+ * invalid-output cases live in ChatOllamaStructuredValidationTest.
  */
 #[CoversClass(ChatOllama::class)]
 #[CoversClass(OllamaException::class)]

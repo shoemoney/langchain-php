@@ -247,33 +247,25 @@ final class ModelRetryMiddlewareTest extends TestCase
 
     public function testShouldApplyExponentialBackoff(): void
     {
-        $model = new ModelRetryTemporaryFailureModel(2);
-        $retry = ModelRetryMiddleware::create(['maxRetries' => 3, 'initialDelayMs' => 100, 'backoffFactor' => 2.0, 'jitter' => false]);
+        $now = 0.0;
+        $model = new ModelRetryTemporaryFailureModel(2, clock: static function () use (&$now): float { return $now; });
+        $retry = ModelRetryMiddleware::create(['maxRetries' => 3, 'initialDelayMs' => 100, 'backoffFactor' => 2.0, 'jitter' => false], static function (int|float $delay) use (&$now): void { $now += $delay; });
 
         self::invokeAgent(self::agent($model, [$retry]));
 
-        $delays = $model->delays();
-        // There are delays between retries.
-        self::assertNotEmpty($delays);
-        // The first is around initialDelayMs (100ms), the second doubles it.
-        self::assertGreaterThanOrEqual(90, $delays[0]);
-        self::assertLessThan(150, $delays[0]);
-        self::assertGreaterThanOrEqual(180, $delays[1]);
-        self::assertLessThan(250, $delays[1]);
+        self::assertSame([100.0, 200.0], $model->delays());
         self::assertSame(3, $model->generateCalls());
     }
 
     public function testShouldApplyConstantBackoffWhenBackoffFactorIs0(): void
     {
-        $model = new ModelRetryTemporaryFailureModel(2);
-        $retry = ModelRetryMiddleware::create(['maxRetries' => 3, 'initialDelayMs' => 100, 'backoffFactor' => 0.0, 'jitter' => false]);
+        $now = 0.0;
+        $model = new ModelRetryTemporaryFailureModel(2, clock: static function () use (&$now): float { return $now; });
+        $retry = ModelRetryMiddleware::create(['maxRetries' => 3, 'initialDelayMs' => 100, 'backoffFactor' => 0.0, 'jitter' => false], static function (int|float $delay) use (&$now): void { $now += $delay; });
 
         self::invokeAgent(self::agent($model, [$retry]));
 
-        $delays = $model->delays();
-        $avgDelay = array_sum($delays) / \count($delays);
-        self::assertGreaterThanOrEqual(90, $avgDelay);
-        self::assertLessThan(150, $avgDelay);
+        self::assertSame([100.0, 100.0], $model->delays());
         self::assertSame(3, $model->generateCalls());
     }
 
@@ -284,26 +276,24 @@ final class ModelRetryMiddlewareTest extends TestCase
         $error = new ModelRetryRateLimitError('rate limited');
         $error->retryAfterMs = 300;
         $model = new ModelRetryAlwaysFailingModel($error);
-        $retry = ModelRetryMiddleware::create(['maxRetries' => 1, 'initialDelayMs' => 1, 'jitter' => false, 'onFailure' => 'continue']);
+        $delays = [];
+        $retry = ModelRetryMiddleware::create(['maxRetries' => 1, 'initialDelayMs' => 1, 'jitter' => false, 'onFailure' => 'continue'], static function (int|float $delay) use (&$delays): void { $delays[] = $delay; });
 
-        $start = microtime(true);
         self::invokeAgent(self::agent($model, [$retry]), 'retry-after');
-        $elapsedMs = (microtime(true) - $start) * 1000;
 
-        self::assertGreaterThanOrEqual(280, $elapsedMs);
+        self::assertSame([300], $delays);
         self::assertSame(2, $model->generateCalls());
     }
 
     public function testUsesItsOwnBackoffWhenNoHintIsPresent(): void
     {
         $model = new ModelRetryAlwaysFailingModel(new \Exception('boom'));
-        $retry = ModelRetryMiddleware::create(['maxRetries' => 1, 'initialDelayMs' => 1, 'jitter' => false, 'onFailure' => 'continue']);
+        $delays = [];
+        $retry = ModelRetryMiddleware::create(['maxRetries' => 1, 'initialDelayMs' => 1, 'jitter' => false, 'onFailure' => 'continue'], static function (int|float $delay) use (&$delays): void { $delays[] = $delay; });
 
-        $start = microtime(true);
         self::invokeAgent(self::agent($model, [$retry]), 'no-hint');
-        $elapsedMs = (microtime(true) - $start) * 1000;
 
-        self::assertLessThan(200, $elapsedMs);
+        self::assertSame([1.0], $delays);
         self::assertSame(2, $model->generateCalls());
     }
 }
@@ -333,8 +323,11 @@ class ModelRetryTemporaryFailureModel extends FakeToolCallingModel
     /** @var \stdClass{attempt: int, delays: list<float>, last: float|null} */
     public \stdClass $record;
 
-    /** @param (\Closure(): \Throwable)|null $makeError */
-    public function __construct(private int $failCount, private ?\Closure $makeError = null)
+    /**
+     * @param (\Closure(): \Throwable)|null $makeError
+     * @param (\Closure(): float)|null $clock
+     */
+    public function __construct(private int $failCount, private ?\Closure $makeError = null, private ?\Closure $clock = null)
     {
         parent::__construct(['toolCalls' => [[]]]);
         $this->record = (object) ['attempt' => 0, 'delays' => [], 'last' => null];
@@ -353,7 +346,7 @@ class ModelRetryTemporaryFailureModel extends FakeToolCallingModel
 
     protected function generate(array $messages, array $options = [], ?CallbackManagerForLLMRun $runManager = null): ChatResult
     {
-        $now = microtime(true) * 1000;
+        $now = $this->clock !== null ? ($this->clock)() : microtime(true) * 1000;
         if ($this->record->attempt > 0) {
             $this->record->delays[] = $now - $this->record->last;
         }

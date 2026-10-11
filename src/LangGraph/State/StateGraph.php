@@ -458,7 +458,7 @@ class StateGraph extends Graph
                 }
             }
 
-            parent::addNode($name, $body, $nodeOptions);
+            parent::addNode($name, self::nodeRunnable($body, $name), $nodeOptions);
 
             $inputSpec = isset($nodeOptions['input'])
                 ? self::channelsFromSchema($nodeOptions['input'])
@@ -485,6 +485,27 @@ class StateGraph extends Graph
         }
 
         return $this;
+    }
+
+    /**
+     * Port of the action coercion in `StateGraph.addNode`: a runnable is kept as is, and a raw function
+     * becomes a `RunnableCallable` named after the node with `trace: false`.
+     *
+     * Unlike the {@see RunnableLambda} a plain {@see Graph} builds, the function is always called as
+     * `func($input, $config)` and runs with that same config published as the current one, so
+     * `getWriter()`, `interrupt()` and the task context read the frame it was handed. A returned
+     * runnable is invoked with the same input. **PHP difference:** there is no signature inspection, so
+     * a callable that rejects a second argument (an internal builtin, or a typed non-config second
+     * parameter) throws; wrap it in a `RunnableLambda` to keep Lambda's arity handling. Anything else
+     * falls through to {@see Graph::addNode()}'s coercion and its error.
+     */
+    private static function nodeRunnable(mixed $body, string $name): mixed
+    {
+        if ($body instanceof RunnableInterface || !is_callable($body)) {
+            return $body;
+        }
+
+        return new RunnableCallable(func: $body, name: $name, trace: false, recurse: true);
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\VectorStores;
 
+use LangChain\Load\Validation;
 use LangChain\Embeddings\EmbeddingsInterface;
 use LangChain\Load\Serializable;
 use LangChain\Schema\Document;
@@ -52,7 +53,7 @@ abstract class VectorStore extends Serializable implements VectorStoreInterface
             'lc' => self::LC_SCHEMA_VERSION,
             'type' => 'constructor',
             'id' => ['langchain', 'vectorstores', $this->vectorstoreType(), (string) end($parts)],
-            'kwargs' => $this->filterKwargs($this->kwargs()),
+            'kwargs' => $this->filterKwargs(Validation::escapeKwargs($this->kwargs(), $this)),
         ];
     }
 

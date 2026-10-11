@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\Prompts;
 
+use LangChain\Load\Validation;
 use LangChain\OutputParsers\BaseOutputParser;
 use LangChain\Runnables\Runnable;
 use LangChain\Runnables\RunnableConfig;
@@ -230,7 +231,7 @@ abstract class BasePromptTemplate extends Runnable implements \JsonSerializable
             'lc' => 1,
             'type' => 'constructor',
             'id' => static::lcId(),
-            'kwargs' => $this->kwargs(),
+            'kwargs' => $this->lcMapKeys(Validation::escapeKwargs($this->kwargs, $this)),
         ];
     }
 

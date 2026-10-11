@@ -32,6 +32,10 @@ use LangGraph\Sdk\Utils\StreamRetry;
  *
  * ## Test seams
  *
+ * Caller signals are polled before opening attempts (including connection retries), reads and
+ * reconnects. A signal cannot interrupt synchronous IO or a backoff sleep already in progress.
+ * Streaming requests disable the configured request deadline with `timeoutMs: null`.
+ *
  * `callerOptions.sleep` (also AsyncCaller's) paces the reconnect backoff; `callerOptions.clock`
  * (`callable(): int|float` ms) drives the idle watchdog.
  */
@@ -57,7 +61,7 @@ trait StreamsWithRetry
     /**
      * Open an SSE endpoint and yield its parts `{id, event, data}`, reconnecting from the last event id.
      *
-     * Config: `endpoint`, `method` (default GET), `signal` `callable(): bool`, `headers`, `params`,
+     * Config: `endpoint`, `method` (default GET), `signal` `callable(): bool` or null, `headers`, `params`,
      * `json`, `maxRetries`, `idleReconnect` (int ms | 'auto' | 0, see {@see StreamRetry}),
      * `onReconnect`, `onInitialResponse` `callable(HttpResponse): void`.
      *
@@ -132,7 +136,7 @@ trait StreamsWithRetry
 
         $http = $this->http;
 
-        return $this->asyncCaller->call(static function () use ($http, $url, $init): StreamResponse {
+        return $this->asyncCaller->callWithOptions(['signal' => $init['signal'] ?? null], static function () use ($http, $url, $init): StreamResponse {
             $timeout = isset($init['timeoutMs']) ? $init['timeoutMs'] / 1000 : null;
             $opened = $http->requestStream(strtoupper($init['method'] ?? 'GET'), $url, $init['headers'] ?? [], $init['body'] ?? null, $timeout);
 

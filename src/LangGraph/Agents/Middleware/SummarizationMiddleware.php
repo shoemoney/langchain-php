@@ -243,7 +243,7 @@ PROMPT;
     }
 
     /**
-     * Zod's `.optional()` number fields: absent or null are undefined, anything but a number is a type error.
+     * Zod's `.optional()` number fields: absent keys are allowed; explicit null is a type error.
      *
      * @param list<array{0: string, 1: string}> $issues
      * @return array<string, int|float>
@@ -258,7 +258,7 @@ PROMPT;
 
         $parsed = [];
         foreach (['fraction', 'tokens', 'messages'] as $key) {
-            if (!isset($value[$key])) {
+            if (!\array_key_exists($key, $value)) {
                 continue;
             }
             if (!\is_int($value[$key]) && !\is_float($value[$key])) {
@@ -292,7 +292,7 @@ PROMPT;
     private static function receivedType(mixed $value): string
     {
         return match (true) {
-            $value === null => 'undefined',
+            $value === null => 'null',
             \is_string($value) => 'string',
             \is_bool($value) => 'boolean',
             \is_int($value), \is_float($value) => 'number',
@@ -322,7 +322,7 @@ PROMPT;
                 throw new \InvalidArgumentException("✖ Invalid input\n  → at tokenCounter");
             }
             foreach (['trimTokensToSummarize', 'maxTokensBeforeSummary', 'messagesToKeep'] as $key) {
-                if (isset($options[$key]) && !\is_int($options[$key]) && !\is_float($options[$key])) {
+                if (\array_key_exists($key, $options) && !\is_int($options[$key]) && !\is_float($options[$key])) {
                     throw new \InvalidArgumentException("✖ Expected number, received " . self::receivedType($options[$key]) . "\n  → at {$key}");
                 }
             }
@@ -348,7 +348,7 @@ PROMPT;
     private static function parseTrigger(mixed $trigger): array
     {
         if (\is_array($trigger) && array_is_list($trigger)) {
-            return array_map(static fn (mixed $t): array => self::parseContextSize($t), $trigger);
+            return array_map(static fn (mixed $t, int $index): array => self::parseContextSize($t, 'trigger.' . $index), $trigger, array_keys($trigger));
         }
 
         return [self::parseContextSize($trigger)];

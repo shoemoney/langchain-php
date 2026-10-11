@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\Tests\Unit\Store\Redis;
 
+use LangChain\Tests\Unit\Checkpoint\RedisLiveServer;
 use LangGraph\Checkpoint\Redis\PhpRedisClient;
 use LangGraph\Checkpoint\Redis\RedisClientInterface;
 use LangGraph\Checkpoint\Redis\TtlConfig;
@@ -15,9 +16,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
  * `tests/store.int.test.ts` against a real Redis Stack server (RedisJSON + RediSearch).
  *
  * Env-gated: set `LANGGRAPH_REDIS_URL` (for example `redis://127.0.0.1:6379`) to run it; without
- * it every test skips. WARNING: each test starts by dropping the `store` and `store_vectors`
- * indexes and deleting every `store:*` and `store_vectors:*` key, so point the URL at a
- * dedicated server or database. Needs ext-redis.
+ * it every test skips. Live runs require .loop/test_backends.py, whose disposable process
+ * run id is verified before dropping test indexes or deleting test keys. Needs ext-redis.
  */
 #[CoversClass(RedisStore::class)]
 #[CoversClass(PhpRedisClient::class)]
@@ -31,6 +31,7 @@ final class RedisStoreIntegrationTest extends RedisStoreSpecCase
         if (!extension_loaded('redis')) {
             self::markTestSkipped('ext-redis is required for the RedisStore integration tests.');
         }
+        RedisLiveServer::assertDisposable();
         parent::setUp();
     }
 

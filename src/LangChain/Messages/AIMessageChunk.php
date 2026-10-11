@@ -22,10 +22,10 @@ class AIMessageChunk extends BaseMessageChunk
     public string $type = BaseMessage::ROLE_AI;
 
     /**
-     * Partially-parsed tool calls, folded by index or id. Each `args` is a
-     * *string* of JSON accumulated across deltas, not yet decoded.
+     * Tool-call deltas, folded by index or id. Each `args` is an undecoded
+     * string: JSON for function tools, raw input text for custom tools.
      *
-     * @var list<array{index?: int, id?: string, name?: string, args?: string, type?: string}>
+     * @var list<array{index?: int, id?: string, name?: string, args?: string, type?: string, isCustomTool?: bool}>
      */
     public array $toolCallChunks = [];
 
@@ -72,9 +72,9 @@ class AIMessageChunk extends BaseMessageChunk
     /**
      * Decode the accumulated `tool_call_chunks` into real tool calls.
      *
-     * Chunks whose args do not parse as JSON become invalid tool calls rather
-     * than being silently dropped — the model hallucinated them, and the caller
-     * needs to see that in order to react.
+     * Function arguments that do not parse as JSON become invalid calls.
+     * Custom tools preserve their raw arguments in `args.input`, including
+     * whitespace and text that happens to be valid JSON.
      *
      * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>}
      *         [toolCalls, invalidToolCalls]
@@ -101,15 +101,15 @@ class AIMessageChunk extends BaseMessageChunk
                 continue;
             }
 
-            // A chunk's `args` is undecoded JSON *by construction* — that is
+            // A chunk's `args` is an undecoded string by construction — that is
             // what lets deltas be accumulated as strings. An already-decoded
             // array is therefore not a shape this method can re-parse, and
             // calling trim() on it raised a TypeError that aborted stream
             // reconstruction outright — a crash, not a bad tool call.
             //
             // It is routed to the invalid list instead, which is the existing
-            // destination for arguments that could not be turned into an
-            // object. A caller that genuinely holds decoded arguments should
+            // destination for arguments that cannot form a valid tool call.
+            // A caller that genuinely holds decoded arguments should
             // use `AIMessage::toolCalls`, not round-trip them through chunks.
             if ($rawArgs !== null && !is_string($rawArgs)) {
                 $invalid[] = array_filter([
@@ -118,6 +118,30 @@ class AIMessageChunk extends BaseMessageChunk
                     'error' => 'Tool call arguments in a chunk must be an undecoded JSON string, got '
                         . get_debug_type($rawArgs) . '.',
                     'id' => $id,
+                    'index' => $index,
+                ], static fn ($v) => $v !== null);
+                continue;
+            }
+
+            // ai.ts delegates to messages/utils.ts::collapseToolCallChunks:
+            // custom chunks with a call id use { input: joinedArgs } rather
+            // than JSON parsing or trimming their accumulated input string.
+            if (($chunk['isCustomTool'] ?? false) === true) {
+                if ($id === null || $id === '') {
+                    $invalid[] = array_filter([
+                        'name' => $name,
+                        'args' => $rawArgs,
+                        'error' => 'Custom tool call is missing an id',
+                        'index' => $index,
+                    ], static fn ($v) => $v !== null);
+                    continue;
+                }
+
+                $calls[] = array_filter([
+                    'name' => $name,
+                    'args' => ['input' => $rawArgs ?? ''],
+                    'id' => $id,
+                    'type' => 'tool_call',
                     'index' => $index,
                 ], static fn ($v) => $v !== null);
                 continue;

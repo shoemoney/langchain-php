@@ -73,7 +73,7 @@ class PregelRunner
             // before the run so a task that throws still has a `task` event paired
             // with the error that ended it — without this, a failure is invisible in
             // the debug stream, which is the one mode anyone debugging would use.
-            $this->loop->emitDebug('task', $this->loop->debugTaskPayload($task, true));
+            $this->loop->emitTaskStart($task);
 
             $error = $this->runWithRetry($task);
             $this->commit($task, $error);
@@ -140,32 +140,6 @@ class PregelRunner
      *    returned nothing is a *decision*, not a crash, and without this marker
      *    the loop could not distinguish it from a task that never ran.
      */
-    /**
-     * What a task produced, as upstream's `task_result.result` payload.
-     *
-     * Upstream's `result` is the task's state delta — the writes it committed,
-     * keyed by channel — which is the same thing `updates` reports one mode over.
-     * Assembled here rather than reused from `emitValues`, because the two differ:
-     * a result is scoped to ONE task and carries the channel keys, while a
-     * `values` chunk is the whole accumulated state.
-     *
-     * @return array<string, mixed>
-     */
-    private function taskResult(PregelExecutableTask $task): array
-    {
-        $out = [];
-        foreach ($task->writes as $write) {
-            $channel = $write[0] ?? null;
-            // HANDLED is bookkeeping for PregelLoop::cacheTaskWrites(), not part of the result.
-            if (!is_string($channel) || $channel === Constants::NO_WRITES || $channel === Constants::HANDLED) {
-                continue;
-            }
-            $out[$channel] = $write[1] ?? null;
-        }
-
-        return $out;
-    }
-
     private function commit(PregelExecutableTask $task, ?\Throwable $error): void
     {
         if ($error === null) {
@@ -178,12 +152,7 @@ class PregelRunner
             // cannot claim a result the saver has not taken — a debug stream that
             // reports writes which were then lost to a failed write is worse than
             // one that reports nothing.
-            $this->loop->emitDebug('task_result', [
-                'id' => $task->id,
-                'name' => $task->name,
-                'interrupts' => $task->interrupts,
-                'result' => $this->taskResult($task),
-            ]);
+            $this->loop->emitTaskResultDebug($task);
 
             return;
         }

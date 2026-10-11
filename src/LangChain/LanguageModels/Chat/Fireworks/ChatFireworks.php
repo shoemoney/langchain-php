@@ -36,6 +36,10 @@ class ChatFireworks extends ChatOpenAICompletions
 
     public ?string $fireworksApiKey = null;
 
+    private bool $serializationOrganizationResolved = false;
+
+    private ?string $serializationInitialRuntimeOrganization = null;
+
     /**
      * @param string|array<string, mixed> $modelOrFields A model name, or the full field bag.
      * @param array<string, mixed>        $fields        Used when the first argument is a model name.
@@ -45,6 +49,8 @@ class ChatFireworks extends ChatOpenAICompletions
         $fields = is_string($modelOrFields) ? $fields + ['model' => $modelOrFields] : $modelOrFields;
 
         $configuration = is_array($fields['configuration'] ?? null) ? $fields['configuration'] : [];
+        $this->serializationOrganizationResolved = ($configuration['organization'] ?? null) !== null
+            || Env::getEnvironmentVariable('OPENAI_ORGANIZATION') !== null;
         $gateway = self::resolveGatewayConfig(
             $configuration['baseURL'] ?? $configuration['baseUrl'] ?? $fields['baseUrl'] ?? self::environmentBaseUrl(),
         );
@@ -70,6 +76,7 @@ class ChatFireworks extends ChatOpenAICompletions
         ]));
 
         $this->fireworksApiKey = $apiKey;
+        $this->serializationInitialRuntimeOrganization = $this->organization;
     }
 
     public function llmType(): string
@@ -98,6 +105,42 @@ class ChatFireworks extends ChatOpenAICompletions
     public static function lcSecrets(): array
     {
         return ['fireworksApiKey' => 'FIREWORKS_API_KEY', 'apiKey' => 'FIREWORKS_API_KEY'];
+    }
+
+    /** @return array<string, array{property: string, secret: string, key: string}>|null */
+    protected function credentialSerialization(): ?array
+    {
+        if (static::class !== self::class) {
+            return parent::credentialSerialization();
+        }
+
+        return [
+            'apiKey' => ['property' => 'apiKey', 'secret' => 'OPENAI_API_KEY', 'key' => 'openai_api_key'],
+            'fireworksApiKey' => ['property' => 'fireworksApiKey', 'secret' => 'FIREWORKS_API_KEY', 'key' => 'fireworks_api_key'],
+            'organization' => ['property' => 'serializationOrganization', 'secret' => 'OPENAI_ORGANIZATION', 'key' => 'organization'],
+        ];
+    }
+
+    protected function serializationCredentialIsResolved(string $property): bool
+    {
+        if ($property === 'serializationOrganization') {
+            // Same-value writes and resets cannot be observed through the public ABI.
+            return $this->organization === $this->serializationInitialRuntimeOrganization
+                ? $this->serializationOrganizationResolved
+                : $this->organization !== null;
+        }
+
+        return parent::serializationCredentialIsResolved($property);
+    }
+
+    /** @return list<string> */
+    protected function credentialSerializationExcludedKeys(): array
+    {
+        if (static::class !== self::class) {
+            return [];
+        }
+
+        return ['openai_api_key', 'configuration'];
     }
 
     /**

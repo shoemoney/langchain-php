@@ -85,11 +85,18 @@ class NamedBarrierValue extends BaseChannel
     /** @return list<string> */
     public function checkpoint(): mixed
     {
+        return $this->seen;
+    }
+
+    public function consume(): bool
+    {
         if (!$this->barrierSatisfied()) {
-            throw new EmptyChannelError();
+            return false;
         }
 
-        return $this->seen;
+        $this->seen = [];
+
+        return true;
     }
 
     public function isAvailable(): bool

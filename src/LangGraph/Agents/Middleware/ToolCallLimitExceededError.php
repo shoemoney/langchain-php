@@ -17,8 +17,10 @@ final class ToolCallLimitExceededError extends \Exception
         public readonly int|float|null $threadLimit,
         public readonly int|float|null $runLimit,
         public readonly ?string $toolName = null,
+        ?bool $hasThreadLimit = null,
+        ?bool $hasRunLimit = null,
     ) {
-        parent::__construct(self::buildFinalAIMessageContent($threadCount, $runCount, $threadLimit, $runLimit, $toolName));
+        parent::__construct(self::buildFinalAIMessageContent($threadCount, $runCount, $threadLimit, $runLimit, $toolName, $hasThreadLimit, $hasRunLimit));
     }
 
     /** Upstream's `name`. */
@@ -31,6 +33,8 @@ final class ToolCallLimitExceededError extends \Exception
      * The text shown to the user once the limit is hit.
      *
      * Port of `buildFinalAIMessageContent`.
+     * Optional presence flags distinguish a supplied null (zero threshold) from an omitted limit.
+     * Without flags, existing callers retain null-as-absent behavior.
      */
     public static function buildFinalAIMessageContent(
         int|float $threadCount,
@@ -38,15 +42,19 @@ final class ToolCallLimitExceededError extends \Exception
         int|float|null $threadLimit,
         int|float|null $runLimit,
         ?string $toolName,
+        ?bool $hasThreadLimit = null,
+        ?bool $hasRunLimit = null,
     ): string {
         $toolDesc = $toolName !== null && $toolName !== '' ? "'{$toolName}' tool" : 'Tool';
         $exceededLimits = [];
 
-        if ($threadLimit !== null && $threadCount > $threadLimit) {
-            $exceededLimits[] = "thread limit exceeded ({$threadCount}/{$threadLimit} calls)";
+        if (($hasThreadLimit ?? ($threadLimit !== null)) && $threadCount > ($threadLimit ?? 0)) {
+            $displayLimit = $threadLimit ?? 'null';
+            $exceededLimits[] = "thread limit exceeded ({$threadCount}/{$displayLimit} calls)";
         }
-        if ($runLimit !== null && $runCount > $runLimit) {
-            $exceededLimits[] = "run limit exceeded ({$runCount}/{$runLimit} calls)";
+        if (($hasRunLimit ?? ($runLimit !== null)) && $runCount > ($runLimit ?? 0)) {
+            $displayLimit = $runLimit ?? 'null';
+            $exceededLimits[] = "run limit exceeded ({$runCount}/{$displayLimit} calls)";
         }
 
         return "{$toolDesc} call limit reached: " . implode(' and ', $exceededLimits) . '.';

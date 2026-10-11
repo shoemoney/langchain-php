@@ -30,7 +30,7 @@ final class Await
      */
     public static function runFiber(callable $fn): mixed
     {
-        $fiber = new \Fiber($fn);
+        $fiber = self::contextFiber($fn);
 
         try {
             $fiber->start();
@@ -58,10 +58,22 @@ final class Await
     public static function spawn(callable $fn): int
     {
         $id = self::$nextId++;
-        $fiber = new \Fiber($fn);
+        $fiber = self::contextFiber($fn);
         self::$driven[$id] = ['fiber' => $fiber, 'started' => false];
 
         return $id;
+    }
+
+    /**
+     * Managed work inherits the creating scope, even when another scope drives it later.
+     * The captured store is installed in the new Fiber, leaving its parent's frames intact.
+     */
+    private static function contextFiber(callable $fn): \Fiber
+    {
+        $storage = AsyncLocalStorage::getInstance();
+        $store = $storage->getStore();
+
+        return new \Fiber(static fn (): mixed => $storage->run($store, $fn));
     }
 
     public static function cancel(int $id): void

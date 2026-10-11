@@ -90,6 +90,7 @@ final class ToolOutput
             'artifact' => $artifact,
             'tool_call_id' => $toolCallId,
             'tool_name' => $name,
+            'name' => $name,
             'additional_kwargs' => [],
             'response_metadata' => $metadata,
         ]);

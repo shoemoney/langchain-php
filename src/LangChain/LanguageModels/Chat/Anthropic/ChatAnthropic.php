@@ -9,6 +9,7 @@ use LangChain\LanguageModels\BaseChatModel;
 use LangChain\LanguageModels\Chat\Anthropic\Tools\Types;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageInputs;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\MessageOutputs;
+use LangChain\LanguageModels\Chat\Anthropic\Utils\Params;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\Standard;
 use LangChain\LanguageModels\Chat\Anthropic\Utils\StreamEvents;
 use LangChain\LanguageModels\Outputs\ChatGeneration;
@@ -87,6 +88,11 @@ class ChatAnthropic extends BaseChatModel
         'stop' => 'stopSequences',
         'stop_sequences' => 'stopSequences',
         'tool_choice' => 'toolChoice',
+        'output_config' => 'outputConfig',
+        'output_format' => 'outputFormat',
+        'context_management' => 'contextManagement',
+        'inference_geo' => 'inferenceGeo',
+        'invocation_kwargs' => 'invocationKwargs',
     ];
 
     public string $model = 'claude-sonnet-4-5';
@@ -126,6 +132,22 @@ class ChatAnthropic extends BaseChatModel
      */
     public array $betas = [];
 
+    /** @var array<string, mixed> */
+    public array $thinking = ['type' => 'disabled'];
+
+    protected bool $thinkingExplicitlySet = false;
+
+    /** @var array<string, mixed>|null */
+    public ?array $outputConfig = null;
+
+    /** @var array<string, mixed>|null */
+    public ?array $contextManagement = null;
+
+    public ?string $inferenceGeo = null;
+
+    /** @var array<string, mixed> */
+    public array $invocationKwargs = [];
+
     public bool $streamUsage = true;
 
     public ?float $timeout = null;
@@ -151,7 +173,10 @@ class ChatAnthropic extends BaseChatModel
         }
 
         $this->model = (string) ($fields['model'] ?? $this->model);
-        $this->apiKey = isset($fields['apiKey']) ? (string) $fields['apiKey'] : $this->apiKey;
+        // Source precedence is nullish: `apiKey`, then the legacy `anthropicApiKey`, then the environment.
+        $this->apiKey = isset($fields['apiKey'])
+            ? (string) $fields['apiKey']
+            : (isset($fields['anthropicApiKey']) ? (string) $fields['anthropicApiKey'] : $this->apiKey);
         $this->baseUrl = isset($fields['baseUrl']) ? (string) $fields['baseUrl'] : $this->baseUrl;
         $this->temperature = isset($fields['temperature']) ? (float) $fields['temperature'] : $this->temperature;
         $this->topP = isset($fields['topP']) ? (float) $fields['topP'] : $this->topP;
@@ -160,6 +185,12 @@ class ChatAnthropic extends BaseChatModel
         $this->stopSequences = isset($fields['stopSequences']) ? array_values((array) $fields['stopSequences']) : $this->stopSequences;
         $this->defaultHeaders = (array) ($fields['defaultHeaders'] ?? []);
         $this->betas = array_values((array) ($fields['betas'] ?? []));
+        $this->thinkingExplicitlySet = isset($fields['thinking']);
+        $this->thinking = $fields['thinking'] ?? $this->thinking;
+        $this->outputConfig = $fields['outputConfig'] ?? null;
+        $this->contextManagement = $fields['contextManagement'] ?? null;
+        $this->inferenceGeo = $fields['inferenceGeo'] ?? null;
+        $this->invocationKwargs = $fields['invocationKwargs'] ?? [];
         $this->streamUsage = (bool) ($fields['streamUsage'] ?? $this->streamUsage);
         $this->timeout = isset($fields['timeout']) ? (float) $fields['timeout'] : $this->timeout;
         $this->maxRetries = (int) ($fields['maxRetries'] ?? $this->maxRetries);
@@ -176,6 +207,7 @@ class ChatAnthropic extends BaseChatModel
         $this->kwargs = array_intersect_key($fields, array_flip([
             'model', 'temperature', 'topP', 'topK', 'maxTokens', 'stopSequences',
             'tools', 'toolChoice', 'streamUsage', 'maxRetries', 'timeout',
+            'thinking', 'outputConfig', 'contextManagement', 'inferenceGeo', 'invocationKwargs',
         ]));
         $this->kwargs = array_filter($this->kwargs, static fn (mixed $v): bool => $v !== null);
     }
@@ -194,6 +226,24 @@ class ChatAnthropic extends BaseChatModel
     public function getName(): string
     {
         return 'ChatAnthropic';
+    }
+
+    /**
+     * Source `ChatAnthropic.lc_secrets`: two serialized fields, `anthropic_api_key`
+     * and `api_key`, neither an alias of the other. Source keeps two synchronized
+     * properties; this port has one, so both markers follow `$apiKey`. This class
+     * only; user subclasses keep the existing serializer.
+     */
+    protected function credentialSerialization(): ?array
+    {
+        if (static::class !== self::class) {
+            return parent::credentialSerialization();
+        }
+
+        return [
+            'anthropicApiKey' => ['property' => 'apiKey', 'secret' => 'ANTHROPIC_API_KEY', 'key' => 'anthropic_api_key'],
+            'apiKey' => ['property' => 'apiKey', 'secret' => 'ANTHROPIC_API_KEY', 'key' => 'api_key'],
+        ];
     }
 
     /**
@@ -239,6 +289,19 @@ class ChatAnthropic extends BaseChatModel
             'tool_choice' => $this->toolChoiceOf($options) ?? $this->toolChoiceOf($bound),
         ];
 
+        $thinking = $options['thinking'] ?? $bound['thinking'] ?? ($this->thinkingExplicitlySet ? $this->thinking : null);
+        $outputConfig = array_replace($this->outputConfig ?? [], $bound['outputConfig'] ?? [], $options['outputConfig'] ?? []);
+        if (!isset($outputConfig['format']) && isset($options['outputFormat'])) {
+            $outputConfig['format'] = $options['outputFormat'];
+        }
+        $params['thinking'] = $thinking;
+        $params['context_management'] = $options['contextManagement'] ?? $bound['contextManagement'] ?? $this->contextManagement;
+        $params = array_replace($params, $options['invocationKwargs'] ?? $bound['invocationKwargs'] ?? $this->invocationKwargs);
+        $params['container'] = $options['container'] ?? $bound['container'] ?? null;
+        $params['mcp_servers'] = $options['mcp_servers'] ?? $bound['mcp_servers'] ?? null;
+        $params['output_config'] = $outputConfig !== [] ? $outputConfig : null;
+        $params['inference_geo'] = $options['inferenceGeo'] ?? $bound['inferenceGeo'] ?? $this->inferenceGeo;
+
         // A tool choice naming a tool that was not offered is a mistake worth
         // catching here. The API rejects it, but its error does not say which
         // of the offered tools was meant.
@@ -255,6 +318,20 @@ class ChatAnthropic extends BaseChatModel
             }
         }
 
+        // Validate the resolved request so PHP's per-call and bound option overrides obey the same rules.
+        $compatibility = [
+            'model' => $params['model'],
+            'thinking' => $params['thinking'] ?? $this->thinking,
+            'thinkingExplicitlySet' => isset($params['thinking']),
+            'outputConfig' => $outputConfig,
+            'temperature' => $params['temperature'] ?? null,
+            'topP' => $params['top_p'] ?? null,
+            'topK' => $params['top_k'] ?? null,
+        ];
+        Params::validateInvocationParamCompatibility($compatibility);
+        unset($params['temperature'], $params['top_p'], $params['top_k']);
+        $params = array_replace($params, Params::getSamplingParams($compatibility));
+
         // Forwarded as a top-level request field (automatic prompt caching). A per-call option wins
         // over the value bound through bindTools() (how PromptCachingMiddleware's modelSettings arrive).
         $cacheControl = $options['cache_control'] ?? $options['cacheControl']
@@ -265,11 +342,14 @@ class ChatAnthropic extends BaseChatModel
 
         // Beta flags travel in a header, not the body; `post()` and `rawEventStream()` lift this key out.
         // Constructor, bound and per-call betas are merged with those the offered tools require.
+        $compaction = array_filter((array) ($params['context_management']['edits'] ?? []), static fn (array $edit): bool => ($edit['type'] ?? null) === 'compact_20260112');
         $betas = array_values(array_unique([
             ...$this->betas,
             ...array_map('strval', (array) ($bound['betas'] ?? [])),
             ...array_map('strval', (array) ($options['betas'] ?? [])),
             ...Types::betasFor((array) ($params['tools'] ?? [])),
+            ...($compaction !== [] ? ['compact-2026-01-12'] : []),
+            ...Params::getTaskBudgetBetas($params['model'], $outputConfig),
         ]));
         if ($betas !== []) {
             $params['betas'] = $betas;

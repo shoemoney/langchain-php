@@ -22,6 +22,18 @@ abstract class BaseExampleSelector extends Serializable
         return ['langchain_core', 'example_selectors', 'base', (string) end($parts)];
     }
 
+    /** Upstream keeps the default `lc_serializable = false` for every selector. */
+    public static function lcSerializable(): bool
+    {
+        return false;
+    }
+
+    /** Upstream selectors are not serializable: they emit `not_implemented`, never constructor kwargs. */
+    public function toJson(): array
+    {
+        return ['lc' => self::LC_SCHEMA_VERSION, 'type' => 'not_implemented', 'id' => static::lcId()];
+    }
+
     /**
      * Add an example to the selector.
      *

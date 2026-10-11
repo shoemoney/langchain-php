@@ -144,17 +144,15 @@ final class StreamModeSubscriptionTest extends TestCase
     /**
      * A mode the port cannot emit must be REFUSED, not silently dropped.
      *
-     * Upstream declares eight `StreamMode` values and this port emits two
-     * (`updates`, `values`). Accepting `debug` and then producing nothing is a
-     * silent no-op indistinguishable from a graph that had nothing to say, so
-     * `Pregel::resolveStreamModes()` refuses at the boundary instead.
+     * The eight declared modes are supported. An unknown mode is still refused
+     * at the boundary so a misspelled subscription cannot silently drop events.
      */
     public function testAnUnsupportedStreamModeIsRefused(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/Unsupported stream mode/');
 
-        iterator_to_array($this->graph(['tasks'])->stream(['messages' => 'hi']));
+        iterator_to_array($this->graph(['unknown_mode'])->stream(['messages' => 'hi']));
     }
 
     /**
@@ -166,13 +164,15 @@ final class StreamModeSubscriptionTest extends TestCase
     public function testTheRefusalNamesTheSupportedModes(): void
     {
         try {
-            iterator_to_array($this->graph(['tasks', 'messages'])->stream(['messages' => 'hi']));
+            iterator_to_array($this->graph(['unknown_mode', 'messages'])->stream(['messages' => 'hi']));
             self::fail('expected an unsupported mode to be refused');
         } catch (\InvalidArgumentException $e) {
             $message = $e->getMessage();
 
-            self::assertStringContainsString('tasks', $message);
-            self::assertStringContainsString('checkpoints', $message);
+            self::assertStringContainsString('unknown_mode', $message);
+            foreach (Pregel::SUPPORTED_STREAM_MODES as $mode) {
+                self::assertStringContainsString($mode, $message);
+            }
             self::assertStringContainsString(
                 'updates',
                 $message,
@@ -191,11 +191,10 @@ final class StreamModeSubscriptionTest extends TestCase
     public function testSupportedModesAreDeclaredOnPregel(): void
     {
         self::assertSame(
-            ['updates', 'values', 'debug'],
+            ['updates', 'values', 'debug', 'tasks', 'checkpoints', 'custom'],
             Pregel::SUPPORTED_STREAM_MODES,
             'the supported set is a declaration on Pregel; update it when a mode is implemented. '
-            . '`debug` was added with DebugStreamModeTest, which asserts it emits — the two cannot '
-            . 'be changed independently.',
+            . 'EngineStreamEventsTest exercises tasks/checkpoints/custom and DebugStreamModeTest pins debug.',
         );
     }
 

@@ -18,11 +18,9 @@ use PHPUnit\Framework\TestCase;
  * malformed-input matrix, the number/string/whitespace tables, the
  * every-prefix walks and the kitchen-sink document.
  *
- * Two kinds of upstream expectation are NOT converted because the PHP parser
- * (`PartialJsonParser`, outside this work package) diverges from upstream: a
- * truncated literal or lone minus sign is rejected, and a partial `\u` escape
- * keeps its backslash (`"15\u` -> `15\u`, upstream `15u`); see
- * {@see self::testKnownDivergencesFromUpstream()}.
+ * Truncated literals, lone minus signs, and short unicode escapes follow the
+ * upstream expectations. PHP replaces unpaired UTF-16 surrogates with U+FFFD;
+ * see {@see self::testKnownDivergencesFromUpstream()}.
  */
 #[CoversClass(JsonUtils::class)]
 final class JsonUtilsTest extends TestCase
@@ -40,9 +38,13 @@ final class JsonUtilsTest extends TestCase
             ['{}', []],
             ['[]', []],
             ['[1', [1]],
+            ['[t', [true]],
+            ['[-', [-0.0]],
             ['[', []],
+            ['[n', [null]],
             ['[null', [null]],
             ['[null,', [null]],
+            ['[null,t', [null, true]],
             ['[null,{', [null, []]],
             ['[null,{"', [null, []]],
             ['[null,{"a', [null, []]],
@@ -53,6 +55,9 @@ final class JsonUtilsTest extends TestCase
             ['"hello', 'hello'],
             ['"hello"', 'hello'],
             ["\"15\\n\\t\\r", "15\n\t\r"],
+            ['"15\\u', '15u'],
+            ['"15\\u00', '15u00'],
+            ['"15\\u00f', '15u00f'],
             ["\"15\\u00f8", "15\u{f8}"],
             ["\"15\\u00f8C", "15\u{f8}C"],
             ["\"15\\u00f8C\"", "15\u{f8}C"],
@@ -68,6 +73,7 @@ final class JsonUtilsTest extends TestCase
             ['1', 1],
             ['12', 12],
             ['123', 123],
+            ['-', -0.0],
             ['-1', -1],
             ['-12', -12],
             ['-12.', -12],
@@ -84,6 +90,13 @@ final class JsonUtilsTest extends TestCase
             [" \n\t\r123", 123],
             ["123\n\t\r", 123],
         ];
+
+        // Upstream's `null values` and `boolean values` every-prefix walks.
+        foreach (['null' => null, 'true' => true, 'false' => false] as $literal => $value) {
+            for ($i = 1; $i < strlen($literal); $i++) {
+                $cases[] = [substr($literal, 0, $i), $value];
+            }
+        }
 
         $named = [];
         foreach ($cases as [$input, $expected]) {
@@ -144,37 +157,11 @@ final class JsonUtilsTest extends TestCase
 
     public function testKnownDivergencesFromUpstream(): void
     {
-        // Upstream drops the backslash of a string cut inside a `\u` escape
-        // (`"15\u` -> "15u", `"15\u00` -> "15u00", `"15\u00f` -> "15u00f"). The
-        // PHP parser deliberately re-emits it so a stream cut mid-escape stays
-        // byte-stable (see the "stream cut mid-escape keeps its backslash" fix).
-        // Pinned here; when the parser changes this fails and the upstream
-        // expectations should be converted into partialDocuments().
-        foreach ([
-            ['"15\\u', '15\\u', '15u'],
-            ['"15\\u00', '15\\u00', '15u00'],
-            ['"15\\u00f', '15\\u00f', '15u00f'],
-        ] as [$input, $phpOutput, $upstream]) {
-            self::assertSame(
-                $phpOutput,
-                JsonUtils::strictParsePartialJson($input),
-                "[{$input}] no longer keeps the backslash; convert the upstream expectation ({$upstream})",
-            );
-        }
-
-        // Upstream accepts a truncated literal or a lone minus sign and answers
-        // with the value it is on its way to (`[t` -> [true], `-` -> -0). The PHP
-        // `PartialJsonParser` rejects them. That file is outside this work
-        // package, so the gap is pinned rather than hidden: when the parser is
-        // fixed this test fails and should be replaced by the upstream cases.
-        foreach (['[t', '[n', '[-', '-', 'n', 'nul', 't', 'tru', 'f', 'fals', '[null,t'] as $truncated) {
-            try {
-                JsonUtils::strictParsePartialJson($truncated);
-                self::fail("[{$truncated}] now parses; convert the upstream expectation");
-            } catch (\RuntimeException) {
-                $this->addToAssertionCount(1);
-            }
-        }
+        // JS strings hold unpaired UTF-16 code units; PHP UTF-8 strings use
+        // the documented U+FFFD replacement instead. Valid pairs still decode.
+        self::assertSame("\u{FFFD}", JsonUtils::strictParsePartialJson('"\\uD83D'));
+        self::assertSame("\u{FFFD}", JsonUtils::strictParsePartialJson('"\\uDE00'));
+        self::assertSame('😀', JsonUtils::strictParsePartialJson('"\\uD83D\\uDE00'));
     }
 
     public function testKitchenSinkOfPartialJsonParsing(): void
@@ -188,17 +175,10 @@ final class JsonUtilsTest extends TestCase
         ));
 
         self::assertCount(strlen(self::KITCHEN_SINK), $segments);
-        $skipped = 0;
         for ($i = 1, $n = strlen(self::KITCHEN_SINK); $i < $n; $i++) {
             $prefix = substr(self::KITCHEN_SINK, 0, $i);
-            if (preg_match('/(?:^|[\[,:\s])(?:n|nu|nul|t|tr|tru|f|fa|fal|fals)$/', $prefix) === 1) {
-                // The known divergence pinned in testKnownDivergencesFromUpstream().
-                $skipped++;
-                continue;
-            }
             self::assertEquals($segments[$i], JsonUtils::strictParsePartialJson($prefix), "[{$prefix}]");
         }
-        self::assertLessThan(30, $skipped, 'only prefixes ending inside a literal may be skipped');
     }
 
     public function testParseJsonMarkdownStillUsesTheSharedParser(): void

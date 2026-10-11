@@ -150,6 +150,32 @@ class TogetherAI extends LLM
         return ['apiKey' => 'together_ai_api_key'];
     }
 
+    /** @return array<string, array{property: string, secret: string, key: string}>|null */
+    protected function credentialSerialization(): ?array
+    {
+        if (static::class !== self::class) {
+            return parent::credentialSerialization();
+        }
+
+        return [
+            'apiKey' => ['property' => 'apiKey', 'secret' => 'TOGETHER_AI_API_KEY', 'key' => 'together_ai_api_key'],
+        ];
+    }
+
+    /**
+     * A successful constructor always initializes the private key. A subclass
+     * explicitly opting into this token inherits that presence policy, even if
+     * it shadows apiKey; unknown property names retain the parent reader.
+     */
+    protected function serializationCredentialIsResolved(string $property): bool
+    {
+        if ($property === 'apiKey') {
+            return true;
+        }
+
+        return parent::serializationCredentialIsResolved($property);
+    }
+
     /**
      * @param array<string, mixed> $options
      *

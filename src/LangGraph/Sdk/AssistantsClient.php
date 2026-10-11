@@ -22,7 +22,7 @@ class AssistantsClient extends BaseClient
     /**
      * Get an assistant by ID.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      *
      * @return Assistant
      */
@@ -32,20 +32,15 @@ class AssistantsClient extends BaseClient
     }
 
     /**
-     * Get the JSON representation of the graph assigned to a runnable (upstream's `getG`+`raph`).
-     *
-     * Named `getAssistantGraph` because `KnownAbsentUpstreamApiTest` greps `src/` for the
-     * upstream spelling to prove PORT_STATUS's OPEN row for Pregel's graph-drawing accessor (the DOT
-     * subsystem, WP-06) is still absent; a method of that name here would falsely refute it. Once
-     * WP-06 lands and that row is retired, this can be renamed to the upstream spelling.
+     * Get the JSON representation of the graph assigned to a runnable.
      *
      * `xray` includes subgraphs; an integer limits the depth.
      *
-     * @param array{xray?: bool|int, signal?: mixed} $options
+     * @param array{xray?: bool|int, signal?: (callable(): bool)|null} $options
      *
      * @return AssistantGraph
      */
-    public function getAssistantGraph(string $assistantId, array $options = []): array
+    public function getGraph(string $assistantId, array $options = []): array
     {
         return $this->fetch("/assistants/{$assistantId}/graph", [
             'params' => ['xray' => $options['xray'] ?? null],
@@ -53,9 +48,21 @@ class AssistantsClient extends BaseClient
     }
 
     /**
+     * Compatibility alias for the previously exported PHP spelling.
+     *
+     * @param array{xray?: bool|int, signal?: (callable(): bool)|null} $options
+     *
+     * @return AssistantGraph
+     */
+    public function getAssistantGraph(string $assistantId, array $options = []): array
+    {
+        return $this->getGraph($assistantId, $options);
+    }
+
+    /**
      * Get the state and config schema of the graph assigned to a runnable.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      *
      * @return GraphSchema
      */
@@ -67,7 +74,7 @@ class AssistantsClient extends BaseClient
     /**
      * Get the subgraphs of an assistant, optionally under a namespace and/or recursively.
      *
-     * @param array{namespace?: string, recurse?: bool, signal?: mixed} $options
+     * @param array{namespace?: string, recurse?: bool, signal?: (callable(): bool)|null} $options
      *
      * @return Subgraphs
      */
@@ -86,7 +93,7 @@ class AssistantsClient extends BaseClient
     /**
      * Create a new assistant.
      *
-     * @param array{graphId: string, config?: array<string, mixed>, context?: mixed, metadata?: array<string, mixed>|null, assistantId?: string, ifExists?: string, name?: string, description?: string, signal?: mixed} $payload
+     * @param array{graphId: string, config?: array<string, mixed>, context?: mixed, metadata?: array<string, mixed>|null, assistantId?: string, ifExists?: string, name?: string, description?: string, signal?: (callable(): bool)|null} $payload
      *
      * @return Assistant
      */
@@ -110,7 +117,7 @@ class AssistantsClient extends BaseClient
     /**
      * Update an assistant.
      *
-     * @param array{graphId?: string, config?: array<string, mixed>, context?: mixed, metadata?: array<string, mixed>|null, name?: string, description?: string, signal?: mixed} $payload
+     * @param array{graphId?: string, config?: array<string, mixed>, context?: mixed, metadata?: array<string, mixed>|null, name?: string, description?: string, signal?: (callable(): bool)|null} $payload
      *
      * @return Assistant
      */
@@ -133,7 +140,7 @@ class AssistantsClient extends BaseClient
      * Delete an assistant. `deleteThreads` also deletes every thread whose
      * `metadata.assistant_id` is this assistant; it defaults to false.
      *
-     * @param array{deleteThreads?: bool, signal?: mixed} $options
+     * @param array{deleteThreads?: bool, signal?: (callable(): bool)|null} $options
      */
     public function delete(string $assistantId, array $options = []): void
     {
@@ -150,7 +157,7 @@ class AssistantsClient extends BaseClient
      * Returns the list, or with `includePagination` a map of the assistants and the
      * `X-Pagination-Next` cursor (null when the header is absent).
      *
-     * @param array{graphId?: string, name?: string, metadata?: array<string, mixed>, limit?: int, offset?: int, sortBy?: string, sortOrder?: string, select?: list<string>, includePagination?: bool, signal?: mixed} $query
+     * @param array{graphId?: string, name?: string, metadata?: array<string, mixed>, limit?: int, offset?: int, sortBy?: string, sortOrder?: string, select?: list<string>, includePagination?: bool, signal?: (callable(): bool)|null} $query
      *
      * @return list<Assistant>|AssistantsSearchResponse
      */
@@ -183,7 +190,7 @@ class AssistantsClient extends BaseClient
     /**
      * Count assistants matching the filters (exact match per metadata key/value).
      *
-     * @param array{metadata?: array<string, mixed>, graphId?: string, name?: string, signal?: mixed} $query
+     * @param array{metadata?: array<string, mixed>, graphId?: string, name?: string, signal?: (callable(): bool)|null} $query
      */
     public function count(array $query = []): int
     {
@@ -200,7 +207,7 @@ class AssistantsClient extends BaseClient
     /**
      * List all versions of an assistant.
      *
-     * @param array{metadata?: array<string, mixed>, limit?: int, offset?: int, signal?: mixed} $payload
+     * @param array{metadata?: array<string, mixed>, limit?: int, offset?: int, signal?: (callable(): bool)|null} $payload
      *
      * @return list<AssistantVersion>
      */
@@ -219,7 +226,7 @@ class AssistantsClient extends BaseClient
     /**
      * Change the version of an assistant.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      *
      * @return Assistant
      */

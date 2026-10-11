@@ -24,14 +24,27 @@ class Document extends Serializable
     /** @var array<string, mixed> */
     public array $metadata;
 
+    /** Optional collection identifier; uniqueness and UUID format are not enforced. */
+    public ?string $id;
+
     /**
      * @param array<string, mixed> $metadata
      */
-    public function __construct(string $pageContent = '', array $metadata = [])
+    public function __construct(string $pageContent = '', array $metadata = [], ?string $id = null)
     {
         $this->pageContent = $pageContent;
         $this->metadata = $metadata;
+        $this->id = $id;
         $this->kwargs = ['page_content' => $pageContent, 'metadata' => $metadata];
+    }
+
+    /** Serialize the current identity alongside the existing constructor fields. */
+    public function kwargs(): array
+    {
+        return [
+            ...parent::kwargs(),
+            ...($this->id !== null ? ['id' => $this->id] : []),
+        ];
     }
 
     /** @return list<string> */
@@ -45,7 +58,7 @@ class Document extends Serializable
      */
     public function withPageContent(string $pageContent): self
     {
-        return new self($pageContent, $this->metadata);
+        return new self($pageContent, $this->metadata, $this->id);
     }
 
     /**
@@ -56,7 +69,7 @@ class Document extends Serializable
         $meta = $this->metadata;
         $meta[$key] = $value;
 
-        return new self($this->pageContent, $meta);
+        return new self($this->pageContent, $meta, $this->id);
     }
 
     public function __toString(): string

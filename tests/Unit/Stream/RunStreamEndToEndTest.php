@@ -146,6 +146,17 @@ final class RunStreamEndToEndTest extends TestCase
         $this->assertSame(['a', 'b'], $ran);
     }
 
+    public function testInternalModeSelectionDoesNotWidenWithRawEngineModesOrCallerOverride(): void
+    {
+        $config = new RunnableConfig(options: ['streamMode' => ['tasks', 'custom'], 'caller_option' => 'retained']);
+        $events = self::collect(RunStream::create(self::counterGraph(), ['v' => 1], $config));
+        self::assertSame(['streamMode' => ['tasks', 'custom'], 'caller_option' => 'retained'], $config->options);
+        self::assertNotContains('tasks', array_column($events, 'method'));
+        self::assertNotContains('custom', array_column($events, 'method'));
+        self::assertContains('values', array_column($events, 'method'));
+        self::assertContains('updates', array_column($events, 'method'));
+    }
+
     public function testMessagesProjectionStreamsChatModelText(): void
     {
         $run = RunStream::create(self::chatGraph(), ['messages' => []]);
