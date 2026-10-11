@@ -259,6 +259,7 @@ class Pregel extends Runnable
             'checkpointer' => $this->checkpointer,
             'checkpointerDisabled' => $this->checkpointerDisabled,
             'nodes' => $this->nodes,
+            'retryPolicy' => $this->retryPolicy,
             'channelSpecs' => ChannelRegistry::getOnlyChannels($this->channels),
             'outputKeys' => $outputKeys,
             'streamKeys' => $this->streamChannels,

@@ -19,6 +19,7 @@ use LangGraph\Pregel\Checkpoint\Checkpoint;
 use LangGraph\Pregel\Checkpoint\CheckpointFunctions;
 use LangGraph\Pregel\Checkpoint\CheckpointTuple;
 use LangGraph\Pregel\Messages\TracedNode;
+use LangGraph\Pregel\Retry\RetryPolicy;
 use LangGraph\Store\AsyncBatchedStore;
 use LangGraph\Store\BaseStore;
 
@@ -100,6 +101,7 @@ class PregelLoop
         public ?array $updatedChannels = null,
         public ?AsyncBatchedStore $store = null,
         public ?BaseCache $cache = null,
+        public ?RetryPolicy $retryPolicy = null,
     ) {
         if ($this->cache !== null) {
             $this->cache = new AsyncBatchedCache($this->cache);
@@ -302,6 +304,7 @@ class PregelLoop
             status: ['status' => 'pending'],
             store: $store,
             cache: $params['cache'] ?? null,
+            retryPolicy: $params['retryPolicy'] ?? null,
         );
         $loop->hasPersistedParent = $hasPersistedParent;
         $parentConfig = $saved->parentConfig;

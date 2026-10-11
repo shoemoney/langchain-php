@@ -130,7 +130,7 @@ final class CallScheduler
      */
     private function runWithRetry(PregelExecutableTask $task): ?\Throwable
     {
-        $policy = $task->retryPolicy;
+        $policy = $task->retryPolicy ?? $this->loop->retryPolicy;
         $attempts = 0;
         $config = $task->config;
 
