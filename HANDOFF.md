@@ -30,12 +30,12 @@ know before you start.
 
 | | |
 |---|---|
-| Path | `/Users/shoemoney/Projects/langchain-php` |
+| Path | ~~`/Users/shoemoney/Projects/langchain-php`~~ Current private candidate: `/Users/shoemoney/Projects/langchain-php-todo-20261011/integration-r1` |
 | Repo | `github.com/shoemoney/langchain-php` (public) |
-| Branch | `main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut) |
-| PHP | 8.5.11 installed; CI matrix on 8.2 / 8.3 / 8.4 |
-| Tests | **20863 tests (19760 passing, 1103 skipped), 66246 assertions** |
-| Size | 684 src files / 113,692 lines · 673 test files / 151,869 lines |
+| Branch | ~~`main`, pushed and **tagged `v0.1.0`** (first release, GitHub release cut)~~ Historical release state. Current branch: `todo/2026-10-11-private-integration-r1`; six-patch source head `6da845a65de7c80de38dbf8961b399854fd31925`, private and unreleased |
+| PHP | Host 8.5.11 measured; historical accepted floor58 has actual 8.2 / 8.3 / 8.4 evidence. New candidate native acceptance remains pending |
+| Tests | **21155 tests (20052 passing, 1103 skipped), 69083 assertions** |
+| Size | 684 src files / 113,813 lines · 679 test files / 154,630 lines |
 | Release | `v0.1.0`, CI green on 8.2/8.3/8.4 + coverage. **Not on Packagist** — consume via the VCS repository. |
 
 **Do not touch `/Users/shoemoney/Projects/agentdesk`.** The user was explicit.
@@ -507,8 +507,8 @@ Unresolved, recorded so they are not re-discovered:
   2026-10-08).** A handler outcome now carries a reserved `Constants::HANDLED` (`__handled__`) write, appended by
   `StateGraph::getUpdates`, and `cacheTaskWrites` returns early if any write has that key (upstream never caches a failed
   task, `loop.ts:838-853`). The pin was inverted to `NodeErrorHandlerTest::testAHandledFailureIsNotCachedUnderTheFailedNodesKey`.
-  Still open: a node with an error handler gets `compiledRetry = null`, so a graph-level `retryPolicy` could re-run the whole
-  wrapper (node plus handler).
+  ~~Still open: a node with an error handler gets `compiledRetry = null`, so a graph-level `retryPolicy` could re-run the whole
+  wrapper (node plus handler).~~ **Corrected in the 2026-10-11 private slice:** node/handler policies resolve inside the inline wrapper; a one-attempt outer policy prevents engine fallback from restarting an exhausted wrapper. Separate handler tasks, timeout wiring and checkpoint/callback lifecycle remain open.
 - ~~**NEW, `PregelRunner::taskResult` leaks the marker.**~~ **FIXED (Wave 4):** `taskResult()` now skips `Constants::HANDLED` as it does `NO_WRITES`, pinned by `tests/Unit/Pregel/DebugTaskResultHandledMarkerTest.php`. Original report: it copies every write except `NO_WRITES` into the debug-mode
   `task_result` payload, so a handled node shows `{"foo":"h","__handled__":true}` in the `debug` stream. Channel state, `updates`
   and `values` are unaffected, and no test pins the leak. A one-line filter on `Constants::HANDLED` (as for `NO_WRITES`) closes it.
@@ -530,8 +530,7 @@ Unresolved, recorded so they are not re-discovered:
   and 1 single-test skip left in the middleware suites (the `hitl.int.test.ts` marker). They inflate the Skipped count in `composer test`; neither MongoDB class has ever been exercised against a real server.
 - **Other Wave 2 gaps owned by later work:** `Pregel::validate()` is not auto-run; `StateGraph::compile(['checkpointer' => true])` becomes a base `MemorySaver`; `Signals::mergeSignals` has no `src` caller until
   `BaseClient::prepareFetchOptions` gets the timeout-signal merge; `tests/Unit/Sdk/Support/RecordingTransport`'s
-  "Streaming is WP-23b" message is stale; `Runtime.writer` / `Runtime.interrupt` in `Agents` read config keys
-  nothing injects yet.
+  "Streaming is WP-23b" message is stale; ~~`Runtime.writer` in `Agents` reads a config key nothing injects yet.~~ **Corrected in the 2026-10-11 private slice:** the engine already publishes its namespace-aware writer under `options['writer']`; both runtime factories now expose it with configurable fallback and callable filtering. `Runtime.interrupt` remains a separate unresolved scope.
 - **Slow retry tests.** That test and its OpenAI twin take about 3.4s each because a retryable
   429 hits the real `usleep` backoff. The backoff method is overridable but these tests do not
   override it.
@@ -729,3 +728,71 @@ PHP numeric-key JSON object IDs can decode as lists and revive (NB1); source lea
 Actual Linux arm64 PHP8.2.34, 8.3.35 and 8.4.26 each pass the complete current52 suite with the optional MongoDB library absent (20,437 tests / 57,766 assertions / 1,099 skips) and loaded (20,437 / 57,771 / 1,097), plus syntax, full style, dependency-platform and strict Composer validation. Discovered case multisets match the host after root mount-path normalization. Each native run additionally skips the same529 PostgreSQL-dependent cases; no new owned slice regresses to a skip. This offline matrix does not establish live backend/provider/Atlas/Redis-cluster/MCP acceptance.
 
 The immutable view includes exact repository history and source. All18 exact owned containers are gone. Common floor73 dev dependencies support PHP8.2; the host ignored lock is unchanged. The512M suite budget is validation-only, while production memory regression children retain128M. Evidence: .loop/next/reports/native-matrix-candidate52-final.json. Historical49 and51 evidence is retained. S1-C core plus reviewed test-name amendment are included; production-family activation and isolated S2-D/N16 remain excluded; canonical L1 included.
+
+
+### Private bounded todo cycle — 2026-10-11
+
+At source head `6da845a65de7c80de38dbf8961b399854fd31925`, the serial **non-live**
+host suite passes on PHP8.5.11: 21,155 cases, 20,052 passing, 1,103 expected
+environment skips and 69,083 assertions; no failures, errors, watchdog or orphan
+termination. Five historical data-set display IDs collide; evidence retains
+occurrence multiplicities instead of deduplicating them. All six immutable done
+checks also pass on the combined source, recorded in root
+`.loop/todo-cycle-2026-10-11/integration/all-six-done.json`. The parent reports
+full dry style passing for all 1,363 source/test files with `--sequential`; the
+first style attempt was sandbox-denied fixer IPC, not a style defect. Parent host checks also pass: best-effort PHP8.2-target parsing for 1,363 files
+(syntax-only on host8.5), PHP8.5 lint for 19 owned files, direct Reflection of12
+owned classes to their exact pinned paths/hashes, strict Composer validation and
+source diff checks. Receipts: root `.loop/todo-cycle-2026-10-11/integration/static-result.json`
+and `static-runs.json`. These do not establish native8.2 runtime compatibility.
+Post-update documentation guards pass all seven cases with no failures/errors/skips;
+root receipt: `.loop/todo-cycle-2026-10-11/integration/doc-guards-result.json`.
+
+The first six-patch run was **non-green**, with one history-ledger guard failure
+and no behavioral failures/errors. The exact pristine-base guard reproduced 86
+missing eight-character markers: closed no-HOME Git emitted eight characters
+where historical markers used seven. Private ledger repairs retain all 115 old
+markers and append actual history-derived aliases plus truthful private rows.
+The passing R2 supersedes that failure without erasing it. The earlier terminated
+five-patch run earns no full-suite credit. Receipt: root
+`.loop/todo-cycle-2026-10-11/integration/full-suite-result.json`; detailed
+qualification and next owners: [PORT_COMPLETION.md](PORT_COMPLETION.md).
+
+The six independent supplemental Codex reviews permit private integration only.
+The requested Sonnet implementation/fresh Opus acceptance routes were unavailable;
+no requested-model acceptance is claimed. Historical accepted floor58 remains
+unchanged, backed by `.loop/next/reports/root-integration-58.json` and its host/native
+receipts. This host pass does not raise that fully accepted floor or replace
+current native/body/include/temp/PHAR/helper custody and live/backend/provider/
+MCP/auth/SDK gates. Missing historical `/tmp` originals are not reconstructed;
+surviving receipts keep their original reading and custody limits.
+
+Graph and functional child tasks now fall back to graph retry when the node has
+none; explicit node policies win. Handled wrappers resolve compile-time policies
+and run under a one-attempt engine policy. Graph retries compute/log intervals
+**without sleeping**; real backoff, retry-wait deadlines, partial-write
+clearance discrimination and full handler lifecycle remain separate. The old
+PregelRunner sleep docblock is a source-owner follow-up, not timing evidence.
+
+Both runtimes expose callable engine writers from options with configurable
+fallback, including real fake-model tool/middleware custom chunks and nested
+namespaces; LangChain layering is preserved. Null options permit fallback;
+invalid non-null options win lookup and normalize to null. Interrupt handling
+is unchanged. Composed signals preserve the first Throwable reason by identity
+and do not latch on a thrown poll. AgentNode evidence is pre-model only;
+AsyncCaller tests use explicit user forwarding. D2 deadlines/normalization and
+D3 engine/provider I/O remain held, with no preemptive synchronous-I/O claim.
+
+Anthropic defaults are the frozen construction-time prefix policy, not live model
+capacity. Cache model/budget identity and max-token metadata remain open.
+Observer close stops the released ThreadStream source; projection replay,
+reentry, buffer and wider lifecycle/cancellation/SDK behavior remain held.
+Remote snapshots preserve task error/state/result, explicit-null result presence
+and server-versus-caller checkpoint fallback. Public PHP interrupt `id` and
+legacy forms remain the approved adaptation. N22 N7 covers nonstring, non-null
+`created_at`; **null is accepted**. Malformed scalar/null tasks, DTO shape growth,
+old native serialized uninitialized fields, local task population and recursive
+closure/GC/DAG/cycle/depth/memory/serde limits remain open. All inherited findings
+and scoped mutation/custody qualifications remain in the six review reports.
+
+Whole-port completion and release remain unclaimed.

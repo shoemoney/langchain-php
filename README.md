@@ -13,6 +13,16 @@ verified by ported test suites.
 > **Status:** active port. See [Port status](#port-status) for exactly what is
 > covered and what is not. Nothing below is claimed beyond what the test suite proves.
 
+The private six-patch candidate at source head `6da845a65de7c80de38dbf8961b399854fd31925`
+passes the non-live host suite on PHP 8.5.11. It covers graph retry fallback,
+runtime writers, composed cancellation reasons, Anthropic constructor defaults,
+ThreadStream observer close and RemoteGraph task fields. Historical accepted
+floor58 remains the last fully accepted host/static/documentation/native snapshot.
+Current documentation guards pass. Native recipe/custody and requested Sonnet/Opus
+gates remain unmet; live/provider/SDK and whole-port acceptance remain open.
+See [Completion gates and next owners](PORT_COMPLETION.md) for measured evidence
+and the current dependency order. This private work is unreleased.
+
 ---
 
 ## Why PHP?
