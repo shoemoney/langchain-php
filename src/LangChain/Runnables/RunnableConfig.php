@@ -323,8 +323,16 @@ final class RunnableConfig
                     $left = $copy->signal;
                     $right = $in->signal;
                     $aborted = false;
-                    $copy->signal = static function () use ($left, $right, &$aborted): bool {
-                        $aborted = $aborted || $left() || $right();
+                    // The first abort observed (left before right) stays latched. A Throwable reason is
+                    // returned as is; any other truthy poll still collapses to `true`.
+                    $copy->signal = static function () use ($left, $right, &$aborted): bool|\Throwable {
+                        if ($aborted !== false) {
+                            return $aborted;
+                        }
+                        $reason = $left() ?: $right();
+                        if ($reason) {
+                            $aborted = $reason instanceof \Throwable ? $reason : true;
+                        }
 
                         return $aborted;
                     };
