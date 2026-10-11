@@ -76,6 +76,33 @@ class ChatAnthropic extends BaseChatModel
 
     private const CLASS_NAME = 'ChatAnthropic';
 
+    /** @var array<string, int> Ordered source model prefixes. */
+    private const MODEL_DEFAULT_MAX_OUTPUT_TOKENS = [
+        'claude-opus-5' => 16384,
+        'claude-sonnet-5' => 16384,
+        'claude-fable-5-1' => 16384,
+        'claude-fable-5' => 16384,
+        'claude-mythos-5' => 16384,
+        'claude-mythos-preview' => 16384,
+        'claude-opus-4-7' => 16384,
+        'claude-opus-4-6' => 16384,
+        'claude-sonnet-4-6' => 16384,
+        'claude-opus-4-5' => 16384,
+        'claude-sonnet-4-5' => 16384,
+        'claude-haiku-4-5' => 16384,
+        'claude-opus-4-1' => 16384,
+        'claude-sonnet-4' => 16384,
+        'claude-opus-4' => 16384,
+        'claude-3-7-sonnet' => 8192,
+        'claude-3-5-sonnet' => 8192,
+        'claude-3-5-haiku' => 8192,
+        'claude-3-opus' => 4096,
+        'claude-3-sonnet' => 4096,
+        'claude-3-haiku' => 4096,
+    ];
+
+    private const FALLBACK_MAX_OUTPUT_TOKENS = 4096;
+
     /**
      * Every wire spelling of every call option, mapped to its canonical name.
      *
@@ -181,7 +208,7 @@ class ChatAnthropic extends BaseChatModel
         $this->temperature = isset($fields['temperature']) ? (float) $fields['temperature'] : $this->temperature;
         $this->topP = isset($fields['topP']) ? (float) $fields['topP'] : $this->topP;
         $this->topK = isset($fields['topK']) ? (float) $fields['topK'] : $this->topK;
-        $this->maxTokens = (int) ($fields['maxTokens'] ?? $this->maxTokens);
+        $this->maxTokens = (int) ($fields['maxTokens'] ?? self::defaultMaxOutputTokensForModel($this->model));
         $this->stopSequences = isset($fields['stopSequences']) ? array_values((array) $fields['stopSequences']) : $this->stopSequences;
         $this->defaultHeaders = (array) ($fields['defaultHeaders'] ?? []);
         $this->betas = array_values((array) ($fields['betas'] ?? []));
@@ -210,6 +237,17 @@ class ChatAnthropic extends BaseChatModel
             'thinking', 'outputConfig', 'contextManagement', 'inferenceGeo', 'invocationKwargs',
         ]));
         $this->kwargs = array_filter($this->kwargs, static fn (mixed $v): bool => $v !== null);
+    }
+
+    private static function defaultMaxOutputTokensForModel(string $model): int
+    {
+        foreach (self::MODEL_DEFAULT_MAX_OUTPUT_TOKENS as $prefix => $tokens) {
+            if (str_starts_with($model, $prefix)) {
+                return $tokens;
+            }
+        }
+
+        return self::FALLBACK_MAX_OUTPUT_TOKENS;
     }
 
     public function llmType(): string
@@ -249,10 +287,10 @@ class ChatAnthropic extends BaseChatModel
     /**
      * The request body.
      *
-     * `max_tokens` is required by the API and has no useful default upstream —
-     * it is the one parameter a caller must think about. It defaults to 1024
-     * here rather than being left unset, because an unset value produces a 400
-     * that names the parameter but not the fix.
+     * `max_tokens` is required by the API. Construction resolves its default
+     * once from the ordered model prefixes, with a 4096 fallback. The public
+     * property's 1024 declaration initializer is replaced during construction;
+     * an explicit constructor value still overrides the model default.
      *
      * @param array<string, mixed> $options
      * @param array<string, mixed> $extra
