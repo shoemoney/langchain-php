@@ -9,25 +9,41 @@ namespace LangGraph\Pregel;
  *
  * Port of `PregelTaskDescription`.
  *
- * Deliberately narrower than {@see PregelExecutableTask}: it carries the id,
- * name, interrupts, and path, and nothing about *how* the task runs. A task
- * description is what a caller is allowed to see; the runnable and config
- * behind it are engine-internal.
+ * Carries public task observations, including remote error, child state and result.
+ * The runnable and execution config behind {@see PregelExecutableTask} remain engine-internal.
+ * Local construction keeps the original id, name, interrupts and path defaults.
  */
 final class PregelTaskDescription
 {
+    private readonly bool $resultPresent;
+
     /**
      * @param string                            $id         Deterministic task id.
      * @param string                            $name       Node name.
      * @param list<array{id: string|null, value: mixed}> $interrupts Pending interrupts.
      * @param TaskPath|null                     $path       Where the task sits in the step.
+     * @param mixed                             $error      The mapped remote error, or null when absent.
+     * @param StateSnapshot|array<string, mixed>|null $state Child snapshot or checkpoint reference.
+     * @param mixed                             $result     Task result, including null.
+     * @param bool                              $resultPresent Distinguishes absent from explicit null.
      */
     public function __construct(
         public readonly string $id = '',
         public readonly string $name = '',
         public readonly array $interrupts = [],
         public readonly ?TaskPath $path = null,
+        public readonly mixed $error = null,
+        public readonly StateSnapshot|array|null $state = null,
+        public readonly mixed $result = null,
+        bool $resultPresent = false,
     ) {
+        $this->resultPresent = $resultPresent || $result !== null;
+    }
+
+    /** Whether a result was supplied, including an explicit null. */
+    public function hasResult(): bool
+    {
+        return $this->resultPresent;
     }
 
     /**

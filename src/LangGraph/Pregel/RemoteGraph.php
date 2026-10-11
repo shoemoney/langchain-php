@@ -52,8 +52,7 @@ use LangGraph\Sdk\Client;
  *
  * ## Not ported
  *
- * `streamEvents` v1/v2 (upstream throws "Not implemented" too) and the `error`/`state`/`result` fields of a
- * task description (see {@see self::createStateSnapshot()}). The v3 event stream is
+ * `streamEvents` v1/v2 (upstream throws "Not implemented" too). The v3 event stream is
  * {@see self::streamEventsV3()}.
  */
 class RemoteGraph extends RunnableBinding
@@ -814,11 +813,11 @@ class RemoteGraph extends RunnableBinding
 
         $configurable = [];
         foreach (['thread_id', 'checkpoint_ns', 'checkpoint_id'] as $key) {
-            if (($resolved[$key] ?? null) !== null) {
+            if (array_key_exists($key, $resolved)) {
                 $configurable[$key] = $resolved[$key];
             }
         }
-        if (($resolved['checkpoint_ns'] ?? null) !== null || ($resolved['checkpoint_id'] ?? null) !== null || ($resolved['checkpoint_map'] ?? null) !== null) {
+        if (array_key_exists('checkpoint_ns', $resolved) || array_key_exists('checkpoint_id', $resolved) || array_key_exists('checkpoint_map', $resolved)) {
             $configurable['checkpoint_map'] = $resolved['checkpoint_map'] ?? [];
         }
 
@@ -826,37 +825,78 @@ class RemoteGraph extends RunnableBinding
     }
 
     /**
-     * Port of `_createStateSnapshot`.
+     * Port of `_createStateSnapshot`, with caller nulls kept as PHP's undefined adaptation.
      *
-     * A task keeps its `id`, `name` and `interrupts`. Upstream also carries `error`, the nested
-     * subgraph `state` and `result`, which {@see PregelTaskDescription} has no field for, so they are
-     * dropped.
+     * Only the entry filters caller fallback keys. Recursive server-derived fallbacks retain nulls.
+     * Public interrupts keep their established `id`; the source rename is marked TODO-remove.
      *
      * @param array<string, mixed>      $state
      * @param array<string, mixed>|null $fallbackConfigurable
      */
     protected function createStateSnapshot(array $state, ?array $fallbackConfigurable = null): StateSnapshot
     {
-        $tasks = [];
-        foreach ($state['tasks'] ?? [] as $task) {
-            $tasks[] = new PregelTaskDescription(
-                id: (string) ($task['id'] ?? ''),
-                name: (string) ($task['name'] ?? ''),
-                interrupts: array_values((array) ($task['interrupts'] ?? [])),
+        $callerCheckpoint = self::getCheckpoint($fallbackConfigurable);
+        $truthy = static fn (mixed $value): bool => $value !== null && $value !== false
+            && $value !== '' && $value !== 0 && $value !== 0.0
+            && !(is_float($value) && is_nan($value));
+
+        $map = null;
+        $map = static function (array $snapshot, ?array $resolvedFallback) use (&$map, $truthy): StateSnapshot {
+            $checkpoint = $snapshot['checkpoint'] ?? null;
+            if ($checkpoint !== null && !is_array($checkpoint)) {
+                throw new \InvalidArgumentException('Invalid snapshot checkpoint: expected an array or null.');
+            }
+            $parent = $snapshot['parent_checkpoint'] ?? null;
+            if ($truthy($parent) && !is_array($parent)) {
+                throw new \InvalidArgumentException('Invalid parent checkpoint: expected an array or null.');
+            }
+
+            $tasks = [];
+            foreach ($snapshot['tasks'] ?? [] as $task) {
+                $taskCheckpoint = $task['checkpoint'] ?? null;
+                if ($truthy($taskCheckpoint) && !is_array($taskCheckpoint)) {
+                    throw new \InvalidArgumentException('Invalid task checkpoint: expected an array or null.');
+                }
+
+                $taskState = $task['state'] ?? null;
+                $mappedState = null;
+                if ($truthy($taskState)) {
+                    if (!is_array($taskState) || !array_key_exists('tasks', $taskState)
+                        || !is_array($taskState['tasks']) || !array_is_list($taskState['tasks'])) {
+                        throw new \InvalidArgumentException('Invalid nested task state: expected an array with a tasks list.');
+                    }
+                    $childFallback = $truthy($taskCheckpoint)
+                        ? self::checkpointToConfig($taskCheckpoint)['configurable']
+                        : $resolvedFallback;
+                    $mappedState = $map($taskState, $childFallback);
+                } elseif ($truthy($taskCheckpoint)) {
+                    $mappedState = ['configurable' => $taskCheckpoint];
+                }
+
+                $error = $task['error'] ?? null;
+                $tasks[] = new PregelTaskDescription(
+                    id: (string) ($task['id'] ?? ''),
+                    name: (string) ($task['name'] ?? ''),
+                    interrupts: array_values((array) ($task['interrupts'] ?? [])),
+                    error: $truthy($error) ? ['message' => $error] : null,
+                    state: $mappedState,
+                    result: $task['result'] ?? null,
+                    resultPresent: array_key_exists('result', $task),
+                );
+            }
+
+            return new StateSnapshot(
+                values: array_key_exists('values', $snapshot) ? $snapshot['values'] : [],
+                next: array_values((array) ($snapshot['next'] ?? [])),
+                config: self::checkpointToConfig($checkpoint ?? $resolvedFallback),
+                metadata: (array) ($snapshot['metadata'] ?? []),
+                createdAt: $snapshot['created_at'] ?? null,
+                parentConfig: $truthy($parent) ? self::checkpointToConfig($parent) : null,
+                tasks: $tasks,
             );
-        }
+        };
 
-        $parent = $state['parent_checkpoint'] ?? null;
-
-        return new StateSnapshot(
-            values: (array) ($state['values'] ?? []),
-            next: array_values((array) ($state['next'] ?? [])),
-            config: self::checkpointToConfig($state['checkpoint'] ?? null, $fallbackConfigurable),
-            metadata: (array) ($state['metadata'] ?? []),
-            createdAt: $state['created_at'] ?? null,
-            parentConfig: $parent ? self::checkpointToConfig($parent) : null,
-            tasks: $tasks,
-        );
+        return $map($state, $callerCheckpoint);
     }
 
     private static function requireThreadId(RunnableConfig $config): string
