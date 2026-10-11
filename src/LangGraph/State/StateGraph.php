@@ -850,12 +850,13 @@ class StateGraph extends Graph
                 $bound = $this->withErrorHandler(
                     $key,
                     $bound,
-                    $retryPolicy,
+                    $retryPolicy ?? ($options['retryPolicy'] ?? null),
                     $handlerNode->bound,
-                    $handlerNode->retryPolicy ?? ($defaults['retryPolicy'] ?? null),
+                    $handlerNode->retryPolicy ?? ($defaults['retryPolicy'] ?? null) ?? ($options['retryPolicy'] ?? null),
                 );
-                // The retries now run inside the wrapper, so the engine must not retry a second time.
-                $compiledRetry = null;
+                // The wrapper resolves node/handler retries itself. An explicit one-attempt
+                // policy prevents the engine from falling back and restarting the whole wrapper.
+                $compiledRetry = new RetryPolicy(maxAttempts: 1);
                 $guardedStarts[$key] = true;
             }
 
