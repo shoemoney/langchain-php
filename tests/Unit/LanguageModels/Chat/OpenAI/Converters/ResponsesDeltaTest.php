@@ -215,6 +215,16 @@ final class ResponsesDeltaTest extends TestCase
         self::assertSame('call_123', $combined->toolCallChunks[0]['id']);
         self::assertTrue($combined->toolCallChunks[0]['isCustomTool']);
         self::assertSame(['call_123' => 'ctc_123'], $combined->additional_kwargs[ResponsesOutput::CUSTOM_TOOL_CALL_IDS_MAP_KEY]);
+
+        // Upstream checks the decoded call on its chunk. This port keeps
+        // undecoded deltas on chunks and promotes them at toMessage().
+        $message = $combined->toMessage();
+        self::assertSame([], $message->invalidToolCalls);
+        self::assertSame([[
+            'name' => 'execute_code', 'args' => ['input' => "console.log('custom tool streaming repro')"],
+            'id' => 'call_123', 'type' => 'tool_call', 'index' => 0,
+        ]], $message->toolCalls);
+        self::assertSame(['call_123' => 'ctc_123'], $message->additional_kwargs[ResponsesOutput::CUSTOM_TOOL_CALL_IDS_MAP_KEY]);
     }
 
     public function testCustomToolInputDeltaEvents(): void
