@@ -23,7 +23,7 @@ class ThreadsClient extends BaseClient
     /**
      * Get a thread by ID. `include` asks the server for extra fields.
      *
-     * @param array{include?: list<string>, signal?: mixed} $options
+     * @param array{include?: list<string>, signal?: (callable(): bool)|null} $options
      *
      * @return Thread
      */
@@ -37,7 +37,7 @@ class ThreadsClient extends BaseClient
     /**
      * Create a new thread. `graphId` is stored as `metadata.graph_id`.
      *
-     * @param array{metadata?: array<string, mixed>|null, threadId?: string, ifExists?: string, graphId?: string, supersteps?: list<array{updates: list<array{values: mixed, command?: array<string, mixed>, asNode: string}>}>, ttl?: int|array{ttl: int, strategy?: string}, signal?: mixed} $payload
+     * @param array{metadata?: array<string, mixed>|null, threadId?: string, ifExists?: string, graphId?: string, supersteps?: list<array{updates: list<array{values: mixed, command?: array<string, mixed>, asNode: string}>}>, ttl?: int|array{ttl: int, strategy?: string}, signal?: (callable(): bool)|null} $payload
      *
      * @return Thread
      */
@@ -80,7 +80,7 @@ class ThreadsClient extends BaseClient
     /**
      * Copy an existing thread.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      *
      * @return Thread
      */
@@ -93,7 +93,7 @@ class ThreadsClient extends BaseClient
      * Update a thread. With `returnMinimal` the server sends `Prefer: return=minimal` and the call
      * returns null.
      *
-     * @param array{metadata?: array<string, mixed>|null, ttl?: int|array{ttl: int, strategy?: string}, returnMinimal?: bool, signal?: mixed} $payload
+     * @param array{metadata?: array<string, mixed>|null, ttl?: int|array{ttl: int, strategy?: string}, returnMinimal?: bool, signal?: (callable(): bool)|null} $payload
      *
      * @return Thread|null
      */
@@ -117,7 +117,7 @@ class ThreadsClient extends BaseClient
     /**
      * Delete a thread.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      */
     public function delete(string $threadId, array $options = []): void
     {
@@ -129,7 +129,7 @@ class ThreadsClient extends BaseClient
      * keeps each thread and its latest state.
      *
      * @param list<string>                                              $threadIds
-     * @param array{strategy?: 'delete'|'keep_latest', signal?: mixed} $options
+     * @param array{strategy?: 'delete'|'keep_latest', signal?: (callable(): bool)|null} $options
      *
      * @return array{pruned_count: int}
      */
@@ -144,7 +144,7 @@ class ThreadsClient extends BaseClient
     /**
      * List threads.
      *
-     * @param array{metadata?: array<string, mixed>, ids?: list<string>, limit?: int, offset?: int, status?: string, sortBy?: string, sortOrder?: string, select?: list<string>, values?: array<string, mixed>, extract?: array<string, string>, signal?: mixed} $query
+     * @param array{metadata?: array<string, mixed>, ids?: list<string>, limit?: int, offset?: int, status?: string, sortBy?: string, sortOrder?: string, select?: list<string>, values?: array<string, mixed>, extract?: array<string, string>, signal?: (callable(): bool)|null} $query
      *
      * @return list<Thread>
      */
@@ -170,7 +170,7 @@ class ThreadsClient extends BaseClient
     /**
      * Count threads matching the filters.
      *
-     * @param array{metadata?: array<string, mixed>, values?: mixed, status?: string, signal?: mixed} $query
+     * @param array{metadata?: array<string, mixed>, values?: mixed, status?: string, signal?: (callable(): bool)|null} $query
      */
     public function count(array $query = []): int
     {
@@ -191,7 +191,7 @@ class ThreadsClient extends BaseClient
      * checkpoint the read is deduplicated (see {@see BaseClient::fetch()}).
      *
      * @param Checkpoint|string|null                        $checkpoint
-     * @param array{subgraphs?: bool, signal?: mixed} $options
+     * @param array{subgraphs?: bool, signal?: (callable(): bool)|null} $options
      *
      * @return ThreadState
      */
@@ -219,7 +219,7 @@ class ThreadsClient extends BaseClient
     /**
      * Add state to a thread.
      *
-     * @param array{values: mixed, checkpoint?: Checkpoint, checkpointId?: string, asNode?: string, signal?: mixed} $options
+     * @param array{values: mixed, checkpoint?: Checkpoint, checkpointId?: string, asNode?: string, signal?: (callable(): bool)|null} $options
      *
      * @return array{configurable?: array<string, mixed>}
      */
@@ -242,7 +242,7 @@ class ThreadsClient extends BaseClient
      *
      * @param string|array{configurable?: array<string, mixed>} $threadIdOrConfig
      * @param array<string, mixed>|null                         $metadata
-     * @param array{signal?: mixed}                             $options
+     * @param array{signal?: (callable(): bool)|null}                             $options
      */
     public function patchState(string|array $threadIdOrConfig, ?array $metadata, array $options = []): void
     {
@@ -264,7 +264,7 @@ class ThreadsClient extends BaseClient
     /**
      * Get all past states for a thread. A read despite being a POST, so it is deduplicated.
      *
-     * @param array{limit?: int, before?: array<string, mixed>, checkpoint?: array<string, mixed>, metadata?: array<string, mixed>, signal?: mixed} $options
+     * @param array{limit?: int, before?: array<string, mixed>, checkpoint?: array<string, mixed>, metadata?: array<string, mixed>, signal?: (callable(): bool)|null} $options
      *
      * @return list<ThreadState>
      */
@@ -282,7 +282,7 @@ class ThreadsClient extends BaseClient
     /**
      * Join the live stream of a thread's runs. `lastEventId` resumes after that event.
      *
-     * @param array{lastEventId?: string, streamMode?: string|list<string>, signal?: mixed} $options
+     * @param array{lastEventId?: string, streamMode?: string|list<string>, signal?: (callable(): bool)|null} $options
      *
      * @return \Generator<int, array{id: string|null, event: string, data: mixed}>
      */

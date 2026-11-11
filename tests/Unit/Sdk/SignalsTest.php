@@ -58,4 +58,36 @@ final class SignalsTest extends TestCase
 
         $this->assertTrue($merged());
     }
+
+    public function testMergedAbortIsStickyAfterItHasBeenObserved(): void
+    {
+        $aborted = true;
+        $merged = Signals::mergeSignals(static function () use (&$aborted): bool {
+            return $aborted;
+        }, static fn (): bool => false);
+
+        $this->assertTrue($merged());
+        $aborted = false;
+        $this->assertTrue($merged(), 'an aborted JS controller cannot become un-aborted');
+    }
+
+    public function testTimeoutSignalExpiresAtItsMonotonicDeadline(): void
+    {
+        $now = 1000.0;
+        $signal = Signals::timeoutSignal(50, static function () use (&$now): float {
+            return $now;
+        });
+
+        $this->assertFalse($signal());
+        $now = 1049.9;
+        $this->assertFalse($signal());
+        $now = 1050.0;
+        $this->assertTrue($signal());
+    }
+
+    public function testNegativeTimeoutIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        Signals::timeoutSignal(-1);
+    }
 }

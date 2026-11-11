@@ -118,7 +118,7 @@ class RunsClient extends BaseClient
      * plus `assistant_id`; only null entries are dropped.
      *
      * @param list<array<string, mixed>> $payloads each with an `assistantId`
-     * @param array{signal?: mixed}      $options
+     * @param array{signal?: (callable(): bool)|null}      $options
      *
      * @return list<Run>
      */
@@ -171,7 +171,7 @@ class RunsClient extends BaseClient
     /**
      * List all runs for a thread.
      *
-     * @param array{limit?: int, offset?: int, status?: string, select?: list<string>, signal?: mixed} $options
+     * @param array{limit?: int, offset?: int, status?: string, select?: list<string>, signal?: (callable(): bool)|null} $options
      *
      * @return list<Run>
      */
@@ -190,7 +190,7 @@ class RunsClient extends BaseClient
     /**
      * Get a run by ID.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      *
      * @return Run
      */
@@ -202,7 +202,7 @@ class RunsClient extends BaseClient
     /**
      * Cancel a run. `$action` is `interrupt` (default) or `rollback`.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      */
     public function cancel(string $threadId, string $runId, bool $wait = false, string $action = 'interrupt', array $options = []): void
     {
@@ -215,7 +215,7 @@ class RunsClient extends BaseClient
     /**
      * Cancel one or more runs.
      *
-     * @param array{threadId?: string, runIds?: list<string>, status?: 'pending'|'running'|'all', action?: string, signal?: mixed} $options
+     * @param array{threadId?: string, runIds?: list<string>, status?: 'pending'|'running'|'all', action?: string, signal?: (callable(): bool)|null} $options
      */
     public function cancelMany(array $options): void
     {
@@ -233,7 +233,7 @@ class RunsClient extends BaseClient
     /**
      * Block until a run is done.
      *
-     * @param array{cancelOnDisconnect?: bool, signal?: mixed} $options
+     * @param array{cancelOnDisconnect?: bool, signal?: (callable(): bool)|null} $options
      */
     public function join(string $threadId, string $runId, array $options = []): mixed
     {
@@ -249,7 +249,7 @@ class RunsClient extends BaseClient
      * `$options` may also be a bare signal closure, as upstream accepts a bare `AbortSignal`.
      * `lastEventId` resumes after that event. `streamIdleReconnect`: int ms, `'auto'` (default) or 0.
      *
-     * @param array{signal?: mixed, cancelOnDisconnect?: bool, lastEventId?: string, streamMode?: string|list<string>, streamIdleReconnect?: int|string}|\Closure|null $options
+     * @param array{signal?: (callable(): bool)|null, cancelOnDisconnect?: bool, lastEventId?: string, streamMode?: string|list<string>, streamIdleReconnect?: int|string}|\Closure|null $options
      *
      * @return \Generator<int, array{id: string|null, event: string, data: mixed}>
      */
@@ -274,7 +274,7 @@ class RunsClient extends BaseClient
     /**
      * Delete a run.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      */
     public function delete(string $threadId, string $runId, array $options = []): void
     {

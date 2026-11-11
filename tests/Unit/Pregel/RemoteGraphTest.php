@@ -10,6 +10,7 @@ use LangChain\Tests\Unit\Sdk\Support\StreamingTransport;
 use LangChain\Utils\Http\HttpResponse;
 use LangChain\Utils\Testing\FakeHttpClient;
 use LangGraph\Errors\GraphInterrupt;
+use LangGraph\Errors\RemoteException;
 use LangGraph\Pregel\Command;
 use LangGraph\Pregel\Constants;
 use LangGraph\Pregel\PregelTaskDescription;
@@ -20,6 +21,7 @@ use LangGraph\Pregel\StateSnapshot;
 use LangGraph\Sdk\Client;
 use LangGraph\State\StateGraph;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -743,7 +745,7 @@ final class RemoteGraphTest extends TestCase
 
     public function testRemoteRunStreamAbortSwallowsACancelFailure(): void
     {
-        [$client] = self::client(static fn (string $method, string $url): HttpResponse => str_contains($url, '/cancel')
+        [$client, $transport] = self::client(static fn (string $method, string $url): HttpResponse => str_contains($url, '/cancel')
             ? new HttpResponse(500, [], 'down')
             : FakeHttpClient::json(200, ['run_id' => 'run_1']));
         $run = (new RemoteGraph(graphId: 'g', client: $client))->streamEventsV3([], self::threadConfig());
@@ -751,6 +753,78 @@ final class RemoteGraphTest extends TestCase
         $run->abort();
 
         $this->assertTrue($run->aborted());
+        $this->assertTrue(($run->signal())());
+        $requestsAfterFailure = count($transport->requests);
+        $run->abort();
+        $this->assertCount($requestsAfterFailure, $transport->requests, 'abort remains idempotent after cancellation fails');
+        $this->assertSame([], iterator_to_array($run, false), 'failed server cancellation does not resume local iteration');
+    }
+
+    /** @return iterable<string, array{mixed, string}> */
+    public static function remoteErrorPayloads(): iterable
+    {
+        // remote.ts serializes non-string data without assuming a message field.
+        yield 'malformed JSON inside a string' => ['{not JSON', '{not JSON'];
+        yield 'structured message' => [['message' => ['nested' => true]], '{"message":{"nested":true}}'];
+        yield 'unexpected list' => [['unexpected', 2], '["unexpected",2]'];
+        yield 'number' => [42, '42'];
+        yield 'boolean' => [false, 'false'];
+        yield 'null' => [null, 'null'];
+    }
+
+    #[DataProvider('remoteErrorPayloads')]
+    public function testRemoteServerErrorPreservesNonStringAndMalformedStringData(mixed $data, string $message): void
+    {
+        [$remote] = self::streaming([
+            ['event' => 'values', 'data' => ['before' => true]],
+            ['event' => 'error|child', 'data' => $data],
+            ['event' => 'values', 'data' => ['after' => true]],
+        ]);
+
+        [$parts, $error] = self::collect($remote->stream([], self::threadConfig(['streamMode' => 'values'])));
+
+        $this->assertSame([['before' => true]], $parts);
+        $this->assertInstanceOf(RemoteException::class, $error);
+        $this->assertSame($message, $error->getMessage());
+        $this->assertSame($data, $error->fields['data']);
+    }
+
+    #[DataProvider('remoteErrorPayloads')]
+    public function testRemoteRunStreamPreservesServerErrorData(mixed $data, string $message): void
+    {
+        [$client] = self::client(static fn (string $method, string $url): HttpResponse => str_ends_with($url, '/runs')
+            ? FakeHttpClient::json(200, ['run_id' => 'run_1'])
+            : self::sse([
+                ['event' => 'values', 'data' => ['before' => true]],
+                ['event' => 'error|child', 'data' => $data],
+                ['event' => 'values', 'data' => ['after' => true]],
+            ]));
+        $run = (new RemoteGraph(graphId: 'g', client: $client))->streamEventsV3([], self::threadConfig());
+
+        [$parts, $error] = self::collect($run->getIterator());
+
+        $this->assertCount(1, $parts);
+        $this->assertSame(['before' => true], $parts[0]['params']['data']);
+        $this->assertInstanceOf(RemoteException::class, $error);
+        $this->assertSame($message, $error->getMessage());
+        $this->assertSame($data, $error->fields['data']);
+    }
+
+    public function testMalformedServerErrorWireJsonFailsDecodingInBothStreamVersions(): void
+    {
+        foreach ([false, true] as $v3) {
+            [$client] = self::client(static fn (string $method, string $url): HttpResponse => str_ends_with($url, '/runs')
+                ? FakeHttpClient::json(200, ['run_id' => 'run_1'])
+                : new HttpResponse(200, ['content-type' => 'text/event-stream'], "event: error\ndata: {not JSON\n\n"));
+            $remote = new RemoteGraph(graphId: 'g', client: $client);
+            $stream = $v3
+                ? $remote->streamEventsV3([], self::threadConfig())->getIterator()
+                : $remote->stream([], self::threadConfig());
+
+            [$parts, $error] = self::collect($stream);
+            $this->assertSame([], $parts);
+            $this->assertInstanceOf(\JsonException::class, $error);
+        }
     }
 
     public function testStreamEventsV3AbortsAtOnceWhenTheSignalIsAlreadySet(): void
