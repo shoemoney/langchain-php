@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
  * results sees the string quietly LOSE a character, which it cannot distinguish
  * from a bug in its own reducer. U+FFFD says "a character began here and I
  * could not read it" — which is true, and is the same choice already made for an
- * unpaired low surrogate and for a short-hex truncation.
+ * unpaired low surrogate. Short-hex escapes instead recover as literal text.
  *
  * The earlier fix for truncated escapes covered the SHORT-HEX path and missed
  * this one. Same instruction both times: test the degenerate end-of-input case,
@@ -41,8 +41,16 @@ final class SurrogateCutAtEofTest extends TestCase
             // U+FFFD is efbfbd.
             'after a letter' => ['"a\uD83D', '61efbfbd'],
             'at the very start' => ['"\uD83D', 'efbfbd'],
-            // The short-hex recovery still emits its backslash first: 5c 75 44.
-            'then a partial hex digit' => ['"a\uD83D\uD', '615c7544efbfbd'],
+            // The replacement occupies the original surrogate's position,
+            // before any following short-hex recovery or plain characters.
+            'then a partial hex digit' => ['"a\uD83D\uD', '61efbfbd7544'],
+            'then a partial low escape' => ['"\uD83D\uDE0', 'efbfbd75444530'],
+            'then plain text' => ['"x\ud800y"', '78efbfbd79'],
+            'then an escaped newline' => ['"\uD83D\n', 'efbfbd0a'],
+            'then a lone backslash' => ['"\uD83D\\', 'efbfbd5c'],
+            'then another high surrogate' => ['"\uD800\uD83D', 'efbfbdefbfbd'],
+            'then a complete pair' => ['"\uD800\uD83D\uDE00"', 'efbfbdf09f9880'],
+            'intervening text prevents pairing' => ['"\uD83Dx\uDE00"', 'efbfbd78efbfbd'],
         ];
     }
 
