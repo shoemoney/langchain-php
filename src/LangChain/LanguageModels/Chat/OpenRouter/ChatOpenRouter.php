@@ -19,7 +19,9 @@ use LangChain\LanguageModels\Outputs\ChatResult;
 use LangChain\LanguageModels\StructuredOutput;
 use LangChain\Messages\AIMessageChunk;
 use LangChain\Messages\BaseMessage;
+use LangChain\OutputParsers\OutputParserException;
 use LangChain\Runnables\Runnable;
+use LangChain\Runnables\RunnableLambda;
 use LangChain\Tracers\CallbackManagerForLLMRun;
 use LangChain\Utils\AsyncCaller;
 use LangChain\Utils\Env;
@@ -29,6 +31,7 @@ use LangChain\Utils\Http\HttpException;
 use LangChain\Utils\Http\HttpResponse;
 use LangChain\Utils\Http\SseParser;
 use LangChain\Utils\Js;
+use LangChain\Utils\JsonSchemaValidator;
 
 /**
  * OpenRouter chat model integration.
@@ -56,7 +59,7 @@ use LangChain\Utils\Js;
  *    chunk when `streamUsage` is on. Upstream skips every chunk without a delta,
  *    which would drop the trailing usage report.
  *  - `withStructuredOutput` takes JSON Schema arrays only (this port has no Zod /
- *    Standard Schema path) and does not validate the parsed value; the
+ *    Standard Schema path) and validates using the shared JSON Schema subset; the
  *    `ls_structured_output_format` tracing hint is not attached.
  *  - `apiKey` is never written into `kwargs()` (the serialized trace payload).
  *  - Tools are converted when bound as well as when sent, so a `StructuredTool`
@@ -638,6 +641,24 @@ class ChatOpenRouter extends BaseChatModel
             );
             $parser = StructuredOutput::createFunctionCallingParser($functionName);
         }
+
+        $parser = $parser->pipe(new RunnableLambda(static function (mixed $value) use ($schema, $method): mixed {
+            // Upstream returns undefined for an absent named tool call, before schema validation.
+            if ($method === 'functionCalling' && $value === null) {
+                return null;
+            }
+            $issues = JsonSchemaValidator::validate($value, $schema);
+            if ($issues !== []) {
+                $rendered = Js::encode($value);
+
+                throw new OutputParserException(
+                    'OpenRouter structured output failed JSON Schema validation: ' . Js::encode($issues),
+                    $rendered,
+                );
+            }
+
+            return $value;
+        }));
 
         return StructuredOutput::assembleStructuredOutputPipeline(
             $llm,

@@ -20,12 +20,9 @@ use PHPUnit\Framework\TestCase;
  *
  * The seam is {@see FakeHttpClient} where upstream spies on `fetch`. The
  * `withStructuredOutput` cases that feed a mocked `invoke` are driven through a
- * scripted HTTP reply instead, so the request body is asserted too. The four
- * "invalid output throws OutputParserException" cases are NOT converted: they
- * exercise Standard Schema validation of the parsed value, and this port is
- * JSON-Schema-native with no schema-validating parser; they are replaced by
- * {@see self::testStructuredOutputIsNotValidatedAgainstTheSchema()}, which pins
- * that divergence.
+ * scripted HTTP reply instead, so the request body is asserted too. Standard
+ * Schema validation cases use the port's supported JSON Schema representation;
+ * additional invalid-output cases live in ChatOpenRouterStructuredValidationTest.
  */
 #[CoversClass(ChatOpenRouter::class)]
 final class ChatOpenRouterTest extends TestCase
@@ -516,13 +513,12 @@ final class ChatOpenRouterTest extends TestCase
         self::model()->withStructuredOutput(self::nameSchema(), ['method' => 'jsonSchema']);
     }
 
-    public function testStructuredOutputIsNotValidatedAgainstTheSchema(): void
+    public function testStructuredOutputIsValidatedAgainstTheSchema(): void
     {
-        // Upstream throws OutputParserException here (Standard Schema validation). This port has no
-        // schema-validating parser, so a well-formed reply of the wrong shape comes back as parsed.
         $http = new FakeHttpClient([FakeHttpClient::json(200, self::completion('{"wrong_field": 123}'))]);
         $structured = self::model([], $http)->withStructuredOutput(self::nameSchema(), ['method' => 'jsonMode']);
 
-        self::assertSame(['wrong_field' => 123], $structured->invoke('What is your name?'));
+        $this->expectException(\LangChain\OutputParsers\OutputParserException::class);
+        $structured->invoke('What is your name?');
     }
 }
