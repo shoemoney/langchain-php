@@ -27,14 +27,13 @@ use LangGraph\Pregel\PregelScratchpad;
  *
  *  - Callbacks are plain handler lists in this port, so only the array/array merge of
  *    upstream's six-way `mergeCallbacks` exists: the lists are concatenated. There is no
- *    `CallbackManager` to merge tags/metadata/handlers of, and no dedupe-by-identity case.
- *  - A `RunnableConfig` object cannot distinguish an absent key from one set to its default,
- *    so `recursionLimit` from a later config object wins only when it differs from the
- *    default (25). A later config that deliberately sets exactly 25 over an earlier 100
- *    therefore does not win; spell it as an array (`['recursionLimit' => 25]`) to be exact.
+ *    `CallbackManager`-valued config to merge, and no dedupe-by-identity case.
+ *  - Empty object maps/lists cannot distinguish an omitted field from an explicit reset.
+ *    Public graph entry treats these as omitted; nonempty caller maps replace ambient maps.
  *  - {@see self::getConfig()} falls back to the config of the task that is currently running
  *    ({@see PregelScratchpad::currentConfig()}) when no ambient {@see AsyncLocalStorage}
- *    config is installed, because nothing in this port seeds that storage while a node runs.
+ *    config is installed. N18 task guards publish ALS; an explicit mock retains this
+ *    compatibility fallback on the same Fiber only.
  */
 final class Config
 {
@@ -159,6 +158,96 @@ final class Config
         $empty->metadata = self::propagateConfigurableToMetadata($empty->configurable, $empty->metadata) ?? [];
 
         return $empty;
+    }
+
+    /**
+     * Public graph stream preprocessing, distinct from internal LG composition.
+     *
+     * Mirrors LC ensureConfig plus Pregel.stream's active-task configurable merge.
+     * Explicit nonempty caller maps/lists replace the whole inherited field.
+     * Empty object fields retain the port's omission adaptation (N18c owns reset
+     * presence). No generic Runnable or generator context interception is added.
+     */
+    public static function prepareGraphCall(?RunnableConfig $call, ?RunnableConfig $bound = null): RunnableConfig
+    {
+        $ambient = self::ambient();
+        $public = $ambient === null ? new RunnableConfig() : clone $ambient;
+        // Source Pregel._defaults removes these invocation-only fields before
+        // publishing task config. PHP task configs still retain them, so strip
+        // only the cloned ambient copy here; explicit caller options remain.
+        foreach (['interruptBefore', 'interruptAfter', 'inputKeys', 'outputKeys', 'debug'] as $key) {
+            unset($public->options[$key]);
+        }
+        $public->runId = [];
+        $public->runName = null;
+        // Pregel.stream places graph-bound recursion in options before LC
+        // preprocessing; an explicitly supplied call recursion still wins.
+        if ($bound !== null) {
+            $public->recursionLimit = self::mergeRecursionLimit($public->recursionLimit, $bound);
+            $public->verbose = RunnableConfig::mergeConfigs($public, $bound)->verbose;
+        }
+        if ($call !== null) {
+            foreach (['tags', 'metadata', 'callbacks', 'runId'] as $field) {
+                if ($call->$field !== []) {
+                    $public->$field = $call->$field;
+                }
+            }
+            foreach (['maxConcurrency', 'signal', 'runName', 'runIdParent', 'checkpointId', 'checkpointMap', 'context', 'toolCall'] as $field) {
+                if ($call->$field !== null) {
+                    $public->$field = $call->$field;
+                }
+            }
+            $public->recursionLimit = self::mergeRecursionLimit($public->recursionLimit, $call);
+            $public->verbose = RunnableConfig::mergeConfigs($public, $call)->verbose;
+            $public->options = array_replace($public->options, array_filter($call->options, static fn ($v) => $v !== null));
+            if ($call->configurable !== []) {
+                $public->configurable = ($ambient?->configurable[Constants::CONFIG_KEY_READ] ?? null) !== null
+                    && ($call->configurable[Constants::CONFIG_KEY_READ] ?? null) === null
+                    ? array_replace($ambient->configurable, $call->configurable)
+                    : $call->configurable;
+            }
+        }
+
+        // LC ensureConfig publishes a complete config, including recursion.
+        return $public->with(['recursionLimit' => $public->recursionLimit, 'verbose' => $public->verbose]);
+    }
+
+    /** Source AsyncGeneratorWithSetup publishes picked effective config at graph entry. */
+    public static function ensureGraphCall(?RunnableConfig $bound, RunnableConfig $public): RunnableConfig
+    {
+        $picked = new RunnableConfig(
+            // Source entry may publish no implicit config without a tracing
+            // RunTree; task inheritance can carry callback managers instead.
+            // PHP ALS always carries plain config/list fields. Include tags
+            // and callbacks only through the explicit public argument here,
+            // avoiding a second inherited list copy at this graph boundary.
+            metadata: $public->metadata,
+            maxConcurrency: $public->maxConcurrency,
+            recursionLimit: $public->recursionLimit,
+            signal: $public->signal,
+            configurable: $public->configurable,
+            options: isset($public->options['store']) ? ['store' => $public->options['store']] : [],
+        );
+        $result = AsyncLocalStorage::runWithConfig($picked, static fn (): RunnableConfig => self::ensureLangGraphConfig($bound, $public));
+        // subgraphs/inputKeys/cache and PHP runtime options are consumed at the
+        // public stream boundary, separately from CONFIG_KEYS upstream. Keep
+        // that options bag without widening internal ensureLangGraphConfig.
+        $result->options = array_replace($public->options, $result->options);
+        $result->runIdParent = $public->runIdParent;
+        $result->checkpointId = $public->checkpointId;
+        $result->checkpointMap = $public->checkpointMap;
+        $result->toolCall = $public->toolCall;
+        // PHP-only run verbosity remains a public scalar, not an LG option.
+        $result->verbose = $public->verbose;
+
+        return $result;
+    }
+
+    private static function mergeRecursionLimit(int $previous, RunnableConfig $next): int
+    {
+        // N11 retains constructor/array presence inside the core scalar merge.
+        // Consume only this scalar: LG's map/list composition is different.
+        return RunnableConfig::mergeConfigs(new RunnableConfig(recursionLimit: $previous), $next)->recursionLimit;
     }
 
     /**
@@ -388,9 +477,7 @@ final class Config
         if ($from->maxConcurrency !== null) {
             $into->maxConcurrency = $from->maxConcurrency;
         }
-        if ($from->recursionLimit !== self::DEFAULT_RECURSION_LIMIT) {
-            $into->recursionLimit = $from->recursionLimit;
-        }
+        $into->recursionLimit = self::mergeRecursionLimit($into->recursionLimit, $from);
         if ($from->signal !== null) {
             $into->signal = $from->signal;
         }
