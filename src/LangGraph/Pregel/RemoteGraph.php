@@ -52,8 +52,7 @@ use LangGraph\Sdk\Client;
  *
  * ## Not ported
  *
- * `streamEvents` v1/v2 (upstream throws "Not implemented" too), the stream-protocol hook
- * (`CONFIG_KEY_STREAM`, which this engine never installs), and the `error`/`state`/`result` fields of a
+ * `streamEvents` v1/v2 (upstream throws "Not implemented" too) and the `error`/`state`/`result` fields of a
  * task description (see {@see self::createStateSnapshot()}). The v3 event stream is
  * {@see self::streamEventsV3()}.
  */
@@ -64,6 +63,9 @@ class RemoteGraph extends RunnableBinding
     private const DEFAULT_RECURSION_LIMIT = 25;
 
     private const MAX_SANITIZE_DEPTH = 64;
+
+    /** The default json_encode depth: deeper input could never be sent. */
+    private const MAX_INPUT_DEPTH = 512;
 
     public string $graphId;
 
@@ -162,11 +164,12 @@ class RemoteGraph extends RunnableBinding
     public function stream(mixed $input, ?RunnableConfig $config = null): \Generator
     {
         $merged = RunnableConfig::mergeConfigs($this->config, $config);
-        $options = $merged->options;
+        $options = $config?->options ?? [];
 
         ['threadId' => $threadId, 'context' => $context, 'config' => $runConfig] = $this->prepareRunRequest($merged);
 
-        $streamSubgraphs = $options['subgraphs'] ?? false;
+        $streamProtocol = $config?->configurable[Constants::CONFIG_KEY_STREAM] ?? null;
+        $streamSubgraphs = $config?->options['subgraphs'] ?? ($streamProtocol !== null);
         $interruptBefore = $options['interruptBefore'] ?? $this->interruptBefore;
         $interruptAfter = $options['interruptAfter'] ?? $this->interruptAfter;
 
@@ -174,7 +177,7 @@ class RemoteGraph extends RunnableBinding
 
         $sentModes = array_values(array_unique(array_map(
             static fn (string $mode): string => $mode === 'messages' ? 'messages-tuple' : $mode,
-            $streamModes,
+            array_values(array_unique([...$streamModes, ...($streamProtocol instanceof StreamProtocol ? $streamProtocol->modes : [])])),
         )));
 
         $payload = [
@@ -204,7 +207,7 @@ class RemoteGraph extends RunnableBinding
             $payload['streamResumable'] = $this->streamResumable;
         }
 
-        $callerNamespace = $merged->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] ?? null;
+        $callerNamespace = $config?->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] ?? null;
 
         foreach ($this->client->runs->stream($threadId, $this->graphId, $payload) as $chunk) {
             $event = (string) $chunk['event'];
@@ -213,6 +216,10 @@ class RemoteGraph extends RunnableBinding
             [$mode, $namespace] = self::splitEvent($event);
             if (is_string($callerNamespace)) {
                 $namespace = [...explode(Constants::CHECKPOINT_NAMESPACE_SEPARATOR, $callerNamespace), ...$namespace];
+            }
+
+            if ($streamProtocol instanceof StreamProtocol && in_array($event, $streamProtocol->modes, true)) {
+                $streamProtocol->push([$namespace, $mode, $data]);
             }
 
             if (str_starts_with($event, 'updates')) {
@@ -238,52 +245,56 @@ class RemoteGraph extends RunnableBinding
         }
     }
 
-    /**
-     * Start a run and return a handle on its protocol events.
-     *
-     * Port of `streamEvents({ version: "v3" })`. Upstream drives a `ThreadStream`, which this port's
-     * SDK does not have, so the run is created over REST (`runs->create`) and then followed with
-     * `runs->joinStream`; see {@see RemoteRunStream}. A thread is created first when the config names
-     * none. Rejects `transformers`, `control` and `interruptBefore`/`interruptAfter`, as upstream does.
-     */
+    /** Remote v1/v2 rejection is eager; v3 keeps the shared PHP Generator signature. */
+    public function streamEvents(
+        mixed $input,
+        ?RunnableConfig $config = null,
+        string $version = 'v2',
+        array $streamOptions = [],
+        ?string $encoding = null,
+    ): \Generator {
+        if ($version !== 'v3') {
+            throw new \RuntimeException('Not implemented.');
+        }
+        if ($encoding !== null && $encoding !== 'text/event-stream') {
+            throw new \InvalidArgumentException(\sprintf('Unsupported encoding "%s".', $encoding));
+        }
+        // The inherited callback-filter argument is not a remote v3 runtime-options carrier.
+        $run = $this->streamEventsV3($input, $config);
+
+        return $encoding === 'text/event-stream' ? $run->toEventStream() : $run->getIterator();
+    }
+
+    /** Start the SDK thread protocol run; Command serializes into input, as in pinned remote.ts. */
     public function streamEventsV3(mixed $input, ?RunnableConfig $config = null): RemoteRunStream
     {
         $merged = RunnableConfig::mergeConfigs($this->config, $config);
-        $options = $merged->options;
+        $options = $config?->options ?? [];
 
-        if (isset($options['transformers'])) {
+        if (array_key_exists('transformers', $options)) {
             throw new \InvalidArgumentException('RemoteGraph.streamEvents({ version: "v3" }) does not support `transformers`.');
         }
-        if (isset($options['control'])) {
+        if (array_key_exists('control', $options)) {
             throw new \InvalidArgumentException('RemoteGraph.streamEvents({ version: "v3" }) does not support `control`.');
         }
-        if (isset($options['interruptBefore']) || $this->interruptBefore !== null) {
+        if (array_key_exists('interruptBefore', $options) || $this->interruptBefore !== null) {
             throw new \InvalidArgumentException('RemoteGraph.streamEvents({ version: "v3" }) does not support `interruptBefore`.');
         }
-        if (isset($options['interruptAfter']) || $this->interruptAfter !== null) {
+        if (array_key_exists('interruptAfter', $options) || $this->interruptAfter !== null) {
             throw new \InvalidArgumentException('RemoteGraph.streamEvents({ version: "v3" }) does not support `interruptAfter`.');
         }
 
-        ['threadId' => $threadId, 'context' => $context, 'config' => $runConfig] = $this->prepareRunRequest($merged);
-        $threadId ??= (string) ($this->client->threads->create()['thread_id'] ?? '');
-
-        $payload = [
+        ['threadId' => $threadId, 'config' => $runConfig] = $this->prepareRunRequest($merged);
+        $thread = $threadId !== null
+            ? $this->client->threads->stream($threadId, ['assistantId' => $this->graphId])
+            : $this->client->threads->stream(['assistantId' => $this->graphId]);
+        $run = $thread->run->start([
+            'input' => Command::isCommand($input) ? self::commandToJson($input) : self::serializeInputs($input),
             'config' => $runConfig,
-            'streamMode' => RemoteRunStream::STREAM_MODES,
-        ];
-        if (Command::isCommand($input)) {
-            $payload['command'] = self::commandToJson($input);
-        } else {
-            $payload['input'] = self::serializeInputs($input);
-        }
-        if ($context !== null) {
-            $payload['context'] = $context;
-        }
-
-        $run = $this->client->runs->create($threadId, $this->graphId, $payload);
+        ]);
 
         $signal = is_callable($merged->signal) ? $merged->signal : null;
-        $stream = new RemoteRunStream($this->client, $threadId, $run['run_id'] ?? null, $signal);
+        $stream = RemoteRunStream::fromThread($this->client, $thread, $run['run_id'] ?? null, $signal);
         if ($signal !== null && $signal()) {
             $stream->abort();
         }
@@ -496,12 +507,13 @@ class RemoteGraph extends RunnableBinding
         }
 
         $parts = ['tags' => $config->tags, 'metadata' => $metadata, 'configurable' => $config->configurable];
+        $parts = self::propagateNestedMetadata($parts, new \SplObjectStorage(), 0);
 
         try {
-            $safe = json_decode(json_encode($parts, \JSON_THROW_ON_ERROR), true, 512, \JSON_THROW_ON_ERROR);
+            $safe = (array) json_decode(json_encode($parts, \JSON_THROW_ON_ERROR), false, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             $seen = new \SplObjectStorage();
-            $safe = json_decode((string) json_encode(self::jsonSafe($parts, $seen, 0), \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_PARTIAL_OUTPUT_ON_ERROR), true);
+            $safe = (array) json_decode((string) json_encode(self::jsonSafe($parts, $seen, 0), \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_PARTIAL_OUTPUT_ON_ERROR));
         }
 
         $configurable = [];
@@ -519,6 +531,36 @@ class RemoteGraph extends RunnableBinding
             'configurable' => $configurable,
             'recursion_limit' => $config->recursionLimit !== self::DEFAULT_RECURSION_LIMIT ? $config->recursionLimit : null,
         ];
+    }
+
+    /** Copy nested config defaults while leaving cycles for the existing JSON fallback. */
+    private static function propagateNestedMetadata(mixed $value, \SplObjectStorage $copies, int $depth): mixed
+    {
+        if ($depth > self::MAX_SANITIZE_DEPTH || (!is_array($value) && !self::isPlainObject($value))) {
+            return $value;
+        }
+        if (is_object($value)) {
+            if ($copies->offsetExists($value)) {
+                return $copies[$value];
+            }
+            $copy = new \stdClass();
+            $copies[$value] = $copy;
+            foreach (self::propagateNestedMetadata(get_object_vars($value), $copies, $depth + 1) as $key => $item) {
+                $copy->{$key} = $item;
+            }
+
+            return $copy;
+        }
+        // Non-plain metadata objects keep their native JSON contract, so that node gets no defaults.
+        $foreignMetadata = isset($value['metadata']) && is_object($value['metadata']) && !self::isPlainObject($value['metadata']);
+        if (!$foreignMetadata && isset($value['configurable']) && (is_array($value['configurable']) || self::isPlainObject($value['configurable']))) {
+            $metadata = isset($value['metadata']) && (is_array($value['metadata']) || self::isPlainObject($value['metadata']))
+                ? (array) $value['metadata'] : [];
+            $propagated = Config::propagateConfigurableToMetadata((array) $value['configurable'], $metadata) ?? $metadata;
+            $value['metadata'] = $propagated === [] ? new \stdClass() : $propagated;
+        }
+
+        return array_map(static fn (mixed $item): mixed => self::propagateNestedMetadata($item, $copies, $depth + 1), $value);
     }
 
     /**
@@ -560,14 +602,118 @@ class RemoteGraph extends RunnableBinding
      */
     protected static function serializeInputs(mixed $value): mixed
     {
+        $height = -1;
+        $changed = false;
+
+        return self::serializeInput($value, new \SplObjectStorage(), new \SplObjectStorage(), new \SplObjectStorage(), 0, $height, $changed);
+    }
+
+    /** Only an exact `stdClass` is a plain object; subclasses keep their native JSON contract. */
+    private static function isPlainObject(mixed $value): bool
+    {
+        return $value instanceof \stdClass && $value::class === \stdClass::class;
+    }
+
+    /**
+     * Reject cycles catchably and retain native JSON contracts outside plain containers. Containers
+     * are copied only when a message below them is mapped (`$changed`); otherwise the original is
+     * returned, so ordinary documents are not duplicated. Completed objects are memoized, so an
+     * aliased DAG is not expanded into an exponential PHP tree, and their relative container height
+     * still guards a memo hit reached through a deeper path. An unchanged object is memoized as its
+     * bare height; a changed one as its copy, whose height is kept separately keyed by that fresh
+     * copy. No per-object array is allocated, keeping bookkeeping small on large documents.
+     *
+     * @param \SplObjectStorage<\stdClass, null> $active
+     * @param \SplObjectStorage<\stdClass, int|\stdClass> $done
+     * @param \SplObjectStorage<\stdClass, int> $copyHeights
+     */
+    private static function serializeInput(mixed $value, \SplObjectStorage $active, \SplObjectStorage $done, \SplObjectStorage $copyHeights, int $depth, int &$height, bool &$changed): mixed
+    {
+        $height = -1;
+        $changed = false;
         if ($value instanceof BaseMessage) {
-            return $value->toDict()['data'] + ['role' => $value->getType()];
+            $changed = true;
+
+            return [...$value->toDict()['data'], 'role' => $value->getType()];
+        }
+        if (!is_array($value) && !self::isPlainObject($value)) {
+            return $value;
+        }
+        if ($depth >= self::MAX_INPUT_DEPTH) {
+            throw new \JsonException('Maximum stack depth exceeded', \JSON_ERROR_DEPTH);
         }
         if (is_array($value)) {
-            return array_map(static fn (mixed $v): mixed => self::serializeInputs($v), $value);
+            return self::serializeEntries($value, $active, $done, $copyHeights, $depth, $height, $changed) ?? $value;
+        }
+        if ($active->offsetExists($value)) {
+            throw new \JsonException('Recursion detected', \JSON_ERROR_RECURSION);
+        }
+        if ($done->offsetExists($value)) {
+            $completed = $done->offsetGet($value);
+            $changed = $completed instanceof \stdClass;
+            [$result, $height] = $changed ? [$completed, $copyHeights->offsetGet($completed)] : [$value, $completed];
+            if ($depth + $height >= self::MAX_INPUT_DEPTH) {
+                throw new \JsonException('Maximum stack depth exceeded', \JSON_ERROR_DEPTH);
+            }
+
+            return $result;
         }
 
-        return $value;
+        $active->offsetSet($value, null);
+        try {
+            $entries = self::serializeEntries(get_object_vars($value), $active, $done, $copyHeights, $depth, $height, $changed);
+            if ($entries === null) {
+                $done->offsetSet($value, $height);
+
+                return $value;
+            }
+            $result = (object) $entries;
+            $done->offsetSet($value, $result);
+            $copyHeights->offsetSet($result, $height);
+
+            return $result;
+        } finally {
+            $active->offsetUnset($value);
+        }
+    }
+
+    /**
+     * Walk container entries; returns a fresh by-value copy only once an entry changed, else null.
+     * The copy never writes through a caller's array reference slot.
+     *
+     * @param array<array-key, mixed> $entries
+     * @param \SplObjectStorage<\stdClass, null> $active
+     * @param \SplObjectStorage<\stdClass, int|\stdClass> $done
+     * @param \SplObjectStorage<\stdClass, int> $copyHeights
+     *
+     * @return array<array-key, mixed>|null
+     */
+    private static function serializeEntries(array $entries, \SplObjectStorage $active, \SplObjectStorage $done, \SplObjectStorage $copyHeights, int $depth, int &$height, bool &$changed): ?array
+    {
+        $height = 0;
+        $changed = false;
+        $copy = null;
+        foreach ($entries as $key => $item) {
+            $childHeight = -1;
+            $childChanged = false;
+            $result = self::serializeInput($item, $active, $done, $copyHeights, $depth + 1, $childHeight, $childChanged);
+            $height = max($height, $childHeight + 1);
+            if ($childChanged && $copy === null) {
+                $copy = [];
+                foreach ($entries as $priorKey => $prior) {
+                    if ($priorKey === $key) {
+                        break;
+                    }
+                    $copy[$priorKey] = $prior;
+                }
+            }
+            if ($copy !== null) {
+                $copy[$key] = $result;
+            }
+        }
+        $changed = $copy !== null;
+
+        return $copy;
     }
 
     /**

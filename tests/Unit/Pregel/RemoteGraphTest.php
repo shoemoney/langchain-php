@@ -10,6 +10,7 @@ use LangChain\Tests\Unit\Sdk\Support\StreamingTransport;
 use LangChain\Utils\Http\HttpResponse;
 use LangChain\Utils\Testing\FakeHttpClient;
 use LangGraph\Errors\GraphInterrupt;
+use LangGraph\Errors\RemoteException;
 use LangGraph\Pregel\Command;
 use LangGraph\Pregel\Constants;
 use LangGraph\Pregel\PregelTaskDescription;
@@ -20,6 +21,7 @@ use LangGraph\Pregel\StateSnapshot;
 use LangGraph\Sdk\Client;
 use LangGraph\State\StateGraph;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -32,7 +34,7 @@ use PHPUnit\Framework\TestCase;
  * Differences from upstream, all forced by the language: no `signal` object (a `callable(): bool`),
  * no BigInt (the circular-reference test uses an object cycle), per-call options live in
  * `RunnableConfig::$options`, and `getGraphAsync`/`getSubgraphsAsync` are `getGraph`/`getSubgraphs`.
- * The v3 tests drive `runs->create` + `runs->joinStream` rather than a `ThreadStream`.
+ * The v3 tests drive the actual SDK ThreadStream commands/protocol SSE transport.
  */
 #[CoversClass(RemoteGraph::class)]
 #[CoversClass(RemoteRunStream::class)]
@@ -59,6 +61,25 @@ final class RemoteGraphTest extends TestCase
 
         return [new Client(['apiUrl' => self::BASE, 'apiKey' => null, 'callerOptions' => ['sleep' => static function (): void {
         }]], $transport), $transport];
+    }
+
+    /** Wrap fixture command results in the SDK protocol response, keeping actual Client dispatch. */
+    private static function protocolClient(\Closure $handler): array
+    {
+        return self::client(static function (string $method, string $url, array $headers, ?string $body) use ($handler): HttpResponse {
+            $response = $handler($method, $url, $headers, $body);
+            if (str_ends_with($url, '/commands')) {
+                return FakeHttpClient::json(200, ['type' => 'response', 'id' => json_decode($body, true)['id'],
+                    'result' => json_decode($response->body, true)]);
+            }
+
+            return $response;
+        });
+    }
+
+    private static function protocolSse(array $events): HttpResponse
+    {
+        return self::sse(array_map(static fn ($event): array => ['event' => 'message', 'data' => $event], $events));
     }
 
     /**
@@ -609,7 +630,7 @@ final class RemoteGraphTest extends TestCase
 
     public function testStreamEventsV3StartsARemoteRunOnTheThread(): void
     {
-        [$client, $transport] = self::client(static fn (string $method, string $url): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1', 'thread_id' => 'thread_1']));
+        [$client, $transport] = self::protocolClient(static fn (string $method, string $url): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1', 'thread_id' => 'thread_1']));
         $remote = new RemoteGraph(graphId: 'test_graph_id', client: $client);
 
         $run = $remote->streamEventsV3(['input' => 'data'], new RunnableConfig(
@@ -623,8 +644,8 @@ final class RemoteGraphTest extends TestCase
         $this->assertSame('thread_1', $run->threadId());
         $this->assertSame('run_1', $run->runId());
         $this->assertCount(1, $transport->requests);
-        $this->assertSame(self::BASE . '/threads/thread_1/runs', $transport->requests[0]['url']);
-        $body = $transport->bodyOf();
+        $this->assertSame(self::BASE . '/threads/thread_1/commands', $transport->requests[0]['url']);
+        $body = $transport->bodyOf()['params'];
         $this->assertSame('test_graph_id', $body['assistant_id']);
         $this->assertSame(['input' => 'data'], $body['input']);
         $this->assertSame(['custom_key' => 'custom_value'], $body['config']['configurable']);
@@ -632,32 +653,32 @@ final class RemoteGraphTest extends TestCase
         $this->assertSame(['remote'], $body['config']['tags']);
     }
 
-    public function testStreamEventsV3CreatesAThreadWhenNoThreadIdIsConfigured(): void
+    public function testStreamEventsV3GeneratesAThreadIdWithoutRestCreate(): void
     {
-        [$client, $transport] = self::client(static fn (string $method, string $url): HttpResponse => str_ends_with($url, '/threads')
+        [$client, $transport] = self::protocolClient(static fn (string $method, string $url): HttpResponse => str_ends_with($url, '/threads')
             ? FakeHttpClient::json(200, ['thread_id' => 'new-thread'])
             : FakeHttpClient::json(200, ['run_id' => 'run_9']));
         $remote = new RemoteGraph(graphId: 'test_graph_id', client: $client);
 
         $run = $remote->streamEventsV3(['input' => 'data']);
 
-        $this->assertSame('new-thread', $run->threadId());
-        $this->assertSame(self::BASE . '/threads', $transport->requests[0]['url']);
-        $this->assertSame(self::BASE . '/threads/new-thread/runs', $transport->requests[1]['url']);
+        $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $run->threadId());
+        $this->assertCount(1, $transport->requests);
+        $this->assertSame(self::BASE . '/threads/' . $run->threadId() . '/commands', $transport->requests[0]['url']);
     }
 
-    public function testStreamEventsV3SerializesACommandAsACommand(): void
+    public function testStreamEventsV3SerializesACommandAsInput(): void
     {
-        [$client, $transport] = self::client(static fn (): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1']));
+        [$client, $transport] = self::protocolClient(static fn (): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1']));
         $remote = new RemoteGraph(graphId: 'test_graph_id', client: $client);
 
         $remote->streamEventsV3(new Command(update: ['foo' => 'bar'], resume: 'yes'), self::threadConfig());
 
-        $body = $transport->bodyOf();
-        $this->assertSame('Command', $body['command']['lg_name']);
-        $this->assertSame(['foo' => 'bar'], $body['command']['update']);
-        $this->assertSame('yes', $body['command']['resume']);
-        $this->assertArrayNotHasKey('input', $body);
+        $body = $transport->bodyOf()['params'];
+        $this->assertSame('Command', $body['input']['lg_name']);
+        $this->assertSame(['foo' => 'bar'], $body['input']['update']);
+        $this->assertSame('yes', $body['input']['resume']);
+        $this->assertArrayNotHasKey('command', $body);
     }
 
     public function testStreamEventsV3RejectsUnsupportedOptions(): void
@@ -679,16 +700,15 @@ final class RemoteGraphTest extends TestCase
 
     public function testStreamEventsV3IteratesRemoteProtocolEvents(): void
     {
-        [$client, $transport] = self::client(static function (string $method, string $url): HttpResponse {
-            if ($method === 'POST') {
+        [$client, $transport] = self::protocolClient(static function (string $method, string $url): HttpResponse {
+            if (str_ends_with($url, '/commands')) {
                 return FakeHttpClient::json(200, ['run_id' => 'run_1']);
             }
 
-            return self::sse([
-                ['event' => 'metadata', 'data' => ['run_id' => 'run_1']],
-                ['event' => 'values', 'data' => ['value' => 1]],
-                ['event' => 'updates|child|sub', 'data' => ['__interrupt__' => [['id' => 'i1', 'value' => 'ok?']]]],
-                ['event' => 'end', 'data' => null],
+            return self::protocolSse([
+                RemoteRunStreamThreadProtocolTest::event('values', ['value' => 1], 17),
+                RemoteRunStreamThreadProtocolTest::event('input.requested', ['interrupt_id' => 'i1', 'payload' => 'ok?'], 18),
+                RemoteRunStreamThreadProtocolTest::event('lifecycle', ['event' => 'interrupted'], 19),
             ]);
         });
         $remote = new RemoteGraph(graphId: 'test_graph_id', client: $client);
@@ -696,38 +716,39 @@ final class RemoteGraphTest extends TestCase
         $run = $remote->streamEventsV3(['input' => 'data'], self::threadConfig());
         $events = iterator_to_array($run, false);
 
-        $this->assertCount(2, $events);
+        $this->assertCount(3, $events);
         $this->assertSame('event', $events[0]['type']);
-        $this->assertSame(0, $events[0]['seq']);
+        $this->assertSame(17, $events[0]['seq']);
         $this->assertSame('values', $events[0]['method']);
         $this->assertSame([], $events[0]['params']['namespace']);
         $this->assertSame(['value' => 1], $events[0]['params']['data']);
-        $this->assertSame(1, $events[1]['seq']);
-        $this->assertSame(['child', 'sub'], $events[1]['params']['namespace']);
+        $this->assertSame(18, $events[1]['seq']);
+        $this->assertSame([], $events[1]['params']['namespace']);
         $this->assertTrue($run->interrupted());
-        $this->assertSame([['id' => 'i1', 'value' => 'ok?']], $run->interrupts());
+        $this->assertSame([['interruptId' => 'i1', 'payload' => 'ok?', 'namespace' => []]], $run->interrupts());
         $this->assertSame(['value' => 1], $run->output());
-        $this->assertStringContainsString('/threads/thread_1/runs/run_1/stream', $transport->requests[1]['url']);
+        $this->assertStringContainsString('/threads/thread_1/stream/events', $transport->requests[1]['url']);
     }
 
     public function testRemoteRunStreamEncodesEventsAsATextEventStream(): void
     {
-        [$client] = self::client(static fn (string $method): HttpResponse => $method === 'POST'
+        [$client] = self::protocolClient(static fn (string $method, string $url): HttpResponse => str_ends_with($url, '/commands')
             ? FakeHttpClient::json(200, ['run_id' => 'run_1'])
-            : self::sse([
-                ['event' => 'values', 'data' => ['v' => 1]],
-                ['event' => 'updates|a', 'data' => ['u' => 2]],
+            : self::protocolSse([
+                RemoteRunStreamThreadProtocolTest::event('values', ['v' => 1], 1),
+                RemoteRunStreamThreadProtocolTest::event('updates', ['u' => 2], 2, ['a']),
+                RemoteRunStreamThreadProtocolTest::event('lifecycle', ['event' => 'completed'], 3),
             ]));
         $remote = new RemoteGraph(graphId: 'g', client: $client);
 
         $frames = iterator_to_array($remote->streamEventsV3([], self::threadConfig())->toEventStream(), false);
 
-        $this->assertSame(["event: values\ndata: {\"v\":1}\n\n", "event: updates|a\ndata: {\"u\":2}\n\n"], $frames);
+        $this->assertSame(["event: values\ndata: {\"v\":1}\n\n", "event: updates|a\ndata: {\"u\":2}\n\n", "event: lifecycle\ndata: {\"event\":\"completed\"}\n\n"], $frames);
     }
 
     public function testRemoteRunStreamAbortCancelsTheRunOnce(): void
     {
-        [$client, $transport] = self::client(static fn (): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1']));
+        [$client, $transport] = self::protocolClient(static fn (): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1']));
         $remote = new RemoteGraph(graphId: 'g', client: $client);
         $run = $remote->streamEventsV3([], self::threadConfig());
 
@@ -743,7 +764,7 @@ final class RemoteGraphTest extends TestCase
 
     public function testRemoteRunStreamAbortSwallowsACancelFailure(): void
     {
-        [$client] = self::client(static fn (string $method, string $url): HttpResponse => str_contains($url, '/cancel')
+        [$client, $transport] = self::protocolClient(static fn (string $method, string $url): HttpResponse => str_contains($url, '/cancel')
             ? new HttpResponse(500, [], 'down')
             : FakeHttpClient::json(200, ['run_id' => 'run_1']));
         $run = (new RemoteGraph(graphId: 'g', client: $client))->streamEventsV3([], self::threadConfig());
@@ -751,11 +772,83 @@ final class RemoteGraphTest extends TestCase
         $run->abort();
 
         $this->assertTrue($run->aborted());
+        $this->assertTrue(($run->signal())());
+        $requestsAfterFailure = count($transport->requests);
+        $run->abort();
+        $this->assertCount($requestsAfterFailure, $transport->requests, 'abort remains idempotent after cancellation fails');
+        $this->assertSame([], iterator_to_array($run, false), 'failed server cancellation does not resume local iteration');
+    }
+
+    /** @return iterable<string, array{mixed, string}> */
+    public static function remoteErrorPayloads(): iterable
+    {
+        // remote.ts serializes non-string data without assuming a message field.
+        yield 'malformed JSON inside a string' => ['{not JSON', '{not JSON'];
+        yield 'structured message' => [['message' => ['nested' => true]], '{"message":{"nested":true}}'];
+        yield 'unexpected list' => [['unexpected', 2], '["unexpected",2]'];
+        yield 'number' => [42, '42'];
+        yield 'boolean' => [false, 'false'];
+        yield 'null' => [null, 'null'];
+    }
+
+    #[DataProvider('remoteErrorPayloads')]
+    public function testRemoteServerErrorPreservesNonStringAndMalformedStringData(mixed $data, string $message): void
+    {
+        [$remote] = self::streaming([
+            ['event' => 'values', 'data' => ['before' => true]],
+            ['event' => 'error|child', 'data' => $data],
+            ['event' => 'values', 'data' => ['after' => true]],
+        ]);
+
+        [$parts, $error] = self::collect($remote->stream([], self::threadConfig(['streamMode' => 'values'])));
+
+        $this->assertSame([['before' => true]], $parts);
+        $this->assertInstanceOf(RemoteException::class, $error);
+        $this->assertSame($message, $error->getMessage());
+        $this->assertSame($data, $error->fields['data']);
+    }
+
+    #[DataProvider('remoteErrorPayloads')]
+    public function testLegacyRemoteRunStreamPreservesServerErrorData(mixed $data, string $message): void
+    {
+        [$client] = self::client(static fn (string $method, string $url): HttpResponse => str_ends_with($url, '/runs')
+            ? FakeHttpClient::json(200, ['run_id' => 'run_1'])
+            : self::sse([
+                ['event' => 'values', 'data' => ['before' => true]],
+                ['event' => 'error|child', 'data' => $data],
+                ['event' => 'values', 'data' => ['after' => true]],
+            ]));
+        $run = new RemoteRunStream($client, 'thread_1', 'run_1');
+
+        [$parts, $error] = self::collect($run->getIterator());
+
+        $this->assertCount(1, $parts);
+        $this->assertSame(['before' => true], $parts[0]['params']['data']);
+        $this->assertInstanceOf(RemoteException::class, $error);
+        $this->assertSame($message, $error->getMessage());
+        $this->assertSame($data, $error->fields['data']);
+    }
+
+    public function testMalformedServerErrorWireJsonFailsDecodingInBothLegacyRestPaths(): void
+    {
+        foreach ([false, true] as $v3) {
+            [$client] = self::client(static fn (string $method, string $url): HttpResponse => str_ends_with($url, '/runs')
+                ? FakeHttpClient::json(200, ['run_id' => 'run_1'])
+                : new HttpResponse(200, ['content-type' => 'text/event-stream'], "event: error\ndata: {not JSON\n\n"));
+            $remote = new RemoteGraph(graphId: 'g', client: $client);
+            $stream = $v3
+                ? (new RemoteRunStream($client, 'thread_1', 'run_1'))->getIterator()
+                : $remote->stream([], self::threadConfig());
+
+            [$parts, $error] = self::collect($stream);
+            $this->assertSame([], $parts);
+            $this->assertInstanceOf(\JsonException::class, $error);
+        }
     }
 
     public function testStreamEventsV3AbortsAtOnceWhenTheSignalIsAlreadySet(): void
     {
-        [$client, $transport] = self::client(static fn (): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1']));
+        [$client, $transport] = self::protocolClient(static fn (): HttpResponse => FakeHttpClient::json(200, ['run_id' => 'run_1']));
         $remote = new RemoteGraph(graphId: 'g', client: $client);
 
         $run = $remote->streamEventsV3([], new RunnableConfig(configurable: ['thread_id' => 't'], signal: static fn (): bool => true));

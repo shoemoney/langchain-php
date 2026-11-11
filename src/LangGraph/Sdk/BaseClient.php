@@ -13,6 +13,7 @@ use LangGraph\Sdk\Utils\GuzzleMethodHttpClient;
 use LangGraph\Sdk\Utils\Headers;
 use LangGraph\Sdk\Utils\InFlightRead;
 use LangGraph\Sdk\Utils\MethodHttpClient;
+use LangGraph\Sdk\Utils\Signals;
 
 /**
  * Port of `client/base.ts`: the shared request machinery behind every LangGraph SDK sub-client.
@@ -27,12 +28,16 @@ use LangGraph\Sdk\Utils\MethodHttpClient;
  *    `LANGCHAIN_API_KEY` in that order; an explicit **null** disables the lookup
  *  - `callerOptions`: forwarded to {@see AsyncCaller} (defaults `maxRetries` 4, `maxConcurrency` 4)
  *  - `timeoutMs`: default per-request timeout
+ *  - `clock`: optional PHP test seam, `callable(): int|float` returning monotonic milliseconds
  *  - `defaultHeaders`: headers on every request
  *  - `onRequest`: `callable(string $url, array $init): array` that may replace the prepared request
  *  - `streamProtocol`: `legacy` (default) — stored for WP-23b's stream clients
  *
  * Known non-exact behaviour: there is no global `langgraph_api:url` / `fetch` override (those are JS
- * `Symbol.for` globals), and `signal` is carried through on the request but never aborts anything.
+ * `Symbol.for` globals). Ordinary fetch() requests poll boolean caller/timeout signals before each
+ * attempt; they cannot interrupt synchronous IO. Streams disable this deadline and poll the caller
+ * before opening attempts, reads and reconnects. Buffered stream fallback uses fetch() and also
+ * polls before attempts. Neither path can interrupt blocking IO. The transport also has its own timeout.
  */
 class BaseClient
 {
@@ -51,6 +56,9 @@ class BaseClient
     protected AsyncCaller $asyncCaller;
 
     protected ?int $timeoutMs;
+
+    /** @var (callable(): int|float)|null */
+    protected $clock;
 
     protected string $apiUrl;
 
@@ -73,10 +81,19 @@ class BaseClient
         $this->http = $http ?? new GuzzleMethodHttpClient();
 
         $callerOptions = array_merge(['maxRetries' => 4, 'maxConcurrency' => 4], $config['callerOptions'] ?? []);
-        $callerOptions['fetch'] ??= fn (string $url, array $init): HttpResponse => $this->send($url, $init);
+        $fetch = $callerOptions['fetch'] ?? fn (string $url, array $init): HttpResponse => $this->send($url, $init);
+        $callerOptions['fetch'] = static function (string $url, array $init) use ($fetch): HttpResponse {
+            $signal = $init['signal'] ?? null;
+            if ($signal !== null && $signal()) {
+                throw new \RuntimeException('AbortError');
+            }
+
+            return $fetch($url, $init);
+        };
 
         $this->asyncCaller = new AsyncCaller($callerOptions);
         $this->timeoutMs = isset($config['timeoutMs']) ? (int) $config['timeoutMs'] : null;
+        $this->clock = $config['clock'] ?? null;
 
         $apiUrl = (string) ($config['apiUrl'] ?? '');
         $this->apiUrl = $apiUrl !== '' ? preg_replace('#/$#', '', $apiUrl) : self::DEFAULT_API_URL;
@@ -155,7 +172,7 @@ class BaseClient
      *
      * @param array<string, mixed> $options
      *
-     * @return array{0: string, 1: array{method?: string, headers: array<string, string>, body?: string, signal?: mixed, timeoutMs: int|null}}
+     * @return array{0: string, 1: array{method?: string, headers: array<string, string>, body?: string, signal?: (callable(): bool)|null, timeoutMs: int|null}}
      */
     protected function prepareFetchOptions(string $path, array $options = []): array
     {
@@ -178,9 +195,10 @@ class BaseClient
             $init['timeoutMs'] = $this->timeoutMs;
         }
 
-        if (array_key_exists('signal', $options)) {
-            $init['signal'] = $options['signal'];
-        }
+        $timeoutSignal = $init['timeoutMs'] !== null
+            ? Signals::timeoutSignal((int) $init['timeoutMs'], $this->clock)
+            : null;
+        $init['signal'] = Signals::mergeSignals($timeoutSignal, $options['signal'] ?? null);
 
         $url = $this->apiUrl . $path;
         $pairs = [];
@@ -395,7 +413,7 @@ class BaseClient
      *
      * @param array<string, mixed> $options
      *
-     * @return array{signal?: mixed}
+     * @return array{signal?: (callable(): bool)|null}
      */
     protected static function signalOf(array $options): array
     {

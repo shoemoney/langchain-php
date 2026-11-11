@@ -114,7 +114,7 @@ class CronsClient extends BaseClient
     /**
      * Delete a cron job by ID.
      *
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      */
     public function delete(string $cronId, array $options = []): void
     {
@@ -124,7 +124,7 @@ class CronsClient extends BaseClient
     /**
      * Search cron jobs. `metadata` is an exact match per key (Agent Server 0.9.0+).
      *
-     * @param array{assistantId?: string, threadId?: string, enabled?: bool, limit?: int, offset?: int, sortBy?: string, sortOrder?: string, select?: list<string>, metadata?: array<string, mixed>, signal?: mixed} $query
+     * @param array{assistantId?: string, threadId?: string, enabled?: bool, limit?: int, offset?: int, sortBy?: string, sortOrder?: string, select?: list<string>, metadata?: array<string, mixed>, signal?: (callable(): bool)|null} $query
      *
      * @return list<Cron>
      */
@@ -149,7 +149,7 @@ class CronsClient extends BaseClient
     /**
      * Count cron jobs matching the filters.
      *
-     * @param array{assistantId?: string, threadId?: string, metadata?: array<string, mixed>, signal?: mixed} $query
+     * @param array{assistantId?: string, threadId?: string, metadata?: array<string, mixed>, signal?: (callable(): bool)|null} $query
      */
     public function count(array $query = []): int
     {

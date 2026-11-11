@@ -11,7 +11,7 @@ use LangChain\Utils\Http\HttpResponse;
  *
  * ## Where this differs from JS
  *
- *  - `signal` is a `callable(): bool` (see {@see Signals}); it is polled before each read.
+ *  - `signal` is a `callable(): bool` (see {@see Signals}); it is polled before each opening and read.
  *  - JS arms a `setTimeout` that errors the stream from outside. A synchronous PHP generator cannot
  *    be interrupted mid-read, so {@see self::idleReconnectStream()} judges the silence when control
  *    comes back to it: on the next line, or on a `null` tick from a transport that polls. A half-open
@@ -110,13 +110,14 @@ final class StreamRetry
      * A reconnect is only possible once the server has sent a `Location`.
      *
      * Options: `maxRetries` (default {@see Reconnect::DEFAULT_MAX_RECONNECT_ATTEMPTS}), `signal`
-     * `callable(): bool`, `onReconnect` `callable(array{attempt: int, lastEventId: string|null, cause: \Throwable}): void`,
+     * `callable(): bool` or null, `onReconnect` `callable(array{attempt: int, lastEventId: string|null, cause: \Throwable}): void`,
      * `sleep` `callable(int $ms): void` (default `usleep`).
      *
      * An error while READING the stream reconnects whatever it is, provided there is a reconnect path
      * and the signal has not fired; an error making the request reconnects only if it is a network
      * error ({@see ErrorUtils::isNetworkError()}). Anything else, and any error with no reconnect path,
-     * propagates.
+     * propagates. A pre-aborted signal returns without opening; an AbortError raised
+     * by a cancelled opening attempt propagates, as do errors from an aborted read.
      *
      * @param callable(?array{lastEventId: string|null, reconnectPath: string}): array{response: HttpResponse, stream: iterable<array<string, mixed>>} $makeRequest
      * @param array<string, mixed>                                                                                                                        $options
