@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Checkpoint\Serde;
 
+use LangChain\Load\Validation;
 use LangChain\Messages\AIMessage;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\ChatMessage;
@@ -85,6 +86,8 @@ final class LcConstructorLoader
             $kwargs = [];
         }
 
-        return new $class($kwargs);
+        // Match the literal-unwrapping boundary of core load(), without adding
+        // new registry entries or routing checkpoint input through that trusted API.
+        return new $class(Validation::unescapeValue($kwargs));
     }
 }

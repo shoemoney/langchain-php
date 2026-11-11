@@ -42,9 +42,16 @@ use LangGraph\Pregel\Checkpoint\CheckpointTuple as PregelCheckpointTuple;
  *    yields nothing where MongoDB's own `limit(0)` means "no limit".
  *  - Pre-format-4 pending sends are folded in on read (the shared base-class migration),
  *    which upstream's Mongo saver does not do.
+ *  - Search-only empty field names and prefix collisions are encoded for the native PHP
+ *    driver. Original Binary metadata stays intact; raw JS/legacy special-key filters need
+ *    coordinated migration. Custom BSON objects and dot/$ query restrictions are unchanged.
  */
 class MongoDBSaver extends BaseCheckpointSaver
 {
+    private const METADATA_SEARCH_KEY_PREFIX = '__lg_empty_key_v1__';
+
+    private const METADATA_SEARCH_DEPTH = 512;
+
     public string $checkpointCollectionName = 'checkpoints';
 
     public string $checkpointWritesCollectionName = 'checkpoint_writes';
@@ -178,7 +185,8 @@ class MongoDBSaver extends BaseCheckpointSaver
                     $key,
                 ));
             }
-            $query['metadata_search.' . $key] = $value;
+            $path = implode('.', array_map(self::metadataSearchKey(...), explode('.', (string) $key)));
+            $query['metadata_search.' . $path] = $value;
         }
 
         if ($opts->before !== null) {
@@ -247,7 +255,7 @@ class MongoDBSaver extends BaseCheckpointSaver
             'type' => $checkpointType,
             'checkpoint' => new MongoBinary($serializedCheckpoint),
             'metadata' => new MongoBinary($serializedMetadata),
-            'metadata_search' => $storedMetadata,
+            'metadata_search' => self::metadataSearch($storedMetadata),
         ];
 
         $this->db->collection($this->checkpointCollectionName)->updateOne(
@@ -257,6 +265,120 @@ class MongoDBSaver extends BaseCheckpointSaver
         );
 
         return static::tupleConfig($threadId, $namespace, $checkpointId);
+    }
+
+    /**
+     * Native PHP updates reject empty BSON field names. Encode only those names and
+     * prefix collisions in the search copy; the Binary metadata is authoritative.
+     * Raw JS/legacy prefix records require coordinated migration before these filters.
+     */
+    private static function metadataSearchKey(string $key): string
+    {
+        $prefix = self::METADATA_SEARCH_KEY_PREFIX;
+        if ($key === '') {
+            return $prefix . 'e';
+        }
+        if (!str_starts_with($key, $prefix) || str_contains($key, "\0") || preg_match('//u', $key) !== 1) {
+            // Do not make an otherwise invalid BSON/UTF-8 key valid by hex-encoding it.
+            return $key;
+        }
+
+        return $prefix . 'k' . bin2hex($key);
+    }
+
+    private static function metadataSearch(mixed $metadata): mixed
+    {
+        $height = 0;
+        $changed = false;
+
+        return self::projectMetadataSearch($metadata, new \SplObjectStorage(), new \SplObjectStorage(), 0, $height, $changed);
+    }
+
+    /**
+     * Copy only changed branches, by value: cloning reference slots can mutate callers.
+     * Native/custom BSON objects remain leaves, including their existing key-validation
+     * failures. This guard bounds custom serdes that do not reject cycles/deep metadata.
+     *
+     * @param \SplObjectStorage<\stdClass, true> $active
+     * @param \SplObjectStorage<\stdClass, int|array{result: \stdClass, height: int}> $completed
+     */
+    private static function projectMetadataSearch(
+        mixed $value,
+        \SplObjectStorage $active,
+        \SplObjectStorage $completed,
+        int $depth,
+        int &$height,
+        bool &$changed,
+    ): mixed {
+        $height = -1;
+        $changed = false;
+        $document = is_object($value) && $value::class === \stdClass::class;
+        if (!is_array($value) && !$document) {
+            return $value;
+        }
+        if ($depth >= self::METADATA_SEARCH_DEPTH) {
+            throw new \InvalidArgumentException('Metadata search nesting exceeds 512 levels.');
+        }
+        if ($document) {
+            if ($active->offsetExists($value)) {
+                throw new \InvalidArgumentException('Circular metadata search document.');
+            }
+            if ($completed->offsetExists($value)) {
+                $entry = $completed[$value];
+                $height = is_int($entry) ? $entry : $entry['height'];
+                if ($depth + $height >= self::METADATA_SEARCH_DEPTH) {
+                    throw new \InvalidArgumentException('Metadata search nesting exceeds 512 levels.');
+                }
+                $changed = !is_int($entry);
+
+                return $changed ? $entry['result'] : $value;
+            }
+            $active[$value] = true;
+        }
+
+        $height = 0;
+        $copy = $value;
+        try {
+            foreach ($value as $key => $item) {
+                $childHeight = 0;
+                $childChanged = false;
+                $projected = self::projectMetadataSearch($item, $active, $completed, $depth + 1, $childHeight, $childChanged);
+                $height = max($height, $childHeight + 1);
+                $encoded = is_array($value) && is_int($key) ? $key : self::metadataSearchKey((string) $key);
+                $keyChanged = (string) $encoded !== (string) $key;
+                if (!$changed && ($keyChanged || $childChanged)) {
+                    $copy = $document ? new \stdClass() : [];
+                    foreach ($value as $earlierKey => $earlierValue) {
+                        if ($earlierKey === $key) {
+                            break;
+                        }
+                        if ($document) {
+                            $copy->{$earlierKey} = $earlierValue;
+                        } else {
+                            $copy[$earlierKey] = $earlierValue;
+                        }
+                    }
+                    $changed = true;
+                }
+                if ($changed) {
+                    if ($document) {
+                        $copy->{$encoded} = $projected;
+                    } else {
+                        $copy[$encoded] = $projected;
+                    }
+                }
+            }
+        } finally {
+            if ($document) {
+                unset($active[$value]);
+            }
+        }
+        if ($document) {
+            // Safe documents do not retain an extra result record or a duplicate tree.
+            $completed[$value] = $changed ? ['result' => $copy, 'height' => $height] : $height;
+        }
+
+        return $copy;
     }
 
     /**
