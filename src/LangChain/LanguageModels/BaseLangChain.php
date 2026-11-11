@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels;
 
+use LangChain\Load\Validation;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\MessageUtils;
 use LangChain\Runnables\Runnable;
@@ -103,7 +104,7 @@ abstract class BaseLangChain extends Runnable implements \JsonSerializable
             'lc' => 1,
             'type' => 'constructor',
             'id' => static::lcId(),
-            'kwargs' => $this->kwargs(),
+            'kwargs' => Validation::escapeKwargs($this->kwargs(), $this),
         ];
     }
 

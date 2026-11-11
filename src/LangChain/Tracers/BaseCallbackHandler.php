@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\Tracers;
 
+use LangChain\Load\Validation;
 use LangChain\LanguageModels\Outputs\ChatGenerationChunk;
 use LangChain\LanguageModels\Outputs\GenerationChunk;
 use LangChain\LanguageModels\Outputs\LLMResult;
@@ -122,7 +123,7 @@ abstract class BaseCallbackHandler
             'lc' => 1,
             'type' => 'constructor',
             'id' => static::lcId(),
-            'kwargs' => $this->kwargs,
+            'kwargs' => Validation::escapeKwargs($this->kwargs, $this),
         ];
     }
 

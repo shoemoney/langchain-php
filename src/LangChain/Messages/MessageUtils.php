@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LangChain\Messages;
 
+use LangChain\Load\Validation;
+
 /**
  * Coercion, rendering, and (de)serialization helpers for messages.
  *
@@ -256,7 +258,9 @@ final class MessageUtils
 
         $type = $stored['type'];
         /** @var array<string, mixed> $data */
-        $data = $stored['data'];
+        // PHP adaptation: toDict() stores serialized kwargs. Undo literal escaping
+        // at this stored-data boundary, without reviving constructors or secrets.
+        $data = Validation::unescapeValue($stored['data']);
 
         $params = [
             'content' => $data['content'] ?? '',
