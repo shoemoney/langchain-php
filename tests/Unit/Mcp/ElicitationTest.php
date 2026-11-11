@@ -27,7 +27,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * "elicitation and logging configuration" (`adapterConfigSchema`, the unported client config);
  * "retains the SDK-required legacy URL identifier" (asserts the SDK's own `ElicitRequestSchema`);
  * interrupts.test.ts "dynamic headers" / "thread isolation" / "real stdio servers" (HTTP header echo, a real
- * server per thread, child processes) and `agent.elicitation.test.ts` (a real server behind an agent).
+ * server per thread, child processes). {@see McpAgentElicitationTest} covers the task targeting and
+ * sequential replay from `agent.elicitation.test.ts` over a scripted MCP client; its real server is not used.
  */
 #[CoversClass(Elicitation::class)]
 #[CoversClass(ElicitationAnswerSchema::class)]
@@ -332,6 +333,51 @@ final class ElicitationTest extends McpTestCase
         self::assertInstanceOf(ToolException::class, $failure);
         self::assertStringContainsString('needs answers built by createMCPElicitationResume()', $failure->getMessage());
         self::assertSame([], array_values(array_filter($ask['served'])));
+    }
+
+    #[DataProvider('refusedResumes')]
+    public function testACorrectedResumeOnTheSameThreadReplaysThePreviouslyRefusedAnswer(mixed $body): void
+    {
+        $ask = $this->askOnce();
+        $first = self::thrownBy(static fn () => $ask['graph']->invoke(
+            new Command(resume: [$ask['raised']['id'] => $body]),
+            $ask['config'],
+        ));
+        self::assertInstanceOf(ToolException::class, $first);
+
+        // Upstream interrupt.ts persists the positional answer before elicitation.ts validates it.
+        // A second Command appends an answer; it does not replace the refused value at position zero.
+        $second = self::thrownBy(static fn () => $ask['graph']->invoke(
+            new Command(resume: Elicitation::createMCPElicitationResume($ask['raised'], ['confirmation' => self::accepted()])),
+            $ask['config'],
+        ));
+
+        self::assertInstanceOf(ToolException::class, $second);
+        self::assertSame($first->getMessage(), $second->getMessage());
+        self::assertCount(3, $ask['served'], 'each execution reissues only the unanswered first server round');
+        self::assertSame([null, null, null], $ask['served'], 'neither the refused nor corrected answer reaches the server');
+
+        $recorded = [];
+        foreach ($ask['saver']->getTuple(['configurable' => $ask['config']->configurable])->pendingWrites ?? [] as [, $channel, $value]) {
+            if ($channel === Constants::RESUME) {
+                $recorded[] = $value;
+            }
+        }
+        self::assertContains([$body], $recorded, 'the first refused answer remains durable at interrupt position zero');
+    }
+
+    #[DataProvider('actionsWithoutContent')]
+    public function testDeclineAndCancelResumeTheGraphAndReachTheServerWithoutContent(string $action): void
+    {
+        $ask = $this->askOnce();
+
+        $result = $ask['graph']->invoke(
+            new Command(resume: Elicitation::createMCPElicitationResume($ask['raised'], ['confirmation' => ['action' => $action]])),
+            $ask['config'],
+        );
+
+        self::assertSame(['done' => true], $result);
+        self::assertSame([null, null, ['confirmation' => ['action' => $action]]], $ask['served']);
     }
 
     public function testRefusalsNameTheOffendingKeyAndThePathOfTheViolation(): void
