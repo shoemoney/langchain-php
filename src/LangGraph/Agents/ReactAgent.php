@@ -244,21 +244,10 @@ final class ReactAgent
 
         if ($clientTools !== [] || $hasWrapToolCallMiddleware) {
             $wrapToolCall = Utils::wrapToolCall($middleware);
-            // Upstream's `patchConfig` drops the node's `runName` from the config it hands to a child and the tool
-            // then names its own run (`config.runName ??= this.name`), so the `tools` stream reports `tool_name: "add"`.
-            // This port's node config keeps `tools` and its tools do not default the name, so the node sets it.
-            $workflow->addNode(ToolNode::TOOLS_NODE_NAME, new class($clientTools, [
+            $workflow->addNode(ToolNode::TOOLS_NODE_NAME, new ToolNode($clientTools, [
                 'signal' => $options['signal'] ?? null,
                 ...($wrapToolCall !== null ? ['wrapToolCall' => $wrapToolCall] : []),
-            ]) extends ToolNode {
-                protected function runTool(array $call, RunnableConfig $config, mixed $state): ToolMessage|Command
-                {
-                    $toolConfig = clone $config;
-                    $toolConfig->runName = isset($call['name']) ? (string) $call['name'] : null;
-
-                    return parent::runTool($call, $toolConfig, $state);
-                }
-            });
+            ]));
         }
 
         // Add edges.
