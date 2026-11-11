@@ -12,12 +12,15 @@ use LangChain\LanguageModels\Outputs\ChatResult;
 use LangChain\LanguageModels\StructuredOutput;
 use LangChain\Messages\AIMessageChunk;
 use LangChain\Messages\BaseMessage;
+use LangChain\OutputParsers\OutputParserException;
 use LangChain\Runnables\Runnable;
+use LangChain\Runnables\RunnableLambda;
 use LangChain\Tracers\CallbackManagerForLLMRun;
 use LangChain\Utils\Http\GuzzleHttpClient;
 use LangChain\Utils\Http\HttpClient;
 use LangChain\Utils\Http\HttpException;
 use LangChain\Utils\Js;
+use LangChain\Utils\JsonSchemaValidator;
 
 /**
  * A chat model backed by an Ollama server's own `/api/chat` endpoint.
@@ -447,9 +450,9 @@ class ChatOllama extends BaseChatModel
      * `format`, and the reply text is parsed. `jsonMode` sends `format: "json"`
      * instead, and `functionCalling` offers the schema as a tool.
      *
-     * Upstream also validates the parsed value through Zod or a Standard
-     * Schema; this port is JSON-Schema-native and does not, so a reply that is
-     * valid JSON but the wrong shape is returned as parsed.
+     * Upstream validates Zod or Standard Schema values but leaves plain JSON
+     * Schema unvalidated. This port validates its native JSON Schema representation
+     * using the shared supported subset, without a schema DSL or transform adapter.
      *
      * @param array<string, mixed> $schema
      * @param array{name?: string, description?: string, method?: string, includeRaw?: bool, strict?: bool} $config
@@ -458,6 +461,7 @@ class ChatOllama extends BaseChatModel
     {
         $method = $config['method'] ?? 'jsonSchema';
         $includeRaw = (bool) ($config['includeRaw'] ?? false);
+        $validationSchema = $schema;
 
         if ($method === 'functionCalling') {
             $functionName = (string) ($config['name'] ?? 'extract');
@@ -465,6 +469,7 @@ class ChatOllama extends BaseChatModel
             if (is_string($schema['name'] ?? null) && is_array($schema['parameters'] ?? null)) {
                 $toolFunction = $schema;
                 $functionName = $schema['name'];
+                $validationSchema = $schema['parameters'];
             } else {
                 $toolFunction = [
                     'name' => $functionName,
@@ -485,6 +490,22 @@ class ChatOllama extends BaseChatModel
                 "Unrecognized structured output method '{$method}'. Expected one of 'functionCalling', 'jsonMode', or 'jsonSchema'"
             );
         }
+
+        $parser = $parser->pipe(new RunnableLambda(static function (mixed $value) use ($validationSchema, $method): mixed {
+            // An absent named tool call remains null, as upstream returns undefined before validation.
+            if ($method === 'functionCalling' && $value === null) {
+                return null;
+            }
+            $issues = JsonSchemaValidator::validate($value, $validationSchema);
+            if ($issues !== []) {
+                throw new OutputParserException(
+                    'Ollama structured output failed JSON Schema validation: ' . Js::encode($issues),
+                    Js::encode($value),
+                );
+            }
+
+            return $value;
+        }));
 
         return StructuredOutput::assembleStructuredOutputPipeline(
             $llm,
