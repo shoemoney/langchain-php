@@ -70,7 +70,7 @@ final class CallScheduler
             $childPad = $next->config?->configurable[Constants::CONFIG_KEY_SCRATCHPAD] ?? null;
             $hadResume = $childPad instanceof PregelScratchpad && $childPad->nullResume !== null;
 
-            $this->loop->emitDebug('task', $this->loop->debugTaskPayload($next, true));
+            $this->loop->emitTaskStart($next);
             $error = $this->runWithRetry($next);
             $this->commit($next, $error);
 
@@ -195,12 +195,7 @@ final class CallScheduler
                 $task->writes[] = [Constants::NO_WRITES, null];
             }
             $this->loop->putWrites($task->id, $task->writes);
-            $this->loop->emitDebug('task_result', [
-                'id' => $task->id,
-                'name' => $task->name,
-                'interrupts' => $task->interrupts,
-                'result' => $this->resultOf($task),
-            ]);
+            $this->loop->emitTaskResultDebug($task);
 
             return;
         }
@@ -238,19 +233,6 @@ final class CallScheduler
 
         $task->writes[] = [Constants::ERROR, ['message' => $error->getMessage(), 'name' => $error::class]];
         $this->loop->putWrites($task->id, $task->writes);
-    }
-
-    /** @return array<string, mixed> */
-    private function resultOf(PregelExecutableTask $task): array
-    {
-        $out = [];
-        foreach ($task->writes as $write) {
-            if ($write[0] !== Constants::NO_WRITES) {
-                $out[$write[0]] = $write[1] ?? null;
-            }
-        }
-
-        return $out;
     }
 
     /**

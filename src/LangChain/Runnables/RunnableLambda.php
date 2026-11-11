@@ -53,8 +53,19 @@ class RunnableLambda extends Runnable
         return 'RunnableLambda';
     }
 
+    /**
+     * The callable receives the config normalized by {@see RunnableConfig::normalizeFields()}: PHP
+     * defaults, then the ambient fields except run identity, then the caller's fields as whole-field
+     * replacements. This is the argument half of upstream `RunnableLambda._invoke`
+     * (`base.ts:2627-2710`) only. No ambient config is published for nested runnables, and the
+     * caller's run identity and recursion limit reach the callable unchanged.
+     *
+     * Normalization happens here, at the leaf, so a {@see RunnableBinding} has already merged its
+     * bound config with the caller's before the defaults are filled in.
+     */
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
+        $config = RunnableConfig::normalizeFields($config);
         $func = $this->func;
 
         if ($this->bound === []) {
@@ -109,7 +120,7 @@ class RunnableLambda extends Runnable
                 // none. Upstream's `ensureConfig` always yields a config, so handing a lambda `null`
                 // in the slot it declared as its config channel was a second, separate defect: the
                 // measured failure was 'must be of type string, null given'.
-                return $func($input, $config ?? new RunnableConfig());
+                return $func($input, $config);
             }
 
             return $func($input);
