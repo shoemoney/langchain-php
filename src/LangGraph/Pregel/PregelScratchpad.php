@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace LangGraph\Pregel;
 
+use LangChain\Runnables\RunnableConfig;
+use LangChain\Utils\AsyncLocalStorage;
+use LangGraph\Pregel\Utils\Config;
+
 /**
  * Per-task state that survives an interrupt.
  *
@@ -80,21 +84,52 @@ final class PregelScratchpad
      * the scratchpad that only the engine knows about. This is the thread of
      * execution the engine publishes them on.
      *
-     * PHP has no `AsyncLocalStorage`, but the engine is synchronous and nested
-     * tasks run inside the parent's call stack, so a plain static is both
-     * sufficient and correct. The previous value is always restored, including
-     * on throw, so a sibling task in the same superstep cannot see it.
+     * Ambient config wins, matching Config::getConfig(); the Fiber-local manual
+     * compatibility value is used only when no ambient config is available.
+     * withConfig publishes the executing task to both views and restores the
+     * enclosing scope, including after suspension or failure. Managed Await
+     * descendants inherit the ambient task; raw Fibers require explicit entry.
      */
-    private static ?\LangChain\Runnables\RunnableConfig $current = null;
+    private static ?RunnableConfig $current = null;
 
-    public static function setCurrentConfig(?\LangChain\Runnables\RunnableConfig $config): void
+    /** @var \WeakMap<\Fiber, RunnableConfig>|null */
+    private static ?\WeakMap $fiberConfigs = null;
+
+    public static function setCurrentConfig(?RunnableConfig $config): void
     {
-        self::$current = $config;
+        $fiber = \Fiber::getCurrent();
+        if ($fiber === null) {
+            self::$current = $config;
+        } elseif ($config === null) {
+            if (self::$fiberConfigs !== null) {
+                unset(self::$fiberConfigs[$fiber]);
+            }
+        } else {
+            self::$fiberConfigs ??= new \WeakMap();
+            self::$fiberConfigs[$fiber] = $config;
+        }
     }
 
-    public static function currentConfig(): ?\LangChain\Runnables\RunnableConfig
+    public static function currentConfig(): ?RunnableConfig
     {
-        return self::$current;
+        $ambient = AsyncLocalStorage::getRunnableConfig();
+        if ($ambient instanceof RunnableConfig) {
+            return $ambient;
+        }
+        if (is_array($ambient)) {
+            // Reuse the graph helper's array normalization; its ambient branch
+            // returns before consulting this compatibility fallback.
+            return Config::getConfig();
+        }
+
+        return self::compatibilityConfig();
+    }
+
+    private static function compatibilityConfig(): ?RunnableConfig
+    {
+        $fiber = \Fiber::getCurrent();
+
+        return $fiber === null ? self::$current : (self::$fiberConfigs[$fiber] ?? null);
     }
 
     /**
@@ -104,14 +139,18 @@ final class PregelScratchpad
      * @param  callable(): T $fn
      * @return T
      */
-    public static function withConfig(?\LangChain\Runnables\RunnableConfig $config, callable $fn): mixed
+    public static function withConfig(?RunnableConfig $config, callable $fn): mixed
     {
-        $previous = self::$current;
-        self::$current = $config;
+        if ($config !== null && AsyncLocalStorage::getGlobalInstance() === null) {
+            // Equivalent to the supported upstream Node entry's initialize-if-absent.
+            AsyncLocalStorage::initializeGlobalInstance(new AsyncLocalStorage());
+        }
+        $previous = self::compatibilityConfig();
+        self::setCurrentConfig($config);
         try {
-            return $fn();
+            return AsyncLocalStorage::runWithConfig($config, $fn);
         } finally {
-            self::$current = $previous;
+            self::setCurrentConfig($previous);
         }
     }
 }

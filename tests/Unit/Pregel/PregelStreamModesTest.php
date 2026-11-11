@@ -30,7 +30,7 @@ use function LangGraph\Pregel\interrupt;
  * Converted (15 of 31):
  *   values mode       - snapshots, final state, final-state as last chunk, intermediate snapshots (4 of 5)
  *   updates mode      - per-node deltas, node delta values (2 of 2)
- *   tasks mode        - re-expressed over `debug` `task`/`task_result` events (1 of 1)
+ *   tasks mode        - raw engine `tasks` starts/results (1 of 1)
  *   all modes         - several modes in one run (1 of 4)
  *   interrupts        - interrupt surfaces, resume with a Command (2 of 2)
  *   protocol shape    - values carry state, updates carry node values (2 of 3)
@@ -38,10 +38,12 @@ use function LangGraph\Pregel\interrupt;
  *   chunk shape       - every chunk is a `[mode, payload]` pair (1 of 2)
  *
  * Skipped (16), each needing something outside the port: text/event-stream
- * encoding, `custom` mode and `config.writer`, `checkpoints` mode envelopes (5
- * tests), seq/type/timestamp on protocol events (3), subgraph run streams (2),
+ * encoding, v3 checkpoint companion envelopes (5 tests), seq/type/timestamp on
+ * protocol events (3), subgraph protocol run streams (2),
  * `AbortSignal` (1), user transformers/`StreamChannel` extensions (3), and the
- * v3 checkpoint-envelope assertion of the chunk-shape pair.
+ * v3 checkpoint-envelope assertion of the chunk-shape pair. Raw engine custom,
+ * checkpoint snapshot and nested namespace coverage is in EngineStreamEventsTest
+ * and EngineSubgraphStreamEventsTest; those do not implement v3 protocol encoding.
  */
 #[CoversClass(Pregel::class)]
 final class PregelStreamModesTest extends TestCase
@@ -144,31 +146,22 @@ final class PregelStreamModesTest extends TestCase
         self::assertContains(['add_one' => ['count' => 1]], $updates);
     }
 
-    // ---- tasks (via debug) ------------------------------------------------
+    // ---- tasks ------------------------------------------------------------
 
     public function testTaskEventsAreEmittedAroundANodeRun(): void
     {
-        $events = self::payloads(self::chunks(self::counterGraph(['streamMode' => ['debug']]), ['count' => 0]), 'debug');
-        $tasks = array_values(array_filter(
-            $events,
-            static fn (array $e): bool => in_array($e['type'], ['task', 'task_result'], true) && $e['payload']['name'] === 'add_one',
-        ));
-
+        $tasks = self::payloads(self::chunks(self::counterGraph(['streamMode' => ['tasks']]), ['count' => 0]), 'tasks');
         self::assertCount(2, $tasks);
         [$start, $result] = $tasks;
-
-        self::assertSame('task', $start['type']);
-        self::assertSame('add_one', $start['payload']['name']);
-        self::assertSame(['count' => 0], $start['payload']['input']);
-        self::assertSame(['branch:to:add_one'], $start['payload']['triggers']);
-        self::assertSame([], $start['payload']['interrupts']);
-        self::assertIsString($start['payload']['id']);
-
-        self::assertSame('task_result', $result['type']);
-        self::assertSame('add_one', $result['payload']['name']);
-        self::assertSame(['count' => 1], $result['payload']['result']);
-        self::assertSame([], $result['payload']['interrupts']);
-        self::assertSame($start['payload']['id'], $result['payload']['id']);
+        self::assertSame('add_one', $start['name']);
+        self::assertSame(['count' => 0], $start['input']);
+        self::assertSame(['branch:to:add_one'], $start['triggers']);
+        self::assertSame([], $start['interrupts']);
+        self::assertIsString($start['id']);
+        self::assertSame('add_one', $result['name']);
+        self::assertSame(['count' => 1], $result['result']);
+        self::assertSame([], $result['interrupts']);
+        self::assertSame($start['id'], $result['id']);
     }
 
     // ---- all modes together -----------------------------------------------

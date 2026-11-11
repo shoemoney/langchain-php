@@ -9,6 +9,8 @@ use LangChain\OutputParsers\BaseLLMOutputParser;
 use LangChain\Runnables\Graph\Graph;
 use LangChain\Prompts\BasePromptTemplate;
 use LangChain\Tracers\BaseCallbackHandler;
+use LangChain\Tracers\BaseTracer;
+use LangChain\Tracers\Run;
 use LangChain\Tracers\CallbackManager;
 use LangChain\Tracers\EventStreamCallbackHandler;
 use LangChain\Tracers\LogStreamCallbackHandler;
@@ -191,15 +193,21 @@ abstract class Runnable implements RunnableInterface
     {
         $inputs = array_values($inputs);
 
-        if (!(bool) ($options['returnExceptions'] ?? false)) {
-            return array_map(fn (mixed $input): mixed => $r->invoke($input, $config), $inputs);
-        }
-
+        $returnExceptions = (bool) ($options['returnExceptions'] ?? false);
         $out = [];
         foreach ($inputs as $position => $input) {
+            $itemConfig = $config === null ? null : clone $config;
+            // Pinned base.ts _getOptionsList uses a scalar runId only for item 0.
+            // Clone even the first config so invocation cannot mutate its caller.
+            if ($position > 0 && $itemConfig !== null) {
+                $itemConfig->runId = [];
+            }
             try {
-                $out[$position] = $r->invoke($input, $config);
+                $out[$position] = self::invokeWithConfig($r, $input, $itemConfig);
             } catch (\Throwable $e) {
+                if (!$returnExceptions) {
+                    throw $e;
+                }
                 // Upstream returns "mixed RunOutputs and errors": the Throwable takes the failed item's
                 // SLOT and the remaining items still run.
                 $out[$position] = $e;
@@ -409,6 +417,106 @@ abstract class Runnable implements RunnableInterface
     }
 
     /**
+     * Listen to the root run only. A fresh tracer is created by a config factory
+     * for every invocation, as in core/runnables/base.ts withListeners.
+     *
+     * @param array{onStart?: callable(Run, RunnableConfig): void, onEnd?: callable(Run, RunnableConfig): void, onError?: callable(Run, RunnableConfig): void} $listeners
+     */
+    public function withListeners(array $listeners): RunnableBinding
+    {
+        return new RunnableBinding($this, configFactories: [self::listenerConfigFactory($listeners)]);
+    }
+
+    /** @param array<string, callable> $listeners
+     *  @return \Closure(RunnableConfig): array{callbacks: list<BaseTracer>}
+     */
+    protected static function listenerConfigFactory(array $listeners): \Closure
+    {
+        return static function (RunnableConfig $config) use ($listeners): array {
+            $tracer = new class($config, $listeners) extends BaseTracer {
+                public string $name = 'RootListenersTracer';
+
+                private ?string $rootId = null;
+
+                /** @param array<string, callable> $listeners */
+                public function __construct(private RunnableConfig $config, private array $listeners)
+                {
+                    parent::__construct(['awaitHandlers' => true]);
+                }
+
+                protected function persistRun(Run $run): void
+                {
+                }
+
+                protected function onRunCreate(Run $run): void
+                {
+                    if ($this->rootId !== null) {
+                        return;
+                    }
+                    $this->rootId = $run->id;
+                    if (isset($this->listeners['onStart'])) {
+                        ($this->listeners['onStart'])($run, $this->config);
+                    }
+                }
+
+                protected function onRunUpdate(Run $run): void
+                {
+                    if ($run->id !== $this->rootId) {
+                        return;
+                    }
+                    $hook = $run->error ? 'onError' : 'onEnd';
+                    if (isset($this->listeners[$hook])) {
+                        ($this->listeners[$hook])($run, $this->config);
+                    }
+                }
+            };
+
+            return ['callbacks' => [$tracer]];
+        };
+    }
+
+    /**
+     * Composition invoke methods in this port do not open their own chain run.
+     * A binding supplies that missing root when callbacks are attached, while
+     * typed models/tools retain the events they already produce themselves.
+     */
+    protected static function invokeWithConfig(RunnableInterface $target, mixed $input, ?RunnableConfig $config): mixed
+    {
+        if ($target instanceof Runnable && $target->emitsOwnRunEvents()) {
+            return $target->invoke($input, $config);
+        }
+        $manager = self::chainCallbackManager($config);
+        if ($manager === null) {
+            return $target->invoke($input, $config);
+        }
+        $runId = $config->runId[0] ?? RunId::v7();
+        $runManager = $manager->handleChainStart(
+            new Serialized(['langchain_core', 'runnables', $target->getName()]),
+            self::coerceToDict($input), $runId, self::runTypeOf($target), [], [],
+            $config->runName ?? $target->getName(),
+        );
+        $child = clone $config;
+        $child->runId = [];
+        $child->runName = null;
+        $child->runIdParent = $runId;
+        try {
+            $output = $target->invoke($input, $child);
+        } catch (\Throwable $error) {
+            $runManager->handleChainError($error);
+            throw $error;
+        }
+        $runManager->handleChainEnd(self::coerceToDict($output, 'output'));
+
+        return $output;
+    }
+
+    /** @return \Generator<int, array{0: string, 1: mixed}> */
+    protected static function streamWithConfig(RunnableInterface $target, mixed $input, RunnableConfig $config): \Generator
+    {
+        yield from self::eventSource($target, $input, $config);
+    }
+
+    /**
      * Try each runnable in turn, returning the first that succeeds.
      *
      * @param list<RunnableInterface> $fallbacks
@@ -448,7 +556,7 @@ abstract class Runnable implements RunnableInterface
     /**
      * @return \Generator<int, RunLogPatch>
      */
-    private function runStreamLog(mixed $input, LogStreamCallbackHandler $handler, RunnableConfig $config): \Generator
+    private function runStreamLog(mixed $input, LogStreamCallbackHandler $handler, RunnableConfig $config, ?RunnableInterface $root = null): \Generator
     {
         $config = clone $config;
         $config->callbacks = [...$config->callbacks, $handler];
@@ -457,7 +565,7 @@ abstract class Runnable implements RunnableInterface
         // One thread cannot do both at once, so the handler is drained after every step of the stream.
         $error = null;
         try {
-            foreach (self::eventSource($this, $input, $config) as $pair) {
+            foreach (self::eventSource($root ?? $this, $input, $config) as $pair) {
                 $handler->write(new RunLogPatch(['ops' => [[
                     'op' => 'add',
                     'path' => '/streamed_output/-',
@@ -642,7 +750,7 @@ abstract class Runnable implements RunnableInterface
         ]));
         $rootEventFilter = new RootEventFilter($streamOptions);
 
-        foreach ($this->runStreamLog($input, $logStreamCallbackHandler, $config) as $log) {
+        foreach ($this->runStreamLog($input, $logStreamCallbackHandler, $rootConfig, $target) as $log) {
             $runLog = $runLog === null ? RunLog::fromRunLogPatch($log) : $runLog->concat($log);
             $state = $runLog->state;
 
