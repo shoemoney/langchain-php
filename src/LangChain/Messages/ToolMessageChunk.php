@@ -31,6 +31,9 @@ class ToolMessageChunk extends BaseMessageChunk
      */
     public mixed $artifact = null;
 
+    /** Concat captures an undefined value; PHP exposes it as null until a non-null value is observed. */
+    private bool $artifactUndefined = false;
+
     public function __construct(string|array $fields = [])
     {
         parent::__construct($fields);
@@ -40,9 +43,28 @@ class ToolMessageChunk extends BaseMessageChunk
             $name = $fields['tool_name'] ?? $fields['toolName'] ?? null;
             $this->toolName = is_string($name) ? $name : null;
             $this->artifact = $fields['artifact'] ?? null;
+            if (array_key_exists('artifact', $fields)) {
+                $this->kwargs['artifact'] = $this->artifact;
+            }
         }
 
         $this->kwargs['tool_call_id'] = $this->toolCallId;
+    }
+
+    public function kwargs(): array
+    {
+        $kwargs = parent::kwargs();
+        // Source toJSON reads current values only for originally supplied keys.
+        if (array_key_exists('artifact', $kwargs)) {
+            if ($this->artifactUndefined && $this->artifact === null) {
+                unset($kwargs['artifact']);
+            } else {
+                $kwargs['artifact'] = $this->artifact;
+                $this->artifactUndefined = false;
+            }
+        }
+
+        return $kwargs;
     }
 
     public static function lcId(): array
@@ -54,7 +76,7 @@ class ToolMessageChunk extends BaseMessageChunk
     {
         $this->assertSameChunkClass($other, self::class);
 
-        return new self([
+        $fields = [
             'content' => MessageMerge::mergeContent($this->content, $other->content),
             'additional_kwargs' => MessageMerge::mergeDicts($this->additional_kwargs, $other->additional_kwargs) ?? [],
             'response_metadata' => MessageMerge::mergeDicts($this->response_metadata, $other->response_metadata) ?? [],
@@ -62,12 +84,15 @@ class ToolMessageChunk extends BaseMessageChunk
             // fallback to the incoming chunk. The port let the incoming id win unless it was empty,
             // which re-points a concatenated tool RESULT at a different CALL.
             'tool_call_id' => $this->toolCallId,
-            // Upstream `tool.ts`: `artifact: _mergeObj(this.artifact, chunk.artifact)` —
-            // an OBJECT merge, so both sides contribute. `mergeObj` is the port's counterpart of
-            // `_mergeObj` and was previously unused by any message class.
             'artifact' => MessageMerge::mergeObj($this->artifact, $other->artifact),
             'name' => $other->name ?? $this->name,
             'id' => $this->id ?? $other->id,
-        ]);
+        ];
+        // Source captures the key even when _mergeObj returns undefined. JSON omits only that
+        // initial value; retaining provenance allows a later artifact assignment to serialize.
+        $result = new self($fields);
+        $result->artifactUndefined = $fields['artifact'] === null;
+
+        return $result;
     }
 }
