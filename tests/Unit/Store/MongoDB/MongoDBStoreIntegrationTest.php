@@ -6,6 +6,8 @@ namespace LangChain\Tests\Unit\Store\MongoDB;
 
 use LangGraph\Store\MongoDB\MongoDBIndexConfig;
 use LangGraph\Store\MongoDB\MongoDBStore;
+use LangGraph\Store\MongoDB\MongoDBDriverStoreClient as ProductionMongoDBStoreDriverClient;
+use LangGraph\Store\MongoDB\MongoDBDriverStoreCollection as ProductionMongoDBStoreDriverCollection;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
@@ -21,9 +23,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(MongoDBStore::class)]
 final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
 {
-    private const DATABASE = 'langgraph_php_test';
-
-    private ?MongoDBStoreDriverClient $client = null;
+    private string $database = '';
+    private ?\MongoDB\Client $nativeClient = null;
+    private ?ProductionMongoDBStoreDriverClient $client = null;
 
     protected function setUp(): void
     {
@@ -35,13 +37,22 @@ final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
             self::markTestSkipped('ext-mongodb and mongodb/mongodb are required for the MongoDB integration tests.');
         }
 
-        $this->client = new MongoDBStoreDriverClient($uri);
-        $this->client->client->dropDatabase(self::DATABASE);
+        $this->database = 'langgraph_php_test_' . bin2hex(random_bytes(12));
+        $this->nativeClient = new \MongoDB\Client($uri, [
+            'serverSelectionTimeoutMS' => 3000,
+            'connectTimeoutMS' => 3000,
+        ], ['disableClientPersistence' => true]);
+        $this->client = new ProductionMongoDBStoreDriverClient($this->nativeClient);
     }
 
     protected function tearDown(): void
     {
-        $this->client?->client->dropDatabase(self::DATABASE);
+        if ($this->nativeClient !== null && $this->database !== '') {
+            self::assertMatchesRegularExpression('/^langgraph_php_test_[a-f0-9]{24}$/D', $this->database);
+            $this->nativeClient->dropDatabase($this->database);
+        }
+        $this->client = null;
+        $this->nativeClient = null;
     }
 
     protected function vectorCasesEnabled(): bool
@@ -57,7 +68,7 @@ final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
     protected function makeStore(string $collection, ?HashEmbeddings $embeddings = null, ?MongoDBIndexConfig $indexConfig = null): MongoDBStore
     {
         self::assertNotNull($this->client);
-        $store = new MongoDBStore($this->client, self::DATABASE, $collection, embeddings: $embeddings, indexConfig: $indexConfig);
+        $store = new MongoDBStore($this->client, $this->database, $collection, embeddings: $embeddings, indexConfig: $indexConfig);
         $store->start();
 
         return $store;
@@ -65,17 +76,17 @@ final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
 
     protected function rawDocument(string $collection, array $namespace, string $key): ?array
     {
-        self::assertNotNull($this->client);
+        self::assertNotNull($this->nativeClient);
 
-        return (new MongoDBStoreDriverCollection($this->client->client->selectCollection(self::DATABASE, $collection)))
+        return (new ProductionMongoDBStoreDriverCollection($this->nativeClient->selectCollection($this->database, $collection)))
             ->findOne(['namespace' => $namespace, 'key' => $key]);
     }
 
     protected function searchIndex(string $collection, string $name): ?array
     {
-        self::assertNotNull($this->client);
+        self::assertNotNull($this->nativeClient);
 
-        foreach ($this->client->client->selectCollection(self::DATABASE, $collection)->listSearchIndexes(['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]) as $index) {
+        foreach ($this->nativeClient->selectCollection($this->database, $collection)->listSearchIndexes(['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]) as $index) {
             if ($index['name'] === $name) {
                 return $index['latestDefinition'] ?? null;
             }
