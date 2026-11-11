@@ -31,15 +31,32 @@ class AzureChatOpenAIResponses extends ChatOpenAIResponses
     }
 
     /**
-     * The Responses route is not deployment-scoped: a deployment URL
-     * (`.../openai/deployments/{name}`) is cut back to `.../openai/responses`.
-     * Non-exact: upstream builds this URL in the openai SDK's AzureOpenAI client from a deployment-scoped baseURL.
+     * Generated endpoints use Azure's resource-level preview Responses route.
+     * This deliberately corrects the pinned SDK's deployment-scoped URL.
      */
     protected function url(): string
     {
-        $root = $this->azureRoot();
-        $at = strpos($root, '/deployments/');
+        return $this->azureProtocolUrl('/responses', deploymentScoped: false);
+    }
 
-        return ($at === false ? $root : substr($root, 0, $at)) . '/responses';
+    /** @param list<\LangChain\Messages\BaseMessage> $messages
+     *  @param array<string, mixed> $options
+     *  @return \Generator<int, array<string, mixed>>
+     */
+    public function streamChatModelEvents(array $messages, array $options = []): \Generator
+    {
+        $client = clone $this;
+        $client->azureRequestOptions = (array) ($options['options'] ?? []);
+
+        yield from $client->azureStreamChatModelEvents($messages, $options);
+    }
+
+    /** @param list<\LangChain\Messages\BaseMessage> $messages
+     *  @param array<string, mixed> $options
+     *  @return \Generator<int, array<string, mixed>>
+     */
+    private function azureStreamChatModelEvents(array $messages, array $options): \Generator
+    {
+        yield from parent::streamChatModelEvents($messages, $options);
     }
 }
