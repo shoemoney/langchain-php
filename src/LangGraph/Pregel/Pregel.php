@@ -147,9 +147,10 @@ class Pregel extends Runnable
     }
 
     /**
-     * Run the graph, yielding `[mode, payload]` chunks as it goes.
-     *
-     * Port of `Pregel._streamIterator`.
+     * Run the graph, yielding `[mode, payload]` pairs or `[namespace, mode, payload]`
+     * triples when subgraphs are requested. This established PHP envelope is
+     * retained for scalar modes too; upstream scalar modes yield bare payloads
+     * (or namespace/payload pairs). Event payloads follow Pregel._streamIterator.
      *
      * The `mode` is what kind of event this is: `values` for whole-state
      * snapshots (one per superstep that changed state) and `updates` for
@@ -208,15 +209,33 @@ class Pregel extends Runnable
             ]);
         }
 
+        $config = $config->with(['metadata' => array_merge(['ls_integration' => 'langgraph'], $config->metadata)]);
         $validInput = $this->validateInput($input);
 
-        $modes = $this->resolveStreamModes();
+        $modes = $this->resolveStreamModes($config);
 
         // `messages` and `tools` are not produced by the loop: they are callbacks
         // fired from inside nodes. Their handlers push into the loop once it
         // exists, which is why the loop is captured by reference.
         $loop = null;
-        $handlers = $this->streamHandlers($modes, $loop, $config);
+        $stream = new StreamProtocol($modes, static function (array $chunk) use (&$loop): void {
+            $loop?->bufferStreamChunk($chunk);
+        });
+        $parentStream = $config->configurable[Constants::CONFIG_KEY_STREAM] ?? null;
+        $protocol = $parentStream instanceof StreamProtocol
+            ? StreamProtocol::duplex($stream, $parentStream)
+            : $stream;
+        if (!isset($config->options['writer'])) {
+            $options = $config->options;
+            $options['writer'] = static function (mixed $chunk) use ($stream): void {
+                $current = PregelScratchpad::currentConfig();
+                $ns = (string) ($current?->configurable[Constants::CONFIG_KEY_CHECKPOINT_NS] ?? '');
+                $namespace = $ns === '' ? [] : array_slice(explode(Constants::CHECKPOINT_NAMESPACE_SEPARATOR, $ns), 0, -1);
+                $stream->push([$namespace, 'custom', $chunk]);
+            };
+            $config = $config->with(['options' => $options]);
+        }
+        $handlers = $this->streamHandlers($modes, $stream, $config);
         if ($handlers !== []) {
             $config = $config->with(['callbacks' => array_merge($config->callbacks, $handlers)]);
         }
@@ -239,10 +258,23 @@ class Pregel extends Runnable
             'durability' => $durability,
         ]);
 
-        $loop->streamModes = $modes;
-        $loop->traceNodes = $handlers !== [];
+        $loop->stream = $protocol;
+        $loop->streamModes = $protocol->modes;
+        $loop->streamSubgraphs = (bool) ($config->options['subgraphs'] ?? false);
+        if ($loop->streamSubgraphs || $parentStream instanceof StreamProtocol) {
+            $loop->config = self::patchConfigurable($loop->config, [Constants::CONFIG_KEY_STREAM => $protocol]);
+        }
+        $loop->traceNodes = $handlers !== [] || array_filter($config->callbacks, static fn (object $handler): bool =>
+            $handler instanceof StreamMessagesHandler || $handler instanceof StreamProtocolMessagesHandler || $handler instanceof StreamToolsHandler) !== [];
 
-        return $loop->run($inputKeys);
+        return (static function () use ($loop, $inputKeys, $stream, $protocol): \Generator {
+            try {
+                return yield from $loop->run($inputKeys);
+            } finally {
+                $stream->close();
+                $protocol->close();
+            }
+        })();
     }
 
     /**
@@ -317,7 +349,7 @@ class Pregel extends Runnable
      *
      * @var list<string>
      */
-    public const SUPPORTED_STREAM_MODES = ['updates', 'values', 'debug'];
+    public const SUPPORTED_STREAM_MODES = ['updates', 'values', 'debug', 'tasks', 'checkpoints', 'custom'];
 
     /**
      * Modes produced by a callback handler rather than by the loop.
@@ -325,7 +357,7 @@ class Pregel extends Runnable
      * `messages` (token and node-output messages, {@see StreamMessagesHandler})
      * and `tools` (tool lifecycle events, {@see StreamToolsHandler}). Kept apart
      * from {@see self::SUPPORTED_STREAM_MODES} because that constant is the set
-     * the LOOP emits and is pinned as such; {@see self::resolveStreamModes()}
+     * the engine and custom writer emit and is pinned as such; {@see self::resolveStreamModes()}
      * accepts the union.
      *
      * @var list<string>
@@ -345,22 +377,17 @@ class Pregel extends Runnable
      *
      * @return list<string>
      */
-    private function resolveStreamModes(): array
+    private function resolveStreamModes(RunnableConfig $config): array
     {
-        $modes = array_values(array_map(strval(...), (array) $this->streamMode));
+        $modes = array_values(array_map(strval(...), (array) ($config->options['streamMode'] ?? $this->streamMode)));
 
         $supported = array_merge(self::SUPPORTED_STREAM_MODES, self::HANDLER_STREAM_MODES);
         $unsupported = array_values(array_diff($modes, $supported));
         if ($unsupported !== []) {
             throw new \InvalidArgumentException(sprintf(
-                'Unsupported stream mode(s): %s. This port emits %s; the remaining upstream modes '
-                . '(%s) are not implemented. Requesting one would otherwise produce an empty stream '
-                . 'with no error.',
+                'Unsupported stream mode(s): %s. Supported modes: %s.',
                 implode(', ', $unsupported),
                 implode(', ', $supported),
-                implode(', ', array_diff([
-                    'values', 'updates', 'debug', 'messages', 'checkpoints', 'tasks', 'custom', 'tools',
-                ], $supported)),
             ));
         }
 
@@ -371,11 +398,9 @@ class Pregel extends Runnable
      * The callback handlers that produce the `messages` and `tools` modes.
      *
      * Port of the "set up messages stream mode" and "set up tools stream mode"
-     * blocks of `_streamIterator`. Each handler gets a sink that narrows
-     * upstream's `[namespace, mode, payload]` chunk to this port's
-     * `[mode, payload]` envelope: the namespace is dropped because `stream()`
-     * does not surface subgraph chunks, and the payload keeps its shape, so a
-     * `messages` chunk is `['messages', [message, metadata]]`.
+     * blocks of `_streamIterator`. Each handler pushes the upstream
+     * `[namespace, mode, payload]` chunk into the same sink as engine events.
+     * The outer stream retains legacy pairs unless `subgraphs` is requested.
      *
      * `$config->options['version'] === 'v3'` selects the protocol-event handler,
      * as `options.version` does upstream.
@@ -383,23 +408,19 @@ class Pregel extends Runnable
      * @param list<string> $modes
      * @return list<object>
      */
-    private function streamHandlers(array $modes, ?PregelLoop &$loop, RunnableConfig $config): array
+    private function streamHandlers(array $modes, StreamProtocol $stream, RunnableConfig $config): array
     {
         $handlers = [];
 
         if (in_array('messages', $modes, true)) {
-            $sink = static function (array $chunk) use (&$loop): void {
-                $loop?->emit([$chunk[2]], 'messages');
-            };
+            $sink = static fn (array $chunk) => $stream->push($chunk);
             $handlers[] = ($config->options['version'] ?? null) === 'v3'
                 ? new StreamProtocolMessagesHandler($sink)
                 : new StreamMessagesHandler($sink);
         }
 
         if (in_array('tools', $modes, true)) {
-            $handlers[] = new StreamToolsHandler(static function (array $chunk) use (&$loop): void {
-                $loop?->emit([$chunk[2]], 'tools');
-            });
+            $handlers[] = new StreamToolsHandler(static fn (array $chunk) => $stream->push($chunk));
         }
 
         return $handlers;

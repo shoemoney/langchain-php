@@ -1065,7 +1065,12 @@ final class Algorithm
     ): RunnableConfig {
         $configurable = $config->configurable;
 
+        // Stream invocation options belong to the parent call. The shared sink and writer
+        // propagate independently; upstream _defaults extracts streamMode from execution config.
+        $options = $config->options;
+        unset($options['streamMode'], $options['subgraphs']);
         $taskConfig = $config->with([
+            'options' => $options,
             'metadata' => array_merge($config->metadata, $metadata),
             'tags' => array_merge($config->tags, $tags),
             'run_name' => $nodeName,
