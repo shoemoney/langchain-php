@@ -41,7 +41,9 @@ use LangGraph\Pregel\Checkpoint\CheckpointTuple as PregelCheckpointTuple;
  * ## Known non-exact behaviour
  *
  *  - Upstream issues the blob writes with `Promise.all`; they are sequential here.
- *  - `fromCluster` is not ported (no cluster client is bundled).
+ *  - Cluster Search uses one coordinator and requires server-side distributed Search support.
+ *  - Raw RedisJSON does not follow MOVED/ASK; native KEYS can be partial/fatal on orphaned keys.
+ *    Multi-node resharding/failover and complete discovery/deletion remain unverified.
  *  - `list()` keeps upstream's default limit of 10.
  */
 class RedisSaver extends BaseCheckpointSaver
@@ -111,6 +113,20 @@ class RedisSaver extends BaseCheckpointSaver
     public static function fromUrl(string $url, ?TtlConfig $ttlConfig = null): self
     {
         $saver = new self(PhpRedisClient::fromUrl($url), $ttlConfig);
+        $saver->ensureIndexes();
+
+        return $saver;
+    }
+
+    /**
+     * Connect to a cluster and create checkpoint indexes, as upstream fromCluster.
+     *
+     * @param list<array{url: string}> $rootNodes
+     * @param callable|null $connector RedisCluster constructor seam; see PhpRedisClient::fromCluster().
+     */
+    public static function fromCluster(array $rootNodes, ?TtlConfig $ttlConfig = null, ?callable $connector = null): self
+    {
+        $saver = new self(PhpRedisClient::fromCluster($rootNodes, $connector), $ttlConfig);
         $saver->ensureIndexes();
 
         return $saver;

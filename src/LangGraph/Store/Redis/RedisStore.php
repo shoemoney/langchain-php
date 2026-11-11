@@ -45,8 +45,10 @@ use LangGraph\Store\SearchOperation;
  * the first 1000 documents. Changed: an exact namespace and key are checked on the hits of
  * `get`/`put`, so `put(["a"], "k")` can no longer delete `["a", "b"] / "k"`.
  *
- * Not ported: `fromCluster` (Redis Cluster through `createCluster`); PhpRedis cluster is out of
- * scope for this port.
+ * Cluster construction uses ext-redis slot routing and one Search coordinator; distributed
+ * Search is a server capability and requires separate multi-node verification.
+ * Raw RedisJSON does not follow MOVED/ASK; module commands during resharding/failover and
+ * borrowed clients using OPT_PREFIX are not verified by the deterministic adapter tests.
  */
 final class RedisStore extends BaseStore
 {
@@ -88,6 +90,20 @@ final class RedisStore extends BaseStore
     public static function fromConnString(string $connString, ?RedisStoreIndexConfig $index = null, ?TtlConfig $ttl = null): self
     {
         return self::fromUrl($connString, $index, $ttl);
+    }
+
+    /**
+     * Connect to a cluster and create the store indexes, as upstream fromCluster.
+     *
+     * @param list<array{url: string}> $rootNodes
+     * @param callable|null $connector RedisCluster constructor seam; see PhpRedisClient::fromCluster().
+     */
+    public static function fromCluster(array $rootNodes, ?RedisStoreIndexConfig $index = null, ?TtlConfig $ttl = null, ?callable $connector = null): self
+    {
+        $store = new self(PhpRedisClient::fromCluster($rootNodes, $connector), $index, $ttl);
+        $store->setup();
+
+        return $store;
     }
 
     public static function isPutOperation(Operation $op): bool
