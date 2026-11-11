@@ -60,6 +60,8 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "suggest": {
+        "ext-mongodb": "Required with mongodb/mongodb by the optional MongoDB checkpoint driver adapters; native and server compatibility must be verified for the chosen backend versions.",
+        "mongodb/mongodb": "Required with ext-mongodb to wrap a borrowed MongoDB client using LangGraph\\Checkpoint\\MongoDB\\MongoDBDriverClient.",
         "ext-pdo_sqlite": "Needed by LangGraph\\Checkpoint\\SqliteSaver. Upstream ships this saver as a separate optional package (@langchain/langgraph-checkpoint-sqlite); this port bundles it, so the extension is required for that backend and suggested rather than mandatory for the rest."
     }
 }

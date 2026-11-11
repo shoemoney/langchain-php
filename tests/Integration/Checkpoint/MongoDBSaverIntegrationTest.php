@@ -21,7 +21,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(MongoDBSaver::class)]
 final class MongoDBSaverIntegrationTest extends CheckpointerSpecCase
 {
-    private const DATABASE = 'langgraph_php_test';
+    private string $database = '';
+
 
     private ?MongoDBDriverClient $client = null;
 
@@ -35,19 +36,19 @@ final class MongoDBSaverIntegrationTest extends CheckpointerSpecCase
             self::markTestSkipped('ext-mongodb and mongodb/mongodb are required for the MongoDB integration tests.');
         }
 
+        $this->database = 'langgraph_php_test_' . bin2hex(random_bytes(12));
         $this->client = new MongoDBDriverClient($uri);
-        $this->client->dropDatabase(self::DATABASE);
     }
 
     protected function tearDown(): void
     {
-        $this->client?->dropDatabase(self::DATABASE);
+        $this->client?->dropDatabase($this->database);
     }
 
     protected function makeSaver(): BaseCheckpointSaver
     {
         self::assertNotNull($this->client);
-        $saver = new MongoDBSaver($this->client, self::DATABASE);
+        $saver = new MongoDBSaver($this->client, $this->database);
         self::assertSame([], $saver->setup());
 
         return $saver;

@@ -21,7 +21,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(MongoDBStore::class)]
 final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
 {
-    private const DATABASE = 'langgraph_php_test';
+    private string $database = '';
+
 
     private ?MongoDBStoreDriverClient $client = null;
 
@@ -35,13 +36,13 @@ final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
             self::markTestSkipped('ext-mongodb and mongodb/mongodb are required for the MongoDB integration tests.');
         }
 
+        $this->database = 'langgraph_php_test_' . bin2hex(random_bytes(12));
         $this->client = new MongoDBStoreDriverClient($uri);
-        $this->client->client->dropDatabase(self::DATABASE);
     }
 
     protected function tearDown(): void
     {
-        $this->client?->client->dropDatabase(self::DATABASE);
+        $this->client?->client->dropDatabase($this->database);
     }
 
     protected function vectorCasesEnabled(): bool
@@ -57,7 +58,7 @@ final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
     protected function makeStore(string $collection, ?HashEmbeddings $embeddings = null, ?MongoDBIndexConfig $indexConfig = null): MongoDBStore
     {
         self::assertNotNull($this->client);
-        $store = new MongoDBStore($this->client, self::DATABASE, $collection, embeddings: $embeddings, indexConfig: $indexConfig);
+        $store = new MongoDBStore($this->client, $this->database, $collection, embeddings: $embeddings, indexConfig: $indexConfig);
         $store->start();
 
         return $store;
@@ -67,7 +68,7 @@ final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
     {
         self::assertNotNull($this->client);
 
-        return (new MongoDBStoreDriverCollection($this->client->client->selectCollection(self::DATABASE, $collection)))
+        return (new MongoDBStoreDriverCollection($this->client->client->selectCollection($this->database, $collection)))
             ->findOne(['namespace' => $namespace, 'key' => $key]);
     }
 
@@ -75,7 +76,7 @@ final class MongoDBStoreIntegrationTest extends MongoDBStoreContractCase
     {
         self::assertNotNull($this->client);
 
-        foreach ($this->client->client->selectCollection(self::DATABASE, $collection)->listSearchIndexes(['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]) as $index) {
+        foreach ($this->client->client->selectCollection($this->database, $collection)->listSearchIndexes(['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]) as $index) {
             if ($index['name'] === $name) {
                 return $index['latestDefinition'] ?? null;
             }
