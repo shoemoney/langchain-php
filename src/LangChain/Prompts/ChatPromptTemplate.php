@@ -44,7 +44,7 @@ class ChatPromptTemplate extends BaseChatPromptTemplate
     /**
      * The messages this prompt renders, in order.
      *
-     * @var list<BaseMessagePromptTemplate|BaseMessage>
+     * @var list<BaseMessagePromptTemplate|BaseChatPromptTemplate|BaseMessage>
      */
     public array $promptMessages = [];
 
@@ -55,7 +55,7 @@ class ChatPromptTemplate extends BaseChatPromptTemplate
     public string $templateFormat = Template::F_STRING;
 
     /**
-     * @param list<BaseMessagePromptTemplate|BaseMessage> $promptMessages
+     * @param list<BaseMessagePromptTemplate|BaseChatPromptTemplate|BaseMessage> $promptMessages
      * @param list<string>                                 $inputVariables
      * @param array<string, string|callable>               $partialVariables
      * @param array<string, mixed>|null                    $templateFormat
@@ -309,9 +309,9 @@ class ChatPromptTemplate extends BaseChatPromptTemplate
      *
      * @param array<string, mixed> $extra
      */
-    private static function coerceMessagePromptTemplateLike(mixed $like, array $extra): BaseMessagePromptTemplate|BaseMessage
+    private static function coerceMessagePromptTemplateLike(mixed $like, array $extra): BaseMessagePromptTemplate|BaseChatPromptTemplate|BaseMessage
     {
-        if ($like instanceof BaseMessagePromptTemplate || $like instanceof BaseMessage) {
+        if ($like instanceof BaseMessagePromptTemplate || $like instanceof BaseChatPromptTemplate || $like instanceof BaseMessage) {
             return $like;
         }
 

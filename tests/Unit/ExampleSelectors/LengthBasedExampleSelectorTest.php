@@ -6,6 +6,7 @@ namespace LangChain\Tests\Unit\ExampleSelectors;
 
 use LangChain\ExampleSelectors\BaseExampleSelector;
 use LangChain\ExampleSelectors\LengthBasedExampleSelector;
+use LangChain\Prompts\FewShotPromptTemplate;
 use LangChain\Prompts\PromptTemplate;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -13,8 +14,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Port of `langchain/src/prompts/tests/selectors.test.ts` and the example-selector
  * case of core `prompts/tests/few_shot.test.ts` ("partial with function and example
- * selector"); the `FewShotPromptTemplate` half of that case cannot run, because
- * that class is not ported.
+ * selector"), including the real FewShotPromptTemplate formatting path.
  */
 #[CoversClass(LengthBasedExampleSelector::class)]
 #[CoversClass(BaseExampleSelector::class)]
@@ -41,7 +41,7 @@ final class LengthBasedExampleSelectorTest extends TestCase
         $this->assertSame([['foo' => 'one one one'], ['foo' => 'one two three']], $chosen);
     }
 
-    public function testExampleSelectorFeedingAPromptTheWayFewShotDoes(): void
+    public function testFewShotPartialWithFunctionAndExampleSelector(): void
     {
         $examplePrompt = PromptTemplate::fromTemplate('An example about {x}');
         $selector = LengthBasedExampleSelector::fromExamples(
@@ -49,10 +49,15 @@ final class LengthBasedExampleSelectorTest extends TestCase
             ['examplePrompt' => $examplePrompt, 'maxLength' => 200],
         );
 
-        $examples = $selector->selectExamples(['bar' => 'baz']);
-        $rendered = implode("\n", array_map($examplePrompt->format(...), $examples));
+        $prompt = new FewShotPromptTemplate(
+            examplePrompt: $examplePrompt,
+            exampleSelector: $selector,
+            inputVariables: ['foo', 'bar'],
+            prefix: '{foo}{bar}',
+            exampleSeparator: "\n",
+        );
 
-        $this->assertSame("An example about foo\nAn example about bar", $rendered);
+        $this->assertSame("boobaz\nAn example about foo\nAn example about bar\n", $prompt->partial(['foo' => static fn (): string => 'boo'])->format(['bar' => 'baz']));
     }
 
     public function testLengthIsWordsAndLinesByDefault(): void
