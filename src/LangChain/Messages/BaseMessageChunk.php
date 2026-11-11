@@ -41,7 +41,9 @@ abstract class BaseMessageChunk extends BaseMessage
      * Promote a fully-folded chunk into its finished-message counterpart.
      *
      * This is the last step of stream reconstruction: fold every chunk with
-     * {@see self::concat()}, then convert.
+     * {@see self::concat()}, then convert. This promotion API is a PHP extension;
+     * the pinned JavaScript BaseMessageChunk has no toMessage() method. Tool artifacts
+     * retain constructor-key provenance and pass unescaped into the finished message.
      */
     public function toMessage(): BaseMessage
     {
@@ -53,7 +55,7 @@ abstract class BaseMessageChunk extends BaseMessage
                 'tool_call_id' => $this->toolCallId,
                 'id' => $this->id,
                 'name' => $this->name,
-            ]),
+            ] + (array_key_exists('artifact', $this->kwargs()) ? ['artifact' => $this->artifact] : [])),
             $this instanceof HumanMessageChunk => new HumanMessage([
                 'content' => $this->content,
                 'additional_kwargs' => $this->additional_kwargs,
