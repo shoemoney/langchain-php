@@ -1065,7 +1065,21 @@ final class Algorithm
     ): RunnableConfig {
         $configurable = $config->configurable;
 
+        // Graph invocation options belong to the parent loop, not its tasks. Upstream
+        // _defaults removes these before task construction; keep the shared sink, writer
+        // and other call options so explicitly forwarded config still carries task context.
+        $options = $config->options;
+        unset(
+            $options['streamMode'],
+            $options['subgraphs'],
+            $options['interruptBefore'],
+            $options['interruptAfter'],
+            $options['inputKeys'],
+            $options['outputKeys'],
+            $options['debug'],
+        );
         $taskConfig = $config->with([
+            'options' => $options,
             'metadata' => array_merge($config->metadata, $metadata),
             'tags' => array_merge($config->tags, $tags),
             'run_name' => $nodeName,

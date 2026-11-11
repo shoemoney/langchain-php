@@ -7,6 +7,7 @@ namespace LangGraph\Pregel;
 use LangChain\Runnables\RunnableConfig;
 use LangGraph\Channels\BaseChannel;
 use LangGraph\Channels\ChannelRegistry;
+use LangGraph\Cache\AsyncBatchedCache;
 use LangGraph\Cache\BaseCache;
 use LangGraph\Errors\EmptyInputError;
 use LangGraph\Errors\GraphDrained;
@@ -58,6 +59,15 @@ class PregelLoop
     /** Chunks buffered by `_emit`, drained by the generator. */
     private array $streamBuffer = [];
 
+    public ?StreamProtocol $stream = null;
+    public bool $streamSubgraphs = false;
+
+    /** Preserve provenance internally; legacy callers retain their two-element envelope. */
+    public function bufferStreamChunk(array $chunk): void
+    {
+        $this->streamBuffer[] = $this->streamSubgraphs ? $chunk : [$chunk[1], $chunk[2]];
+    }
+
     /** The final output, readable via `Generator::getReturn()`. */
     public mixed $output = null;
 
@@ -91,6 +101,9 @@ class PregelLoop
         public ?AsyncBatchedStore $store = null,
         public ?BaseCache $cache = null,
     ) {
+        if ($this->cache !== null) {
+            $this->cache = new AsyncBatchedCache($this->cache);
+        }
     }
 
     /**
@@ -521,6 +534,20 @@ class PregelLoop
         $this->tasks = $nextTasks;
         $taskList = array_values($this->tasks);
 
+        // Checkpoint events describe the saved state together with the NEXT prepared tasks.
+        if ($this->checkpointer !== null && in_array('checkpoints', $this->streamModes, true)) {
+            $this->emit(iterator_to_array(Debug::mapDebugCheckpoint(
+                $this->checkpointConfig,
+                $this->channels,
+                $this->streamKeys,
+                $this->checkpointMetadata,
+                $taskList,
+                $this->checkpointPendingWrites,
+                $this->prevCheckpointConfig,
+                $this->outputKeys,
+            ), false), 'checkpoints');
+        }
+
         if ($taskList === []) {
             $this->status['status'] = 'done';
 
@@ -575,6 +602,10 @@ class PregelLoop
         if (Algorithm::shouldInterrupt($this->checkpoint, $this->interruptBefore, $taskList)) {
             $this->status['status'] = 'interrupt_before';
             throw new GraphInterrupt();
+        }
+
+        if (in_array('tasks', $this->streamModes, true)) {
+            $this->emit(iterator_to_array(Debug::mapDebugTasks($taskList), false), 'tasks');
         }
 
         return true;
@@ -930,28 +961,35 @@ class PregelLoop
             return;
         }
 
-        if ($writes !== []) {
-            $firstChannel = $writes[0][0] ?? null;
+        $path = $task->path;
+        if (($writes[0][0] ?? null) === Constants::INTERRUPT
+            && $path !== null && $path->isPush() && $path->isCallPath()) {
+            return;
+        }
 
-            if ($firstChannel === Constants::INTERRUPT) {
-                $path = $task->path;
-                if ($path !== null && $path->isPush() && $path->isCallPath()) {
-                    return;
-                }
+        try {
+            if ($writes !== []) {
+                $firstChannel = $writes[0][0] ?? null;
 
-                $interruptWrites = [];
-                foreach ($writes as $write) {
-                    if ($write[0] === Constants::INTERRUPT) {
-                        $interruptWrites[] = $write[1] ?? null;
+                if ($firstChannel === Constants::INTERRUPT) {
+                    $interruptWrites = [];
+                    foreach ($writes as $write) {
+                        if ($write[0] === Constants::INTERRUPT) {
+                            $interruptWrites[] = $write[1] ?? null;
+                        }
+                    }
+
+                    $this->emit([[Constants::INTERRUPT => $interruptWrites]], 'updates');
+                    $this->emit([[Constants::INTERRUPT => $interruptWrites]], 'values');
+                } elseif ($firstChannel !== Constants::ERROR) {
+                    foreach (IO::mapOutputUpdates($this->outputKeys, [[$task, $writes]], $cached) as $update) {
+                        $this->emit([$update], 'updates');
                     }
                 }
-
-                $this->emit([[Constants::INTERRUPT => $interruptWrites]], 'updates');
-                $this->emit([[Constants::INTERRUPT => $interruptWrites]], 'values');
-            } elseif ($firstChannel !== Constants::ERROR) {
-                foreach (IO::mapOutputUpdates($this->outputKeys, [[$task, $writes]], $cached) as $update) {
-                    $this->emit([$update], 'updates');
-                }
+            }
+        } finally {
+            if (!$cached && in_array('tasks', $this->streamModes, true)) {
+                $this->emit(iterator_to_array(Debug::mapDebugTaskResults([[$task, $writes]], $this->streamKeys), false), 'tasks');
             }
         }
     }
@@ -1334,17 +1372,27 @@ class PregelLoop
             // that exists. Its payload is the same seven fields `getState()` returns —
             // upstream's `checkpoint` debug payload IS a StateSnapshot — so it is read
             // off the same values rather than reassembled, and the two cannot drift.
-            $this->emitDebug('checkpoint', [
-                'config' => $this->checkpointConfig->configurable,
-                'values' => IO::readChannels($this->channels, $this->outputKeys),
-                'metadata' => $this->checkpointMetadata,
-                'next' => $this->nextTaskNames(),
-                'parentConfig' => $this->prevCheckpointConfig?->configurable,
-                'tasks' => array_map(
+            if (in_array('debug', $this->streamModes, true)) {
+                $sourceCheckpoint = iterator_to_array(Debug::mapDebugCheckpoint(
+                    $this->checkpointConfig,
+                    $this->channels,
+                    $this->outputKeys,
+                    $this->checkpointMetadata,
+                    array_values($this->tasks),
+                    $this->checkpointPendingWrites,
+                    $this->prevCheckpointConfig,
+                    $this->outputKeys,
+                ), false)[0];
+                // Preserve the recorded legacy debug shape while sharing the source snapshot builder.
+                $sourceCheckpoint['config'] = $sourceCheckpoint['config']['configurable'];
+                $sourceCheckpoint['parentConfig'] = $sourceCheckpoint['parentConfig']['configurable'] ?? null;
+                $sourceCheckpoint['next'] = $this->nextTaskNames();
+                $sourceCheckpoint['tasks'] = array_map(
                     static fn (PregelExecutableTask $t): array => $t->toDescription()->toArray(),
                     array_values($this->tasks),
-                ),
-            ], $this->step);
+                );
+                $this->emitDebug('checkpoint', $sourceCheckpoint, $this->step);
+            }
         }
 
         if (!$exiting) {
@@ -1411,8 +1459,50 @@ class PregelLoop
         }
 
         foreach ($payload as $item) {
-            $this->streamBuffer[] = [$mode, $item];
+            if ($this->stream !== null) {
+                $this->stream->push([$this->checkpointNamespace, $mode, $item]);
+            } else {
+                $this->streamBuffer[] = [$mode, $item];
+            }
         }
+    }
+
+    /** Legacy debug task boundary; raw source starts are emitted together before dispatch. */
+    public function emitTaskStart(PregelExecutableTask $task): void
+    {
+        if (in_array('debug', $this->streamModes, true)) {
+            $this->emitDebug('task', $this->debugTaskPayload($task, true));
+        }
+    }
+
+    /** Shared by the superstep runner and the functional task scheduler. */
+    public function emitTaskResultDebug(PregelExecutableTask $task): void
+    {
+        if (!in_array('debug', $this->streamModes, true)) {
+            return;
+        }
+        $visibleTask = clone $task;
+        if ($visibleTask->config !== null) {
+            $visibleTask->config = $visibleTask->config->with([
+                'tags' => array_values(array_diff($visibleTask->config->tags, [Constants::TAG_HIDDEN])),
+            ]);
+        }
+        $channels = array_values(array_filter(array_column($task->writes, 0),
+            static fn (string $channel): bool => !in_array($channel, [Constants::NO_WRITES, Constants::HANDLED], true)));
+        $source = iterator_to_array(Debug::mapDebugTaskResults([[$visibleTask, $task->writes]], $channels), false)[0];
+        // Legacy debug used the last write for repeated channels; raw tasks preserves every write.
+        $result = [];
+        foreach ($task->writes as [$channel, $value]) {
+            if (array_key_exists($channel, $source['result'])) {
+                $result[$channel] = $value;
+            }
+        }
+        $this->emitDebug('task_result', [
+            'id' => $source['id'],
+            'name' => $source['name'],
+            'interrupts' => $task->interrupts,
+            'result' => $result,
+        ]);
     }
 
     /**
@@ -1460,17 +1550,19 @@ class PregelLoop
      */
     public function debugTaskPayload(PregelExecutableTask $task, bool $withInput): array
     {
+        // Legacy debug includes hidden bookkeeping tasks and framework metadata. The raw
+        // tasks mode filters those, but both derive identity/input/triggers from the source mapper.
+        $visibleTask = clone $task;
+        if ($visibleTask->config !== null) {
+            $visibleTask->config = $visibleTask->config->with([
+                'tags' => array_values(array_diff($visibleTask->config->tags, [Constants::TAG_HIDDEN])),
+            ]);
+        }
+        $source = iterator_to_array(Debug::mapDebugTasks([$visibleTask]), false)[0];
         $payload = [
-            'id' => $task->id,
-            'name' => $task->name,
-            // `triggers` is TOP-LEVEL upstream, not only inside `metadata`. Reading
-            // the recorded run rather than the source is what caught this: the
-            // payload keys are `id, input, interrupts, metadata, name, triggers` —
-            // five at the top level with `triggers` beside `name`, and a nested
-            // `langgraph_triggers` inside `metadata` as well. Nesting it and calling
-            // that done would have satisfied a reader looking at `metadata` and left
-            // a consumer reading `triggers` — the documented place — with nothing.
-            'triggers' => $task->triggers,
+            'id' => $source['id'],
+            'name' => $source['name'],
+            'triggers' => $source['triggers'],
             'interrupts' => $task->interrupts,
             'metadata' => [
                 'langgraph_step' => $this->step,
@@ -1479,9 +1571,8 @@ class PregelLoop
                 'langgraph_path' => $task->path?->toArray(),
             ],
         ];
-
         if ($withInput) {
-            $payload['input'] = $task->input;
+            $payload['input'] = $source['input'];
         }
 
         return $payload;
@@ -1605,6 +1696,10 @@ class PregelLoop
             $this->toInterrupt[] = $pushed;
 
             return null;
+        }
+
+        if (in_array('tasks', $this->streamModes, true)) {
+            $this->emit(iterator_to_array(Debug::mapDebugTasks([$pushed]), false), 'tasks');
         }
 
         $this->traceTask($pushed);
