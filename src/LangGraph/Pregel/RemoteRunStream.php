@@ -6,35 +6,25 @@ namespace LangGraph\Pregel;
 
 use LangGraph\Errors\RemoteException;
 use LangGraph\Sdk\Client;
+use LangGraph\Sdk\Stream\ThreadProjection;
+use LangGraph\Sdk\Stream\ThreadStream;
 
 /**
- * A handle on a run started on a remote server, iterated as protocol events.
- *
- * Port of `RemoteGraphRunStream` from `pregel/remote-run-stream.ts`. Upstream adapts the SDK's
- * `ThreadStream` to the local `GraphRunStream`; neither exists in this port, so this class follows the
- * run over REST instead: {@see RemoteGraph::streamEventsV3()} creates the run and this class reads
- * `runs->joinStream()`, turning each SSE part into an event
- *
- * ```
- * ['type' => 'event', 'seq' => int, 'method' => 'values', 'params' => ['namespace' => [], 'timestamp' => ms, 'data' => ...]]
- * ```
- *
- * `metadata` and `end` parts are run bookkeeping, not graph events, and are skipped; an `error` part
- * throws.
- *
- * `abort()` marks the run aborted and asks the server to cancel it (best effort, as upstream). The
- * signal handed to the stream is polled between reads, so an abort stops iteration at the next part.
- *
- * Upstream's `values`/`messages`/`subgraphs`/`lifecycle` projections are not ported: they are views of
- * the `ThreadStream` subscription machinery. {@see self::output()} and {@see self::interrupts()} are the
- * two answers a caller needs from the event list.
+ * Remote protocol handle. fromThread() adapts the SDK ThreadStream; the public direct constructor
+ * retains the legacy REST joinStream path. SDK projections are delegated without wrappers.
+ * Callable signals are checked at entry/exit and raw/lifecycle yield boundaries. They cannot
+ * interrupt delegated projection pulls or blocked reads; those need the SDK common-pull seam.
  *
  * @implements \IteratorAggregate<int, array<string, mixed>>
  */
 final class RemoteRunStream implements \IteratorAggregate
 {
-    /** The stream modes a v3 run asks the server for. */
+    /** Legacy REST stream modes preserved for the public direct constructor. */
     public const STREAM_MODES = ['values', 'updates', 'messages-tuple', 'custom', 'tasks', 'checkpoints'];
+
+    public const PROTOCOL_CHANNELS = ['values', 'updates', 'messages', 'tools', 'custom', 'tasks', 'checkpoints', 'lifecycle', 'input'];
+
+    private ?ThreadStream $thread = null;
 
     private bool $aborted = false;
 
@@ -60,6 +50,105 @@ final class RemoteRunStream implements \IteratorAggregate
         $this->callerSignal = $signal;
     }
 
+    public static function fromThread(Client $client, ThreadStream $thread, ?string $runId = null, ?callable $signal = null): self
+    {
+        $stream = new self($client, $thread->threadId, $runId, $signal);
+        $stream->thread = $thread;
+
+        return $stream;
+    }
+
+    public function thread(): ?ThreadStream
+    {
+        return $this->thread;
+    }
+
+    private function requireThread(): ThreadStream
+    {
+        return $this->thread ?? throw new \LogicException('Thread projections require RemoteRunStream::fromThread().');
+    }
+
+    private function checkSignal(): void
+    {
+        if (!$this->aborted && $this->callerSignal !== null && ($this->callerSignal)()) {
+            $this->abort();
+        }
+    }
+
+    private function delegate(callable $operation): mixed
+    {
+        $this->checkSignal();
+        try {
+            return $operation($this->requireThread());
+        } finally {
+            $this->checkSignal();
+        }
+    }
+
+    public function values(): ThreadProjection
+    {
+        return $this->delegate(static fn (ThreadStream $thread): ThreadProjection => $thread->values());
+    }
+
+    public function messages(): ThreadProjection
+    {
+        return $this->delegate(static fn (ThreadStream $thread): ThreadProjection => $thread->messages());
+    }
+
+    public function messagesFrom(string $node): ThreadProjection
+    {
+        return $this->delegate(static fn (ThreadStream $thread): ThreadProjection => $thread->messagesFrom($node));
+    }
+
+    public function subgraphs(): ThreadProjection
+    {
+        return $this->delegate(static fn (ThreadStream $thread): ThreadProjection => $thread->subgraphs());
+    }
+
+    /** Named lazy accessor replaces the source extensions Proxy without copying its cache. */
+    public function extension(string $name): ThreadProjection
+    {
+        return $this->delegate(static fn (ThreadStream $thread): ThreadProjection => $thread->extension($name));
+    }
+
+    public function lifecycle(): \Generator
+    {
+        foreach ($this->iterateThread(['lifecycle']) as $event) {
+            yield [...(array) $event['params']['data'],
+                'namespace' => $event['params']['namespace'], 'timestamp' => $event['params']['timestamp']];
+        }
+    }
+
+    private function iterateThread(array $channels): \Generator
+    {
+        $this->checkSignal();
+        if ($this->aborted) {
+            return;
+        }
+        $subscription = $this->requireThread()->subscribe(['channels' => $channels]);
+        $cursor = $subscription->getIterator();
+        try {
+            while (true) {
+                $this->checkSignal();
+                if ($this->aborted || !$cursor->valid()) {
+                    return;
+                }
+                $this->checkSignal();
+                if ($this->aborted) {
+                    return;
+                }
+                yield $cursor->current();
+                $this->checkSignal();
+                if ($this->aborted) {
+                    return;
+                }
+                $cursor->next();
+            }
+        } finally {
+            $subscription->unsubscribe();
+        }
+    }
+
     public function threadId(): string
     {
         return $this->threadId;
@@ -77,7 +166,11 @@ final class RemoteRunStream implements \IteratorAggregate
      */
     public function signal(): callable
     {
-        return fn (): bool => $this->aborted || ($this->callerSignal !== null && ($this->callerSignal)());
+        return function (): bool {
+            $this->checkSignal();
+
+            return $this->aborted;
+        };
     }
 
     public function aborted(): bool
@@ -95,21 +188,30 @@ final class RemoteRunStream implements \IteratorAggregate
         }
         $this->aborted = true;
 
-        if ($this->runId === null) {
-            return;
+        try {
+            if ($this->runId !== null) {
+                $this->client->runs->cancel($this->threadId, $this->runId, false);
+            }
+        } catch (\Throwable) {
+            // Best effort cancellation must not prevent releasing the thread.
         }
         try {
-            $this->client->runs->cancel($this->threadId, $this->runId, false);
+            $this->thread?->close();
         } catch (\Throwable) {
-            // Best effort, as upstream: the caller already has what it needs from the abort.
+            // Best effort, as upstream.
         }
     }
 
     /**
-     * @return \Generator<int, array{type: string, seq: int, method: string, params: array{namespace: list<string>, timestamp: int, data: mixed}}>
+     * @return \Generator<int, array<string, mixed>> Exact thread envelopes; legacy records use generated seq/time.
      */
     public function getIterator(): \Generator
     {
+        if ($this->thread !== null) {
+            yield from $this->iterateThread(self::PROTOCOL_CHANNELS);
+
+            return;
+        }
         if ($this->runId === null) {
             return;
         }
@@ -157,6 +259,9 @@ final class RemoteRunStream implements \IteratorAggregate
      */
     public function output(): mixed
     {
+        if ($this->thread !== null) {
+            return $this->delegate(static fn (ThreadStream $thread): mixed => $thread->output());
+        }
         foreach ($this as $ignored) {
             // Drain; getIterator() records the last values event.
         }
@@ -167,17 +272,19 @@ final class RemoteRunStream implements \IteratorAggregate
     /** Whether an interrupt has been seen so far. */
     public function interrupted(): bool
     {
-        return $this->interrupted;
+        return $this->thread !== null
+            ? $this->delegate(static fn (ThreadStream $thread): bool => $thread->interrupted()) : $this->interrupted;
     }
 
     /**
      * The interrupts seen so far.
      *
-     * @return list<array{id: string|null, value: mixed}>
+     * @return list<array<string, mixed>> SDK interruptId/payload/namespace; legacy id/value records.
      */
     public function interrupts(): array
     {
-        return $this->interrupts;
+        return $this->thread !== null
+            ? $this->delegate(static fn (ThreadStream $thread): array => $thread->interrupts()) : $this->interrupts;
     }
 
     /**
@@ -199,7 +306,9 @@ final class RemoteRunStream implements \IteratorAggregate
                 yield "event: {$name}\ndata: " . json_encode($event['params']['data'] ?? new \stdClass()) . "\n\n";
             }
         } catch (\Throwable $e) {
-            yield "event: error\ndata: " . json_encode(['message' => (string) $e]) . "\n\n";
+            $message = $this->thread !== null
+                ? (new \ReflectionClass($e))->getShortName() . ': ' . $e->getMessage() : (string) $e;
+            yield "event: error\ndata: " . json_encode(['message' => $message]) . "\n\n";
         }
     }
 

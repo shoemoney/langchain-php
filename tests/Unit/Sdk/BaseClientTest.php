@@ -334,6 +334,106 @@ final class BaseClientTest extends TestCase
         $this->assertNull($t->requests[2]['timeout']);
     }
 
+    public function testPreparedSignalMergesTheConfiguredDeadlineWithCallerAbort(): void
+    {
+        $now = 1000;
+        $aborted = false;
+        $client = $this->threads(new RecordingTransport(), [
+            'timeoutMs' => 100,
+            'clock' => static function () use (&$now): int { return $now; },
+        ]);
+        $caller = static function () use (&$aborted): bool { return $aborted; };
+        [, $init] = $client->rawPrepare('/a', ['signal' => $caller]);
+
+        $this->assertFalse($init['signal']());
+        $now = 1099;
+        $this->assertFalse($init['signal']());
+        $now = 1100;
+        $this->assertTrue($init['signal']());
+
+        [, $next] = $client->rawPrepare('/b', ['signal' => $caller]);
+        $this->assertFalse($next['signal'](), 'each request starts a new deadline');
+        $aborted = true;
+        $this->assertTrue($next['signal']());
+    }
+
+    public function testRequestTimeoutOverrideAndNullUseTheUpstreamPrecedence(): void
+    {
+        $now = 0;
+        $client = $this->threads(new RecordingTransport(), [
+            'timeoutMs' => 100,
+            'clock' => static function () use (&$now): int { return $now; },
+        ]);
+        $caller = static fn (): bool => false;
+        [, $overridden] = $client->rawPrepare('/a', ['timeoutMs' => 20]);
+        [, $disabled] = $client->rawPrepare('/b', ['timeoutMs' => null, 'signal' => $caller]);
+        [, $none] = $client->rawPrepare('/c', ['timeoutMs' => null]);
+
+        $now = 20;
+        $this->assertTrue($overridden['signal']());
+        $this->assertSame($caller, $disabled['signal']);
+        $this->assertNull($none['signal']);
+    }
+
+    public function testAnAbortedCallerPreventsTheFirstTransportAttempt(): void
+    {
+        $transport = new RecordingTransport();
+        $client = $this->threads($transport);
+
+        try {
+            $client->rawFetch('/a', ['signal' => static fn (): bool => true]);
+            $this->fail('expected AbortError');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('AbortError', $e->getMessage());
+        }
+        $this->assertSame([], $transport->requests);
+    }
+
+    public function testDeadlineExpiryDuringBackoffPreventsTheNextCustomFetchAttempt(): void
+    {
+        $now = 0;
+        $calls = 0;
+        $client = $this->threads(new RecordingTransport(), [
+            'timeoutMs' => 50,
+            'clock' => static function () use (&$now): int { return $now; },
+            'callerOptions' => [
+                'maxRetries' => 3,
+                'fetch' => static function () use (&$calls): HttpResponse {
+                    $calls++;
+
+                    return new HttpResponse(500, [], 'retry');
+                },
+                'sleep' => static function () use (&$now): void { $now = 50; },
+            ],
+        ]);
+
+        try {
+            $client->rawFetch('/a');
+            $this->fail('expected AbortError');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('AbortError', $e->getMessage());
+        }
+        $this->assertSame(1, $calls);
+    }
+
+    public function testPolledTimeoutDoesNotInterruptASynchronousTransport(): void
+    {
+        $now = 0;
+        $client = $this->threads(new RecordingTransport(), [
+            'timeoutMs' => 50,
+            'clock' => static function () use (&$now): int { return $now; },
+            'callerOptions' => [
+                'fetch' => static function () use (&$now): HttpResponse {
+                    $now = 100;
+
+                    return FakeHttpClient::json(200, ['ok' => true]);
+                },
+            ],
+        ]);
+
+        $this->assertSame(['ok' => true], $client->rawFetch('/a'));
+    }
+
     public function testOnRequestMayReplaceThePreparedRequest(): void
     {
         $t = new RecordingTransport();
