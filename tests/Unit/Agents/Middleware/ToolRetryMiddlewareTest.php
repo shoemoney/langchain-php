@@ -432,39 +432,31 @@ final class ToolRetryMiddlewareTest extends TestCase
     public function testShouldUseExponentialBackoff(): void
     {
         $model = self::model([['name' => 'temp_failing_tool', 'args' => ['input' => 'test'], 'id' => '1']]);
-        $retry = ToolRetryMiddleware::create(['maxRetries' => 3, 'initialDelayMs' => 50, 'backoffFactor' => 2.0, 'jitter' => false]);
+        $delays = [];
+        $retry = ToolRetryMiddleware::create(['maxRetries' => 3, 'initialDelayMs' => 50, 'backoffFactor' => 2.0, 'jitter' => false], static function (int|float $delay) use (&$delays): void { $delays[] = $delay; });
         $agent = self::agent($model, [self::temporaryFailureTool(3)], [$retry]);
 
-        $start = microtime(true);
         $toolMessages = self::toolMessages($agent, 'Use temp failing tool');
-        $actualDelay = (microtime(true) - $start) * 1000;
 
         self::assertCount(1, $toolMessages);
         self::assertStringContainsString('Success after 4 attempts', $toolMessages[0]->content);
 
-        // The total delay: 50 + 100 + 200 = 350ms, with some tolerance for execution time.
-        $expectedDelay = 50 + 100 + 200;
-        self::assertGreaterThanOrEqual($expectedDelay, $actualDelay);
-        self::assertLessThan($expectedDelay + 200, $actualDelay);
+        self::assertSame([50.0, 100.0, 200.0], $delays);
     }
 
     public function testShouldUseConstantBackoffWhenBackoffFactorIs0(): void
     {
         $model = self::model([['name' => 'temp_failing_tool', 'args' => ['input' => 'test'], 'id' => '1']]);
-        $retry = ToolRetryMiddleware::create(['maxRetries' => 2, 'initialDelayMs' => 50, 'backoffFactor' => 0.0, 'jitter' => false]);
+        $delays = [];
+        $retry = ToolRetryMiddleware::create(['maxRetries' => 2, 'initialDelayMs' => 50, 'backoffFactor' => 0.0, 'jitter' => false], static function (int|float $delay) use (&$delays): void { $delays[] = $delay; });
         $agent = self::agent($model, [self::temporaryFailureTool(2)], [$retry]);
 
-        $start = microtime(true);
         $toolMessages = self::toolMessages($agent, 'Use temp failing tool');
-        $actualDelay = (microtime(true) - $start) * 1000;
 
         self::assertCount(1, $toolMessages);
         self::assertStringContainsString('Success after 3 attempts', $toolMessages[0]->content);
 
-        // The total delay is 50 + 50 = 100ms (exponential would be at least 50 + 100 = 150ms).
-        $expectedDelay = 50 + 50;
-        self::assertGreaterThanOrEqual($expectedDelay, $actualDelay);
-        self::assertLessThan($expectedDelay + 200, $actualDelay);
+        self::assertSame([50, 50], $delays);
     }
 
     public function testShouldCapDelayAtMaxDelay(): void

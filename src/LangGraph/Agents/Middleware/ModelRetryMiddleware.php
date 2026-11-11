@@ -19,7 +19,7 @@ use LangGraph\Agents\Middleware;
  * `maxDelayMs` (60000) and `jitter` (true). Invalid options raise an {@see InvalidRetryConfigError}.
  *
  * A `Retry-After` hint on the error (see {@see Utils::getRetryAfterMs()}) is a floor for the delay. The wait
- * is a real {@see Utils::sleep()}; tests keep it short with a small `initialDelayMs`.
+ * uses {@see Utils::sleep()} by default. A second callable argument can replace the synchronous sleeper.
  *
  * ```
  * $agent = Agent::create(['model' => $model, 'middleware' => [ModelRetryMiddleware::create(['maxRetries' => 3])]]);
@@ -32,16 +32,17 @@ final class ModelRetryMiddleware
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param array<string, mixed>        $config
+     * @param (callable(int|float): void)|null $sleep PHP dependency seam receiving the delay in milliseconds
      * @return array<string, mixed> the middleware
      * @throws InvalidRetryConfigError
      */
-    public static function create(array $config = []): array
+    public static function create(array $config = [], ?callable $sleep = null): array
     {
         $parsed = Constants::parseRetrySchema($config);
         $issues = $parsed['success'] ? [] : $parsed['issues'];
 
-        $onFailure = $config['onFailure'] ?? 'continue';
+        $onFailure = \array_key_exists('onFailure', $config) ? $config['onFailure'] : 'continue';
         if ($onFailure !== 'error' && $onFailure !== 'continue' && !($onFailure instanceof \Closure) && !(\is_callable($onFailure) && !\is_string($onFailure))) {
             $issues[] = ['path' => ['onFailure'], 'code' => 'invalid_union', 'message' => 'Invalid input'];
         }
@@ -50,6 +51,7 @@ final class ModelRetryMiddleware
         }
 
         ['maxRetries' => $maxRetries, 'retryOn' => $retryOn, 'backoffFactor' => $backoffFactor, 'initialDelayMs' => $initialDelayMs, 'maxDelayMs' => $maxDelayMs, 'jitter' => $jitter] = $parsed['data'];
+        $sleep ??= Utils::sleep(...);
 
         $shouldRetryException = static function (\Throwable $error) use ($retryOn): bool {
             if (!\is_array($retryOn) || !array_is_list($retryOn) || ($retryOn !== [] && !\is_string($retryOn[0]))) {
@@ -97,7 +99,7 @@ final class ModelRetryMiddleware
                     'jitter' => ['type' => 'boolean'],
                 ],
             ],
-            'wrapModelCall' => static function (array $request, callable $handler) use ($maxRetries, $shouldRetryException, $delayConfig, $handleFailure): mixed {
+            'wrapModelCall' => static function (array $request, callable $handler) use ($maxRetries, $shouldRetryException, $delayConfig, $handleFailure, $sleep): mixed {
                 $delegated = [...$request, 'modelSettings' => ['maxRetries' => 0, ...(array) ($request['modelSettings'] ?? [])]];
 
                 // Initial attempt + retries.
@@ -116,7 +118,7 @@ final class ModelRetryMiddleware
                         if ($attempt < $maxRetries) {
                             $delay = Utils::calculateRetryDelay($delayConfig, $attempt, Utils::getRetryAfterMs($error));
                             if ($delay > 0) {
-                                Utils::sleep($delay);
+                                $sleep($delay);
                             }
                         } else {
                             // No more retries.

@@ -38,22 +38,23 @@ final class ToolRetryMiddleware
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param array<string, mixed>        $config
+     * @param (callable(int|float): void)|null $sleep PHP dependency seam receiving the delay in milliseconds
      * @return array<string, mixed> the middleware
      * @throws InvalidRetryConfigError
      * @throws \TypeError for a `tools` entry that is neither a name nor a tool
      */
-    public static function create(array $config = []): array
+    public static function create(array $config = [], ?callable $sleep = null): array
     {
         $parsed = Constants::parseRetrySchema($config);
         $issues = $parsed['success'] ? [] : $parsed['issues'];
 
-        $onFailureConfig = $config['onFailure'] ?? 'continue';
+        $onFailureConfig = \array_key_exists('onFailure', $config) ? $config['onFailure'] : 'continue';
         $literals = ['error', 'continue', 'raise', 'return_message'];
         if (!\in_array($onFailureConfig, $literals, true) && !($onFailureConfig instanceof \Closure) && !(\is_callable($onFailureConfig) && !\is_string($onFailureConfig))) {
             $issues[] = ['path' => ['onFailure'], 'code' => 'invalid_union', 'message' => 'Invalid input'];
         }
-        if (isset($config['tools']) && !\is_array($config['tools'])) {
+        if (\array_key_exists('tools', $config) && !\is_array($config['tools'])) {
             $issues[] = ['path' => ['tools'], 'code' => 'invalid_type', 'message' => 'Expected array, received ' . get_debug_type($config['tools'])];
         }
         if ($issues !== [] || !$parsed['success']) {
@@ -61,6 +62,7 @@ final class ToolRetryMiddleware
         }
 
         ['maxRetries' => $maxRetries, 'retryOn' => $retryOn, 'backoffFactor' => $backoffFactor, 'initialDelayMs' => $initialDelayMs, 'maxDelayMs' => $maxDelayMs, 'jitter' => $jitter] = $parsed['data'];
+        $sleep ??= Utils::sleep(...);
 
         $onFailure = $onFailureConfig;
         if ($onFailureConfig === 'raise') {
@@ -141,7 +143,7 @@ final class ToolRetryMiddleware
                     'jitter' => ['type' => 'boolean'],
                 ],
             ],
-            'wrapToolCall' => static function (array $request, callable $handler) use ($maxRetries, $shouldRetryTool, $shouldRetryException, $delayConfig, $handleFailure): mixed {
+            'wrapToolCall' => static function (array $request, callable $handler) use ($maxRetries, $shouldRetryTool, $shouldRetryException, $delayConfig, $handleFailure, $sleep): mixed {
                 $tool = $request['tool'] ?? null;
                 $toolName = (string) (match (true) {
                     \is_object($tool) && property_exists($tool, 'name') => $tool->name,
@@ -175,7 +177,7 @@ final class ToolRetryMiddleware
                         if ($attempt < $maxRetries) {
                             $delay = Utils::calculateRetryDelay($delayConfig, $attempt, Utils::getRetryAfterMs($error));
                             if ($delay > 0) {
-                                Utils::sleep($delay);
+                                $sleep($delay);
                             }
                         } else {
                             return $handleFailure($toolName, $toolCallId, $error, $attemptsMade);
