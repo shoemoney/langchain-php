@@ -18,8 +18,8 @@ use LangGraph\Checkpoint\Redis\RedisClientInterface;
  * skipped!`, which fails the `OK (N tests` check the WP done-script reads, and a gate that
  * silently reports nothing is worse than one that runs the same scenarios against the fake.
  *
- * Point the URL at a DEDICATED database: every test starts by deleting the saver keyspace
- * (`checkpoint:*`, `checkpoint_blob:*`, `checkpoint_write:*`, `write_keys_zset:*`).
+ * Live cleanup requires a disposable server launched by .loop/test_backends.py.
+ * Its process-specific run id must match LANGGRAPH_REDIS_TEST_RUN_ID before any deletion.
  */
 final class RedisLiveServer
 {
@@ -52,6 +52,7 @@ final class RedisLiveServer
             return new FakeRedisClient();
         }
 
+        self::assertDisposable();
         $client = PhpRedisClient::fromUrl($url);
         foreach (self::PATTERNS as $pattern) {
             $keys = $client->keys($pattern);
@@ -61,6 +62,25 @@ final class RedisLiveServer
         }
 
         return $client;
+    }
+
+    /** Refuse cleanup unless the configured endpoint is the owned disposable process. */
+    public static function assertDisposable(): void
+    {
+        $expected = getenv('LANGGRAPH_REDIS_TEST_RUN_ID');
+        if (!is_string($expected) || $expected === '') {
+            throw new \RuntimeException('Live Redis tests require the disposable .loop/test_backends.py harness.');
+        }
+        $redis = self::raw();
+        try {
+            $info = $redis->info('server');
+            $actual = is_array($info) ? ($info['run_id'] ?? '') : '';
+            if (!is_string($actual) || !hash_equals($expected, $actual)) {
+                throw new \RuntimeException('Redis test run id does not match the disposable server; cleanup refused.');
+            }
+        } finally {
+            $redis->close();
+        }
     }
 
     /** Another connection to the same store as `$client` (a new saver "from the URL"). */
@@ -78,6 +98,15 @@ final class RedisLiveServer
             return $client->ttl($key);
         }
 
+        $redis = self::raw();
+        $ttl = $redis->ttl($key);
+        $redis->close();
+
+        return is_int($ttl) && $ttl >= 0 ? $ttl : null;
+    }
+
+    private static function raw(): \Redis
+    {
         $redis = new \Redis();
         $parts = parse_url((string) self::url());
         $redis->connect((string) ($parts['host'] ?? '127.0.0.1'), (int) ($parts['port'] ?? 6379));
@@ -88,9 +117,6 @@ final class RedisLiveServer
         if ($database !== '' && ctype_digit($database)) {
             $redis->select((int) $database);
         }
-        $ttl = $redis->ttl($key);
-        $redis->close();
-
-        return is_int($ttl) && $ttl >= 0 ? $ttl : null;
+        return $redis;
     }
 }
