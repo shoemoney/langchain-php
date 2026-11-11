@@ -177,6 +177,53 @@ final class ReactAgentStreamV3Test extends TestCase
         self::assertSame('call_1', $started['tool_call_id']);
     }
 
+    public function testAFailingToolsV3CallRetainsItsNameAndCallId(): void
+    {
+        $failing = tool(static function (): never {
+            throw new \RuntimeException('weather unavailable');
+        }, ['name' => 'get_weather', 'description' => 'Weather', 'schema' => Schema::object([])]);
+        $agent = Agent::create([
+            'model' => AgentAssertions::fakeChat([
+                new AIMessage(['content' => '', 'tool_calls' => [['name' => 'get_weather', 'args' => [], 'id' => 'call_error', 'type' => 'tool_call']]]),
+                new AIMessage('Weather unavailable.'),
+            ]),
+            'tools' => [$failing],
+        ]);
+
+        $run = $agent->streamEvents(self::input(), null, 'v3');
+        $calls = iterator_to_array($run->toolCalls, false);
+
+        self::assertCount(1, $calls);
+        self::assertSame('get_weather', $calls[0]->name);
+        self::assertSame('call_error', $calls[0]->callId);
+        self::assertSame('error', $calls[0]->status->value());
+        self::assertSame('weather unavailable', $calls[0]->error->value());
+        self::assertTrue($calls[0]->output->isRejected());
+        self::assertSame('Weather unavailable.', $run->output()['messages'][3]->content);
+    }
+
+    public function testV3UsesAnExplicitToolRunNameWithoutChangingTheCallId(): void
+    {
+        $named = tool(static fn (): string => 'sunny', [
+            'name' => 'get_weather', 'description' => 'Weather', 'schema' => Schema::object([]),
+            'defaultConfig' => ['runName' => 'weather trace'],
+        ]);
+        $agent = Agent::create([
+            'model' => AgentAssertions::fakeChat([
+                new AIMessage(['content' => '', 'tool_calls' => [['name' => 'get_weather', 'args' => [], 'id' => 'call_named', 'type' => 'tool_call']]]),
+                new AIMessage('Sunny.'),
+            ]),
+            'tools' => [$named],
+        ]);
+
+        $calls = iterator_to_array($agent->streamEvents(self::input(), null, 'v3')->toolCalls, false);
+
+        self::assertCount(1, $calls);
+        self::assertSame('weather trace', $calls[0]->name);
+        self::assertSame('call_named', $calls[0]->callId);
+        self::assertSame('sunny', $calls[0]->output->value());
+    }
+
     public function testTransformersRegisterMiddlewareThenOptionThenCallSite(): void
     {
         $order = [];

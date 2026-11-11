@@ -306,10 +306,12 @@ abstract class BaseChatModel extends BaseLanguageModel
         ?array $callbacks,
         ?RunnableConfig $config,
     ): RunnableConfig {
-        return RunnableConfig::mergeConfigs(
-            new RunnableConfig(callbacks: $callbacks ?? []),
-            $config ?? new RunnableConfig(),
-        );
+        $merged = clone ($config ?? new RunnableConfig());
+        if ($merged->callbacks === []) {
+            $merged->callbacks = $callbacks ?? [];
+        }
+
+        return $merged;
     }
 
     /**
