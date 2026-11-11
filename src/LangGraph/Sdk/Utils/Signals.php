@@ -31,14 +31,42 @@ final class Signals
             return $nonNull[0];
         }
 
-        return static function () use ($nonNull): bool {
+        $aborted = false;
+
+        return static function () use ($nonNull, &$aborted): bool {
+            if ($aborted) {
+                return true;
+            }
             foreach ($nonNull as $signal) {
                 if ($signal()) {
+                    $aborted = true;
+
                     return true;
                 }
             }
 
             return false;
         };
+    }
+
+    /**
+     * PHP's polled adaptation of `AbortSignal.timeout`: a monotonic deadline,
+     * observed when the callable is polled. No timer interrupts synchronous IO.
+     * The optional clock returns milliseconds and makes deadline checks deterministic.
+     *
+     * @param (callable(): int|float)|null $clock
+     *
+     * @return callable(): bool
+     */
+    public static function timeoutSignal(int $timeoutMs, ?callable $clock = null): callable
+    {
+        if ($timeoutMs < 0) {
+            throw new \InvalidArgumentException('timeoutMs must be non-negative.');
+        }
+
+        $clock ??= static fn (): float => hrtime(true) / 1_000_000;
+        $deadline = $clock() + $timeoutMs;
+
+        return static fn (): bool => $clock() >= $deadline;
     }
 }
