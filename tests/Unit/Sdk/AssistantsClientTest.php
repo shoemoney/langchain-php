@@ -97,6 +97,29 @@ final class AssistantsClientTest extends TestCase
         $this->assertSame('http://localhost:8123/assistants/asst_1/graph', $t->requests[1]['url']);
     }
 
+    public function testGetGraphUsesTheUpstreamSpellingAndPreservesTheAlias(): void
+    {
+        $seen = [];
+        $signal = static fn (): bool => false;
+        $client = new AssistantsClient(['apiKey' => null, 'callerOptions' => [
+            'fetch' => static function (string $url, array $init) use (&$seen): HttpResponse {
+                $seen[] = [$url, $init['signal']];
+
+                return FakeHttpClient::json(200, ['nodes' => [], 'edges' => []]);
+            },
+        ]]);
+
+        $expected = ['nodes' => [], 'edges' => []];
+        $this->assertSame($expected, $client->getGraph('asst_1', ['xray' => true, 'signal' => $signal]));
+        $this->assertSame($expected, $client->getAssistantGraph('asst_1', ['xray' => false, 'signal' => $signal]));
+        $this->assertSame($expected, $client->getGraph('asst_1', ['xray' => 0]));
+        $this->assertSame([
+            ['http://localhost:8123/assistants/asst_1/graph?xray=true', $signal],
+            ['http://localhost:8123/assistants/asst_1/graph?xray=false', $signal],
+            ['http://localhost:8123/assistants/asst_1/graph?xray=0', null],
+        ], $seen);
+    }
+
     public function testGetAndGetSchemas(): void
     {
         $t = new RecordingTransport([

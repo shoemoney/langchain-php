@@ -21,7 +21,7 @@ class StoreClient extends BaseClient
      *
      * @param list<string>                                                      $namespace
      * @param array<string, mixed>                                              $value
-     * @param array{index?: false|list<string>|null, ttl?: int|float|null, signal?: mixed} $options
+     * @param array{index?: false|list<string>|null, ttl?: int|float|null, signal?: (callable(): bool)|null} $options
      */
     public function putItem(array $namespace, string $key, array $value, array $options = []): void
     {
@@ -37,7 +37,7 @@ class StoreClient extends BaseClient
      * Retrieve a single item, or null if the server has none.
      *
      * @param list<string>                                     $namespace
-     * @param array{refreshTtl?: bool|null, signal?: mixed} $options
+     * @param array{refreshTtl?: bool|null, signal?: (callable(): bool)|null} $options
      *
      * @return Item|null
      */
@@ -59,7 +59,7 @@ class StoreClient extends BaseClient
      * Delete an item.
      *
      * @param list<string>          $namespace
-     * @param array{signal?: mixed} $options
+     * @param array{signal?: (callable(): bool)|null} $options
      */
     public function deleteItem(array $namespace, string $key, array $options = []): void
     {
@@ -75,7 +75,7 @@ class StoreClient extends BaseClient
      * Search for items within a namespace prefix.
      *
      * @param list<string>                                                                                                  $namespacePrefix
-     * @param array{filter?: array<string, mixed>, limit?: int, offset?: int, query?: string, refreshTtl?: bool|null, signal?: mixed} $options
+     * @param array{filter?: array<string, mixed>, limit?: int, offset?: int, query?: string, refreshTtl?: bool|null, signal?: (callable(): bool)|null} $options
      *
      * @return SearchItemsResponse
      */
@@ -98,7 +98,7 @@ class StoreClient extends BaseClient
     /**
      * List namespaces with optional match conditions.
      *
-     * @param array{prefix?: list<string>, suffix?: list<string>, maxDepth?: int, limit?: int, offset?: int, signal?: mixed} $options
+     * @param array{prefix?: list<string>, suffix?: list<string>, maxDepth?: int, limit?: int, offset?: int, signal?: (callable(): bool)|null} $options
      *
      * @return ListNamespaceResponse
      */
