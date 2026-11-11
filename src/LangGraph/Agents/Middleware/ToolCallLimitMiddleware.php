@@ -18,6 +18,8 @@ use LangGraph\Agents\Middleware;
  * `exitBehavior`: `continue` (the default; blocked calls get an error ToolMessage and the others run),
  * `error` (throw a {@see ToolCallLimitExceededError}) or `end` (stop with an AI message; only valid when
  * every pending call is the limited tool).
+ * Present null limits use a zero threshold, matching the upstream factory's numeric comparison;
+ * omitted limits are inactive. PHP accepts int|float|null and rejects other types at the factory.
  *
  * ```
  * $searchLimiter = ToolCallLimitMiddleware::create(['toolName' => 'search', 'threadLimit' => 5, 'runLimit' => 3]);
@@ -43,9 +45,18 @@ final class ToolCallLimitMiddleware
         $toolName = $options['toolName'] ?? null;
         $threadLimit = $options['threadLimit'] ?? null;
         $runLimit = $options['runLimit'] ?? null;
+        $hasThreadLimit = \array_key_exists('threadLimit', $options);
+        $hasRunLimit = \array_key_exists('runLimit', $options);
 
-        if ($threadLimit === null && $runLimit === null) {
+        if (!$hasThreadLimit && !$hasRunLimit) {
             throw new \InvalidArgumentException('At least one limit must be specified (threadLimit or runLimit)');
+        }
+
+        foreach (['threadLimit', 'runLimit'] as $field) {
+            $value = $options[$field] ?? null;
+            if ($value !== null && !\is_int($value) && !\is_float($value)) {
+                throw new \InvalidArgumentException("{$field} must be an int, float or null; received " . get_debug_type($value) . '.');
+            }
         }
 
         $exitBehavior = $options['exitBehavior'] ?? self::DEFAULT_EXIT_BEHAVIOR;
@@ -55,9 +66,11 @@ final class ToolCallLimitMiddleware
             throw new \InvalidArgumentException("Invalid enum value. Expected 'continue' | 'error' | 'end', received '{$received}'\n  → at exitBehavior");
         }
 
-        if ($threadLimit !== null && $runLimit !== null && $runLimit > $threadLimit) {
+        if ($hasThreadLimit && $hasRunLimit && ($runLimit ?? 0) > ($threadLimit ?? 0)) {
+            $displayRunLimit = $runLimit ?? 'null';
+            $displayThreadLimit = $threadLimit ?? 'null';
             throw new \InvalidArgumentException(
-                "runLimit ({$runLimit}) cannot exceed threadLimit ({$threadLimit}). "
+                "runLimit ({$displayRunLimit}) cannot exceed threadLimit ({$displayThreadLimit}). "
                 . 'The run limit should be less than or equal to the thread limit.',
             );
         }
@@ -77,7 +90,7 @@ final class ToolCallLimitMiddleware
             ],
             'afterModel' => [
                 'canJumpTo' => ['end'],
-                'hook' => static fn (array $state): ?array => self::afterModel($state, $toolName, $threadLimit, $runLimit, $exitBehavior),
+                'hook' => static fn (array $state): ?array => self::afterModel($state, $toolName, $threadLimit, $runLimit, $exitBehavior, $hasThreadLimit, $hasRunLimit),
             ],
             'afterAgent' => static fn (): array => ['runToolCallCount' => []],
         ]);
@@ -87,7 +100,7 @@ final class ToolCallLimitMiddleware
      * @param array<string, mixed> $state
      * @return array<string, mixed>|null
      */
-    private static function afterModel(array $state, ?string $toolName, int|float|null $threadLimit, int|float|null $runLimit, string $exitBehavior): ?array
+    private static function afterModel(array $state, ?string $toolName, int|float|null $threadLimit, int|float|null $runLimit, string $exitBehavior, bool $hasThreadLimit, bool $hasRunLimit): ?array
     {
         $lastAIMessage = null;
         foreach (array_reverse(array_values((array) ($state['messages'] ?? []))) as $message) {
@@ -119,8 +132,8 @@ final class ToolCallLimitMiddleware
                 continue;
             }
 
-            $wouldExceed = ($threadLimit !== null && $tempThreadCount + 1 > $threadLimit)
-                || ($runLimit !== null && $tempRunCount + 1 > $runLimit);
+            $wouldExceed = ($hasThreadLimit && $tempThreadCount + 1 > ($threadLimit ?? 0))
+                || ($hasRunLimit && $tempRunCount + 1 > ($runLimit ?? 0));
             if ($wouldExceed) {
                 $blocked[] = $toolCall;
             } else {
@@ -145,7 +158,7 @@ final class ToolCallLimitMiddleware
 
         if ($exitBehavior === 'error') {
             // The hypothetical thread count shows which limit was exceeded.
-            throw new ToolCallLimitExceededError($finalThreadCount + \count($blocked), $finalRunCount, $threadLimit, $runLimit, $toolName);
+            throw new ToolCallLimitExceededError($finalThreadCount + \count($blocked), $finalRunCount, $threadLimit, $runLimit, $toolName, $hasThreadLimit, $hasRunLimit);
         }
 
         $toolMsgContent = self::buildToolMessageContent($toolName);
@@ -185,6 +198,8 @@ final class ToolCallLimitMiddleware
                 $threadLimit,
                 $runLimit,
                 $toolName,
+                $hasThreadLimit,
+                $hasRunLimit,
             ));
 
             return [
