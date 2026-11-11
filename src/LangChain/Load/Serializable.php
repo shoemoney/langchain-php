@@ -84,7 +84,7 @@ abstract class Serializable implements \JsonSerializable
             'lc' => self::LC_SCHEMA_VERSION,
             'type' => 'constructor',
             'id' => static::lcId(),
-            'kwargs' => $this->filterKwargs($this->kwargs()),
+            'kwargs' => $this->filterKwargs(Validation::escapeKwargs($this->kwargs(), $this)),
         ];
     }
 
