@@ -20,7 +20,7 @@ class ChatPromptValue extends PromptValue
     public function __construct(public readonly array $messages)
     {
         $this->kwargs = [
-            'messages' => array_map(static fn (BaseMessage $m): array => $m->toDict(), $messages),
+            'messages' => array_map(static fn (BaseMessage $m): BaseMessage => $m, $messages),
         ];
     }
 
