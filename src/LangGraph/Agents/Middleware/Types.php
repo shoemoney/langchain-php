@@ -18,7 +18,7 @@ use LangGraph\Agents\Utils as AgentUtils;
  *  - `stateSchema`: an `AnnotationRoot` or a JSON Schema array; persisted between invocations;
  *  - `contextSchema`: a JSON Schema array; read-only, filtered from the run context;
  *  - `tools`: tools the middleware registers;
- *  - `streamTransformers`: stream transformer factories (recorded, see `Middleware::create()`);
+ *  - `streamTransformers`: stream transformer factories registered on each v3 run stream (see `Middleware::create()`);
  *  - `wrapToolCall`: `fn(array $request, callable $handler): ToolMessage|Command`;
  *  - `wrapModelCall`: `fn(array $request, callable $handler): AIMessage|Command`;
  *  - `beforeAgent`, `beforeModel`, `afterModel`, `afterAgent`: `fn(array $state, Runtime $runtime): ?array`, or

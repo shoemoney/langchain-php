@@ -206,6 +206,12 @@ class ToolNode extends RunnableCallable
                 'configurable' => $config->configurable + ['__state' => $state],
                 'signal' => Utils::mergeAbortSignals($this->signal, $config->signal),
             ]);
+            // Upstream clears the parent node's identity when patching child
+            // callbacks. Preserve an explicit direct tool invocation name,
+            // including names supplied on dynamically replaced tools.
+            if ($toolConfig->runName !== null && $toolConfig->runName === ($config->metadata['langgraph_node'] ?? null)) {
+                $toolConfig->runName = $tool instanceof StructuredTool ? ($tool->defaultConfig['runName'] ?? null) : null;
+            }
             $invocation = [...$toolCall, 'type' => 'tool_call'];
 
             try {

@@ -87,6 +87,12 @@ class ToolNode extends RunnableCallable
             // `configurable[CONFIG_KEY_STORE]`, which `ToolRuntime::fromConfig()` reads.
             $toolConfig = $config->with(['configurable' => $config->configurable + ['__state' => $state]]);
             $toolName = $tool instanceof StructuredTool ? $tool->name : $tool->getName();
+            // The engine assigns the task's node name to runName. Upstream's
+            // child callback patch clears that identity; direct invocation
+            // names still belong to the tool and must remain explicit.
+            if ($toolConfig->runName !== null && $toolConfig->runName === ($config->metadata['langgraph_node'] ?? null)) {
+                $toolConfig->runName = $tool instanceof StructuredTool ? ($tool->defaultConfig['runName'] ?? null) : null;
+            }
 
             if ($tool instanceof StructuredTool) {
                 $capture = new CommandPassthroughTool($tool);

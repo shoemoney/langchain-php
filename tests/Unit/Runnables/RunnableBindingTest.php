@@ -233,6 +233,6 @@ final class RunnableBindingTest extends TestCase
     {
         $binding = new RunnableBinding(RunnableLambda::from(static fn (mixed $i): mixed => $i));
 
-        self::assertSame('RunnableBinding', $binding->getName());
+        self::assertSame('RunnableLambda', $binding->getName());
     }
 }
