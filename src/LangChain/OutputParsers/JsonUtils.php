@@ -32,7 +32,7 @@ final class JsonUtils
     {
         $parser ??= static fn (string $t): mixed => self::parsePartialJson($t);
 
-        $s = trim($s);
+        $s = PartialJsonParser::trimWhitespace($s);
 
         $firstFence = strpos($s, '```');
         if ($firstFence === false) {
@@ -51,7 +51,7 @@ final class JsonUtils
         $closing = strpos($after, '```');
         $final = $closing === false ? $after : substr($after, 0, $closing);
 
-        return $parser(trim($final));
+        return $parser(PartialJsonParser::trimWhitespace($final));
     }
 
     /**
@@ -79,6 +79,6 @@ final class JsonUtils
             // Not complete JSON — fall through to the partial parser.
         }
 
-        return (new PartialJsonParser(trim($s)))->parse();
+        return (new PartialJsonParser($s))->parse();
     }
 }
