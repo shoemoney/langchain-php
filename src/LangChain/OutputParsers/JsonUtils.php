@@ -79,6 +79,6 @@ final class JsonUtils
             // Not complete JSON — fall through to the partial parser.
         }
 
-        return (new PartialJsonParser(trim($s)))->parse();
+        return (new PartialJsonParser($s))->parse();
     }
 }

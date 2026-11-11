@@ -10,24 +10,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * A stream cut mid-escape must recover the text the caller wrote.
- *
- * `parseString` already had a rule for this — a cut escape re-emits its
- * backslash (`if ($escaped) { $result .= '\\'; }`) — and the short-hex branch of
- * `parseUnicodeEscape` broke it. `match` had already consumed the `\`, and the
- * branch returned `'u' . $hex`, so it vanished.
- *
- * Measured before the fix, by bytes: `"a\u1` recovered as `61 75 31` — 'a', 'u',
- * '1', no `5c`.
- *
- * Why it matters beyond tidiness: `JsonOutputParser`'s `diff: true` path
- * compares successive partial results and emits JSON-Patch operations from the
- * difference. Losing the backslash makes the string flip from `''` to `au1` to
- * `a\u1234` to the real character, so every chunk of every emoji in a stream
- * produces a spurious `replace`. Silent, and it scales with the payload.
- *
- * Assertions are on BYTES, not on rendered text: a terminal swallows the
- * distinction between `au1` and `a\u1`, and so would a naive string assertion.
+ * Short unicode escapes follow upstream `strictParsePartialJson`: `\u1`
+ * recovers as `u1`. A lone backslash still recovers as a backslash.
+ * Byte assertions distinguish the two cases precisely.
  */
 #[CoversClass(PartialJsonParser::class)]
 final class TruncatedEscapeRecoveryTest extends TestCase
@@ -36,28 +21,27 @@ final class TruncatedEscapeRecoveryTest extends TestCase
     public static function truncatedEscapes(): array
     {
         return [
-            'one hex digit' => ['"a\\u1', '61 5c 75 31'],
-            'two hex digits' => ['"a\\u12', '61 5c 75 31 32'],
-            'three hex digits' => ['"a\\u123', '61 5c 75 31 32 33'],
+            'lone backslash' => ['"a\\', '61 5c'],
+            'no hex digits' => ['"a\\u', '61 75'],
+            'one hex digit' => ['"a\\u1', '61 75 31'],
+            'two hex digits' => ['"a\\u12', '61 75 31 32'],
+            'three hex digits' => ['"a\\u123', '61 75 31 32 33'],
         ];
     }
 
     #[DataProvider('truncatedEscapes')]
-    public function testACutEscapeKeepsItsBackslash(string $fragment, string $expectedHex): void
+    public function testACutEscapeMatchesUpstreamBytes(string $fragment, string $expectedHex): void
     {
         $recovered = (new PartialJsonParser($fragment))->parse();
 
         self::assertSame(
             str_replace(' ', '', $expectedHex),
             bin2hex((string) $recovered),
-            'a truncated escape must keep the backslash the caller wrote',
+            'a truncated escape must match upstream recovery',
         );
     }
 
-    /**
-     * The no-escape case must be untouched — the fix adds a backslash only when
-     * one was present.
-     */
+    /** Text without an escape remains unchanged. */
     public function testTextWithNoEscapeIsUnaffected(): void
     {
         $recovered = (new PartialJsonParser('"au12'))->parse();

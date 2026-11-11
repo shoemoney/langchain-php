@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  * position in BOTH branches (`pos += hex.length`, outside the length check).
  * This port advanced only in the four-digit branch, so the partial case
  * re-read the hex digits as ordinary characters: `"a\u12` produced `au1212`
- * where upstream produces `au122`.
+ * where upstream produces `au12`.
  */
 #[CoversClass(PartialJsonParser::class)]
 final class PartialJsonTruncationTest extends TestCase
@@ -24,17 +24,11 @@ final class PartialJsonTruncationTest extends TestCase
     /** @return iterable<string, array{string, string}> */
     public static function truncatedEscapes(): iterable
     {
-        // These expectations USED to drop the backslash — 'au12' for `"a\u12`.
-        // The parser has always re-emitted it for a cut escape
-        // (`if ($escaped) { $result .= '\\'; }`), so the short-hex branch was
-        // the inconsistency, and this data provider enshrined it. The
-        // consequence was a spurious JSON-Patch `replace` per chunk per emoji
-        // for `diff: true` consumers. See TruncatedEscapeRecoveryTest, which
-        // pins the bytes.
-        yield 'two digits' => ['"a\u12', 'a\\u12'];
-        yield 'one digit' => ['"a\u1', 'a\\u1'];
-        yield 'no digits' => ['"a\u', 'a\\u'];
-        yield 'at the very start' => ['"\uD', '\\uD'];
+        // Upstream emits `u${hex}` once; it does not retain the backslash.
+        yield 'two digits' => ['"a\u12', 'au12'];
+        yield 'one digit' => ['"a\u1', 'au1'];
+        yield 'no digits' => ['"a\u', 'au'];
+        yield 'at the very start' => ['"\uD', 'uD'];
     }
 
     #[DataProvider('truncatedEscapes')]
@@ -159,7 +153,7 @@ final class PartialJsonTruncationTest extends TestCase
     public static function surrogateCases(): array
     {
         return [
-            'lone high surrogate mid-string' => ['{"a":"x\ud800y"}', "xy\u{FFFD}"],
+            'lone high surrogate mid-string' => ['{"a":"x\ud800y"}', "x\u{FFFD}y"],
             'lone high surrogate alone' => ['{"a":"\ud800"}', "\u{FFFD}"],
             'a valid pair is untouched' => ['{"a":"\ud834\udd1e"}', "\u{1D11E}"],
         ];

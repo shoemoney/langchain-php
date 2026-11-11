@@ -9,18 +9,19 @@ namespace LangChain\OutputParsers;
  *
  * Port of `strictParsePartialJson` from `@langchain/core/utils/json`.
  *
- * It differs from `json_decode` in exactly one way: hitting the end of the
- * buffer while a container is still open returns the container as it stands
- * rather than failing. That is what lets a streamed `{` become `[]` and a
- * streamed `{"a": 1` become `['a' => 1]` on the way to the finished value.
+ * Open containers and truncated strings, literals, and numbers recover the
+ * value represented by the prefix, following the upstream streaming parser.
  *
- * Offsets are counted in code points to match the TypeScript original, which
- * indexes by UTF-16 unit.
+ * PHP reports offsets in Unicode code points; the TypeScript original reports
+ * UTF-16 code-unit offsets. This is a deliberate diagnostic adaptation.
  *
  * @internal
  */
 final class PartialJsonParser
 {
+    /** ECMAScript WhiteSpace and LineTerminator characters used by String.trim() and /\s/. */
+    private const WHITESPACE = '[\x{0009}-\x{000D}\x{0020}\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]';
+
     private int $pos = 0;
 
     /**
@@ -34,9 +35,12 @@ final class PartialJsonParser
 
     private readonly int $length;
 
-    public function __construct(private readonly string $buffer)
+    private readonly string $buffer;
+
+    public function __construct(string $buffer)
     {
-        $this->length = mb_strlen($buffer, 'UTF-8');
+        $this->buffer = preg_replace('/\A' . self::WHITESPACE . '+|' . self::WHITESPACE . '+\z/u', '', $buffer) ?? $buffer;
+        $this->length = mb_strlen($this->buffer, 'UTF-8');
     }
 
     /**
@@ -63,7 +67,7 @@ final class PartialJsonParser
 
     private function skipWhitespace(): void
     {
-        while ($this->pos < $this->length && ctype_space($this->charAt($this->pos))) {
+        while ($this->pos < $this->length && preg_match('/\A' . self::WHITESPACE . '\z/u', $this->charAt($this->pos)) === 1) {
             $this->pos++;
         }
     }
@@ -87,24 +91,20 @@ final class PartialJsonParser
             return $this->parseString();
         }
 
-        // Argument order matters and it was backwards: the PHP signature is
-        // str_starts_with($haystack, $needle), so this used to ask "does the
-        // literal 'null' start with the rest of the buffer?" — never true. Every
-        // literal therefore fell through to the error path, which meant COMPLETE
-        // and perfectly valid JSON containing `true`, `false` or `null` threw
-        // `Unexpected character`. This is not about partial input at all.
-        $rest = mb_substr($this->buffer, $this->pos, 5, 'UTF-8');
-        if (str_starts_with($rest, 'null')) {
+        // Upstream checks whether each literal starts with the available
+        // prefix. Its token-sized lookahead also rejects malformed prefixes
+        // followed by a delimiter, such as `[n,` or `{"a": tr}`.
+        if (str_starts_with('null', mb_substr($this->buffer, $this->pos, 4, 'UTF-8'))) {
             $this->pos += min(4, $this->length - $this->pos);
 
             return null;
         }
-        if (str_starts_with($rest, 'true')) {
+        if (str_starts_with('true', mb_substr($this->buffer, $this->pos, 4, 'UTF-8'))) {
             $this->pos += min(4, $this->length - $this->pos);
 
             return true;
         }
-        if (str_starts_with($rest, 'false')) {
+        if (str_starts_with('false', mb_substr($this->buffer, $this->pos, 5, 'UTF-8'))) {
             $this->pos += min(5, $this->length - $this->pos);
 
             return false;
@@ -130,6 +130,9 @@ final class PartialJsonParser
             $char = $this->charAt($this->pos);
 
             if ($escaped) {
+                if ($char !== 'u') {
+                    $result .= $this->flushUnpairedHighSurrogate();
+                }
                 $result .= match ($char) {
                     'n' => "\n",
                     't' => "\t",
@@ -170,14 +173,14 @@ final class PartialJsonParser
 
                 return $result;
             } else {
-                $result .= $char;
+                $result .= $this->flushUnpairedHighSurrogate() . $char;
             }
 
             $this->pos++;
         }
 
         if ($escaped) {
-            $result .= '\\';
+            $result .= $this->flushUnpairedHighSurrogate() . '\\';
         }
 
         // A stream cut INSIDE an escape pair must not lose the half it saw.
@@ -192,8 +195,8 @@ final class PartialJsonParser
         // character silently, which is worse than seeing U+FFFD where the
         // character began.
         //
-        // U+FFFD is the same choice already made for an unpaired LOW surrogate,
-        // and for the short-hex truncation at line 223: something has to occupy
+        // U+FFFD is the same choice already made for an unpaired LOW surrogate:
+        // something has to occupy
         // the position, and the replacement character says "there was a
         // character here and I could not read it" rather than pretending the
         // input never mentioned it.
@@ -203,6 +206,17 @@ final class PartialJsonParser
         }
 
         return $result;
+    }
+
+    private function flushUnpairedHighSurrogate(): string
+    {
+        if ($this->pendingHighSurrogate === null) {
+            return '';
+        }
+
+        $this->pendingHighSurrogate = null;
+
+        return "\u{FFFD}";
     }
 
     /**
@@ -237,7 +251,7 @@ final class PartialJsonParser
             // sits outside the length check, json.ts:89). Advancing only in the
             // four-digit branch left the partial case re-reading the hex digits
             // as ordinary characters, so a fragment ending mid-escape produced
-            // `au1212` where upstream produces `au122`.
+            // `au1212` where upstream produces `au12`.
             $this->pos += $hexLength;
 
             if ($hexLength === 4) {
@@ -268,9 +282,10 @@ final class PartialJsonParser
                 // partner becomes U+FFFD rather than fataling, because a stream
                 // cut mid-pair is the normal case here, not an error.
                 if ($code >= 0xD800 && $code <= 0xDBFF) {
+                    $prefix = $this->flushUnpairedHighSurrogate();
                     $this->pendingHighSurrogate = $code;
 
-                    return '';
+                    return $prefix;
                 }
 
                 if ($code >= 0xDC00 && $code <= 0xDFFF) {
@@ -297,24 +312,9 @@ final class PartialJsonParser
                 return self::encodeCodePoint($code);
             }
 
-            // Fewer than four digits: emit the raw text WITH ITS BACKSLASH.
-            //
-            // `parseString` already has a rule for a stream cut mid-escape — it
-            // re-emits the backslash (`if ($escaped) { $result .= '\\'; }`) so
-            // the recovered text looks like what the caller wrote. This branch
-            // broke that rule: `match` had already consumed the `\\`, so
-            // returning `'u' . $hex` dropped it.
-            //
-            // Measured before the fix, by bytes: `"a\u1` recovered as
-            // 61 75 31 — 'a', 'u', '1', with no 5c. So a caller diffing partial
-            // results — `JsonOutputParser`'s `diff: true` path — sees the string
-            // flip from '' to 'au1' to 'a\u1234' to the real character, and emits
-            // a spurious JSON-Patch `replace` for every chunk of every emoji in
-            // the stream. Silent, and it grows with the payload.
-            //
-            // Keeping the escape is also the more faithful reading: the input
-            // contained a backslash, and dropping it invents a different string.
-            return '\\u' . $hex;
+            // Upstream recovers short unicode escapes as `u${hex}`. A lone
+            // backslash is handled separately by parseString().
+            return $this->flushUnpairedHighSurrogate() . 'u' . $hex;
         }
 
         throw new \RuntimeException(
@@ -371,16 +371,35 @@ final class PartialJsonParser
             }
         }
 
-        if ($numStr === '' || $numStr === '-' || $numStr === '.') {
+        if ($numStr === '-') {
+            return -0.0;
+        }
+
+        // Number.parseFloat rejects prefixes with no significand digits,
+        // including `-.` and `-e1`. PHP casts these strings to zero instead.
+        // A digit after the decimal point is sufficient (`-.5`), and an
+        // incomplete exponent after a valid significand still recovers it.
+        if (preg_match('/^-?(?:[0-9]+|\.[0-9]+)/', $numStr) !== 1) {
             $this->pos = $start;
             throw new \RuntimeException("Invalid number '{$numStr}' at position {$start}");
         }
 
-        if (str_contains($numStr, '.') || str_contains($numStr, 'e') || str_contains($numStr, 'E')) {
-            return (float) $numStr;
+        // Number.parseFloat uses IEEE-754 doubles for every number. Casting
+        // oversized integer strings directly to int would saturate at PHP's
+        // integer bounds instead of rounding or overflowing like JavaScript.
+        $number = (float) $numStr;
+        if ($number == 0.0 && str_starts_with($numStr, '-')) {
+            return -0.0;
         }
 
-        return (int) $numStr;
+        // Retain the port's int representation only for safely representable
+        // integer tokens. Outside JS's safe integer range, return the double.
+        if (!str_contains($numStr, '.') && !str_contains($numStr, 'e') && !str_contains($numStr, 'E')
+            && abs($number) <= min(PHP_INT_MAX, 9007199254740991)) {
+            return (int) $number;
+        }
+
+        return $number;
     }
 
     /** @return list<mixed> */
