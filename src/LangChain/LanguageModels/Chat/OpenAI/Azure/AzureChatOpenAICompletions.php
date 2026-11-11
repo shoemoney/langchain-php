@@ -32,6 +32,6 @@ class AzureChatOpenAICompletions extends ChatOpenAICompletions
 
     protected function url(): string
     {
-        return $this->azureRoot() . '/chat/completions';
+        return $this->azureProtocolUrl('/chat/completions', deploymentScoped: true);
     }
 }

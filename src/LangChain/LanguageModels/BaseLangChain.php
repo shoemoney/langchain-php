@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels;
 
+use LangChain\Load\Validation;
 use LangChain\Messages\BaseMessage;
 use LangChain\Messages\MessageUtils;
 use LangChain\Runnables\Runnable;
@@ -103,8 +104,73 @@ abstract class BaseLangChain extends Runnable implements \JsonSerializable
             'lc' => 1,
             'type' => 'constructor',
             'id' => static::lcId(),
-            'kwargs' => $this->kwargs(),
+            'kwargs' => $this->serializedKwargs(),
         ];
+    }
+
+    /**
+     * The source credential contract of this exact class, or null for none.
+     *
+     * Null keeps the plain escaped kwargs, which is what every class gets unless
+     * it opts in. An opted-in class returns, per source secret field name (the
+     * `lc_secrets` key, in source order), the PHP property holding the resolved
+     * credential, the secret id and the serialized key (the `lc_aliases` value or
+     * the snake_case name). Opt-in is per exact class on purpose: a subclass
+     * inherits the parent's credential properties but not necessarily its source
+     * secret ids, so it must map its own contract before emitting markers.
+     *
+     * @return array<string, array{property: string, secret: string, key: string}>|null
+     */
+    protected function credentialSerialization(): ?array
+    {
+        return null;
+    }
+
+    /**
+     * The constructor kwargs as `Serializable.toJSON` emits them.
+     *
+     * Source order, all three steps: escape the captured user values, then
+     * replace each resolved credential with a trusted secret marker, then map
+     * the credential field names to their serialized keys. A generated marker
+     * is therefore never escaped, and a secret-shaped user literal never becomes
+     * a marker. Only credential keys are mapped; ordinary kwargs keep their
+     * existing PHP spellings.
+     *
+     * A credential is resolved when its current property is not null. JS
+     * distinguishes `undefined` (omitted) from `null` (marked); a PHP property
+     * cannot record that, so an assigned null is read as unresolved and omitted.
+     *
+     * @return array<string, mixed>
+     */
+    private function serializedKwargs(): array
+    {
+        $kwargs = Validation::escapeKwargs($this->kwargs(), $this);
+        $contract = $this->credentialSerialization();
+        if ($contract === null) {
+            return $kwargs;
+        }
+
+        foreach ($contract as $field) {
+            // A raw value already spelled like the serialized key (a bound kwarg, say)
+            // must not survive next to, or instead of, the marker.
+            if (!array_key_exists($field['key'], $contract)) {
+                unset($kwargs[$field['key']]);
+            }
+        }
+        foreach ($contract as $name => $field) {
+            if ($this->{$field['property']} === null) {
+                unset($kwargs[$name]);
+            } else {
+                $kwargs[$name] = ['lc' => 1, 'type' => 'secret', 'id' => [$field['secret']]];
+            }
+        }
+
+        $serialized = [];
+        foreach ($kwargs as $key => $value) {
+            $serialized[isset($contract[$key]) ? $contract[$key]['key'] : $key] = $value;
+        }
+
+        return $serialized;
     }
 
     /** @return array{lc: int, type: string, id: list<string>, kwargs: array<string, mixed>} */

@@ -43,7 +43,8 @@ use LangChain\Utils\Http\SseParser;
  *
  * Read from the constructor, else `$fields['apiKey']`, else the
  * `OPENAI_API_KEY` environment variable. The key is never written into
- * `kwargs()`, because those are what the tracer serialises.
+ * `kwargs()`, because those are what the tracer serialises; the serialized
+ * constructor of the three OpenAI chat classes carries a secret marker instead.
  */
 abstract class BaseChatOpenAI extends BaseChatModel
 {
@@ -286,6 +287,28 @@ abstract class BaseChatOpenAI extends BaseChatModel
     public function getName(): string
     {
         return 'ChatOpenAI';
+    }
+
+    /**
+     * Source `lc_secrets`/`lc_aliases` of `BaseChatOpenAI`, for the three OpenAI
+     * chat classes themselves only. Azure, xAI, DeepSeek, Fireworks, Together and
+     * any user subclass declare (or inherit) different source contracts and keep
+     * the existing serializer until those are mapped.
+     *
+     * Only the already-resolved properties are marked. Source also resolves the
+     * key from `configuration.apiKey` and the organization from
+     * `OPENAI_ORGANIZATION`; this constructor does neither, so neither is marked.
+     */
+    protected function credentialSerialization(): ?array
+    {
+        if (!in_array(static::class, [ChatOpenAI::class, ChatOpenAICompletions::class, ChatOpenAIResponses::class], true)) {
+            return parent::credentialSerialization();
+        }
+
+        return [
+            'apiKey' => ['property' => 'apiKey', 'secret' => 'OPENAI_API_KEY', 'key' => 'openai_api_key'],
+            'organization' => ['property' => 'organization', 'secret' => 'OPENAI_ORGANIZATION', 'key' => 'organization'],
+        ];
     }
 
     /**

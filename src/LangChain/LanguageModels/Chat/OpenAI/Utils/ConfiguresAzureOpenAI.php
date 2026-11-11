@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangChain\LanguageModels\Chat\OpenAI\Utils;
 
+use LangChain\Load\Validation;
 use LangChain\LanguageModels\Chat\OpenAI\OpenAIException;
 use LangChain\Utils\Env;
 
@@ -232,7 +233,7 @@ trait ConfiguresAzureOpenAI
             if (isset($aliases[$key])) {
                 $kwargs[$aliases[$key]] = isset($secrets[$key])
                     ? ['lc' => 1, 'type' => 'secret', 'id' => [$secrets[$key]]]
-                    : $value;
+                    : Validation::escapeKwargs([$key => $value], $this)[$key];
             } elseif (array_key_exists($key, $baseKwargs)) {
                 $kwargs[$key] = $baseKwargs[$key];
             }

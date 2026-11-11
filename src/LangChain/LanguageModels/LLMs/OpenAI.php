@@ -181,6 +181,24 @@ class OpenAI extends BaseLLM
     }
 
     /**
+     * Source `OpenAI.lc_secrets`: both credential spellings map to one
+     * `openai_api_key` marker. This class only; {@see AzureOpenAI} and user
+     * subclasses keep the existing serializer.
+     */
+    protected function credentialSerialization(): ?array
+    {
+        if (static::class !== self::class) {
+            return parent::credentialSerialization();
+        }
+
+        return [
+            'openAIApiKey' => ['property' => 'apiKey', 'secret' => 'OPENAI_API_KEY', 'key' => 'openai_api_key'],
+            'apiKey' => ['property' => 'apiKey', 'secret' => 'OPENAI_API_KEY', 'key' => 'openai_api_key'],
+            'organization' => ['property' => 'organization', 'secret' => 'OPENAI_ORGANIZATION', 'key' => 'organization'],
+        ];
+    }
+
+    /**
      * The request parameters, minus `prompt`.
      *
      * Port of `invocationParams`. A value that was never set is omitted, which
