@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LangGraph\Checkpoint\Serde;
 
+use LangChain\Load\Validation;
 use LangGraph\Channels\DeltaSnapshot;
 
 /**
@@ -45,6 +46,12 @@ final class JsonPlusDecoder
     public function revive(mixed $value): mixed
     {
         if (!is_array($value)) {
+            return $value;
+        }
+
+        // Literal contents must not participate in bottom-up constructor revival.
+        // Retain the wrapper until the known LC constructor's kwargs boundary.
+        if (count($value) === 1 && array_key_exists(Validation::LC_ESCAPED_KEY, $value)) {
             return $value;
         }
 
