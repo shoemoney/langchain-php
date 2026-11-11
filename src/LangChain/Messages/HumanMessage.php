@@ -22,4 +22,19 @@ class HumanMessage extends BaseMessage
     {
         return ['langchain_core', 'messages', 'HumanMessage'];
     }
+    /** @return array{lc: int, type: string, id: list<string>, kwargs?: array|\stdClass} */
+    public function toSerializedConstructor(): array
+    {
+        if (static::class !== self::class) {
+            return parent::toSerializedConstructor();
+        }
+        $state = self::sourceContractPublicState($this);
+
+        return self::serializeSourceContract(
+            $this, $this->kwargs(), static::lcId(), true,
+            [['aliases' => parent::lcAliases(), 'secrets' => [], 'attributes' => []]],
+            $state, $state,
+        );
+    }
+
 }
