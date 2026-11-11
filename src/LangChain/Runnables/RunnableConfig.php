@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LangChain\Runnables;
 
-
 /**
  * Per-invocation settings threaded through a runnable chain.
  *
@@ -17,15 +16,22 @@ namespace LangChain\Runnables;
  */
 final class RunnableConfig
 {
+    public int $recursionLimit = 25;
+
+    public bool $verbose = false;
+
+    /** Explicit fields retained when parsing loose config arrays. @var array<string, true> */
+    private array $providedFields = [];
+
     /**
      * @param list<string>              $tags       Trace labels, e.g. ['llm', 'openai'].
      * @param array<string, mixed>      $metadata   Arbitrary values surfaced in traces.
      * @param array<string, mixed>      $runId      Per-leg run ids assigned by the caller.
      * @param list<object>              $callbacks  Callback handlers (tracers, token counters).
      * @param int|null                  $maxConcurrency  Cap on parallel legs in a RunnableParallel.
-     * @param int                       $recursionLimit  Max depth for self-referential graphs.
+     * @param int|null                  $recursionLimit  Max depth for self-referential graphs; null uses 25.
      * @param mixed                     $signal     An abort token; checked at each step boundary.
-     * @param bool                      $verbose    Print the run tree to stdout.
+     * @param bool|null                 $verbose    Print the run tree to stdout; null uses false.
      * @param string|null               $runName    Display name in traces.
      * @param string|null               $runIdParent Parent run id, for nesting.
      * @param string|null               $checkpointId    LangGraph checkpoint to resume from.
@@ -48,9 +54,9 @@ final class RunnableConfig
         public array $runId = [],
         public array $callbacks = [],
         public ?int $maxConcurrency = null,
-        public int $recursionLimit = 25,
+        ?int $recursionLimit = null,
         public mixed $signal = null,
-        public bool $verbose = false,
+        ?bool $verbose = null,
         public ?string $runName = null,
         public ?string $runIdParent = null,
         public ?string $checkpointId = null,
@@ -60,13 +66,19 @@ final class RunnableConfig
         public mixed $toolCall = null,
         public mixed $context = null,
     ) {
+        $this->recursionLimit = $recursionLimit ?? 25;
+        $this->verbose = $verbose ?? false;
+        if ($recursionLimit !== null) {
+            $this->providedFields['recursionLimit'] = true;
+        }
+        if ($verbose !== null) {
+            $this->providedFields['verbose'] = true;
+        }
     }
 
     /**
-     * Build from the loose associative shape callers write, ignoring keys the
-     * active runnable does not understand rather than throwing — the TS version
-     * is explicitly permissive here so a config authored for one runnable can
-     * be replayed against another.
+     * Build from the loose associative shape callers write. Extra CallOptions
+     * keys remain in the options bag, matching the permissive TS config shape.
      *
      * @param array<string, mixed>|null $config
      */
@@ -91,15 +103,15 @@ final class RunnableConfig
             return $default;
         };
 
-        return new self(
+        $result = new self(
             tags: (array) $pick('tags', []),
             metadata: (array) $pick('metadata', []),
             runId: (array) $pick('run_id', []),
             callbacks: (array) $pick('callbacks', []),
             maxConcurrency: $pick('max_concurrency') === null ? null : (int) $pick('max_concurrency'),
-            recursionLimit: (int) $pick('recursion_limit', 25),
+            recursionLimit: $pick('recursion_limit') === null ? null : (int) $pick('recursion_limit'),
             signal: $pick('signal'),
-            verbose: (bool) $pick('verbose', false),
+            verbose: $pick('verbose') === null ? null : (bool) $pick('verbose'),
             runName: $pick('run_name') === null ? null : (string) $pick('run_name'),
             runIdParent: $pick('run_id_parent') === null ? null : (string) $pick('run_id_parent'),
             checkpointId: $pick('checkpoint_id') === null ? null : (string) $pick('checkpoint_id'),
@@ -109,6 +121,20 @@ final class RunnableConfig
             toolCall: $pick('tool_call'),
             context: $pick('context'),
         );
+        foreach ($config as $key => $value) {
+            $field = self::toCamelCase((string) $key);
+            if ($field !== 'providedFields' && property_exists($result, $field)) {
+                // Source uses raw options[key] ?? copy[key]; a null must not
+                // turn the constructor's non-null default into an explicit reset.
+                if ($value !== null) {
+                    $result->providedFields[$field] = true;
+                }
+            } else {
+                $result->options[$key] = $value;
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -128,12 +154,13 @@ final class RunnableConfig
     {
         $c = clone $this;
         foreach ($overrides as $key => $value) {
+            $prop = self::toCamelCase($key);
             if ($value === null) {
                 continue;
             }
-            $prop = self::toCamelCase($key);
-            if (property_exists($c, $prop)) {
+            if ($prop !== 'providedFields' && property_exists($c, $prop)) {
                 $c->{$prop} = $value;
+                $c->providedFields[$prop] = true;
             }
         }
 
@@ -162,68 +189,59 @@ final class RunnableConfig
     }
 
     /**
-     * Fields whose upstream merge rule is plain "a later config overwrites an earlier one".
-     *
-     * Upstream `mergeConfigs` in `libs/langchain-core/src/runnables/config.ts` iterates
-     * `Object.keys(options)`, so only keys ACTUALLY PRESENT are copied. When a config arrives as an
-     * array (which is how `StructuredTool::$defaultConfig` is supplied) this method keeps that
-     * presence semantics with `array_key_exists()`; a `RunnableConfig` object cannot distinguish an
-     * absent key from one set to its default, so all of its fields are treated as present.
-     */
-    private const LATER_WINS_FIELDS = [
-        'runId', 'callbacks', 'maxConcurrency', 'recursionLimit', 'verbose',
-        'runName', 'runIdParent', 'checkpointId', 'checkpointMap',
-        'options', 'toolCall', 'context',
-    ];
-
-    /**
-     * Mirrors upstream `mergeConfigs` from `libs/langchain-core/src/runnables/config.ts`.
-     *
-     * Upstream has no equivalent of a hand-written per-field list, so it inherits every config key by
-     * construction. The per-key rules are:
-     *
-     *  - `metadata` / `configurable`: spread — a key set on either side survives;
-     *  - `tags`: union of both, deduplicated, first-seen order preserved;
-     *  - `signal`: combined;
-     *  - every other key: overwritten by the later config.
-     *
-     * Upstream's `timeout` rule (`Math.min`) has no target here — `RunnableConfig` has no `timeout`
-     * field — and upstream's `signal` combination uses `AbortSignal.any()`, which has no PHP
-     * equivalent, so a later `signal` wins. See PORT_STATUS.md "Known non-exact behaviours".
+     * Per-field source merge rules. PHP's options bag represents the extra
+     * top-level CallOptions fields, so it spreads independently by option key.
+     * Unset nullable object fields do not erase a bound value; explicit array
+     * presence is preserved, including empty run-id arrays.
      */
     public static function mergeConfigs(mixed ...$configs): self
     {
         $copy = new self();
-
         foreach ($configs as $config) {
             if ($config === null) {
                 continue;
             }
-
-            $isArray = is_array($config);
-            $in = $isArray ? self::fromArray($config) : $config;
-            if (! $in instanceof self) {
+            $in = is_array($config) ? self::fromArray($config) : $config;
+            if (!$in instanceof self) {
                 continue;
             }
-
-            $copy->metadata = array_merge($copy->metadata, $in->metadata);
-            $copy->configurable = array_merge($copy->configurable, $in->configurable);
-            $copy->tags = array_values(array_unique(array_merge($copy->tags, $in->tags)));
-
-            if ($in->signal !== null) {
-                $copy->signal = $in->signal;
-            }
-
-            foreach (self::LATER_WINS_FIELDS as $field) {
-                if ($isArray) {
-                    if (array_key_exists($field, $config)) {
-                        $copy->$field = $in->$field;
-                    }
-
+            $copy->metadata = [...$copy->metadata, ...$in->metadata];
+            $copy->configurable = [...$copy->configurable, ...$in->configurable];
+            $copy->tags = array_values(array_unique([...$copy->tags, ...$in->tags]));
+            $copy->callbacks = [...$copy->callbacks, ...$in->callbacks];
+            foreach ($in->options as $key => $value) {
+                if ($key === 'timeout' && is_numeric($value) && is_numeric($copy->options[$key] ?? null)) {
+                    $copy->options[$key] = min($copy->options[$key], $value);
                     continue;
                 }
+                $copy->options[$key] = $value ?? ($copy->options[$key] ?? null);
+            }
+            foreach (['runId', 'maxConcurrency', 'recursionLimit', 'verbose', 'runName', 'runIdParent',
+                'checkpointId', 'checkpointMap', 'toolCall', 'context'] as $field) {
+                $value = $in->$field;
+                if ($value === null) {
+                    continue;
+                }
+                if (!isset($in->providedFields[$field]) && (($field === 'runId' && $value === [])
+                    || ($field === 'recursionLimit' && $value === 25) || ($field === 'verbose' && $value === false))) {
+                    continue;
+                }
+                $copy->$field = $value;
+                $copy->providedFields[$field] = true;
+            }
+            if ($in->signal !== null) {
+                if (is_callable($copy->signal) && is_callable($in->signal)) {
+                    $left = $copy->signal;
+                    $right = $in->signal;
+                    $aborted = false;
+                    $copy->signal = static function () use ($left, $right, &$aborted): bool {
+                        $aborted = $aborted || $left() || $right();
 
-                $copy->$field = $in->$field;
+                        return $aborted;
+                    };
+                } else {
+                    $copy->signal = $in->signal;
+                }
             }
         }
 

@@ -150,7 +150,11 @@ abstract class StructuredTool extends BaseLangChain
      */
     public function invoke(mixed $input, ?RunnableConfig $config = null): mixed
     {
-        $enrichedConfig = $this->mergeConfig($config);
+        $enrichedConfig = clone $this->mergeConfig($config);
+        // DynamicTool/DynamicStructuredTool.call() in core/tools/index.ts default
+        // only an absent run name. Keep this at the shared seam so passthrough
+        // tools retain the same identity, without mutating the caller's config.
+        $enrichedConfig->runName ??= $this->name;
 
         if (ToolUtils::isToolCall($input)) {
             $toolInput = $input['args'] ?? [];

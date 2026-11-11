@@ -82,9 +82,10 @@ class RunStream implements \IteratorAggregate, StreamHandle
     /**
      * Run a compiled graph and stream it as protocol events (`streamEvents` with `version: "v3"`).
      *
-     * The graph is asked for every mode the protocol maps AND this port's engine can emit: `values`,
-     * `updates`, `messages` (as protocol lifecycle events) and `tools`. `custom` and `tasks` are not
-     * produced by this port's engine and are not requested.
+     * This adapter requests its established modes: values, updates, messages and tools.
+     * The raw engine also supports tasks, custom and checkpoint snapshots; their v3
+     * protocol integration is pending, so widening engine support does not implicitly
+     * widen this adapter's mode subscription.
      *
      * @param array<string, mixed>|list<mixed>|object|null $input
      * @param list<StreamTransformer|callable(): StreamTransformer> $transformers user transformers (instances or factories)
@@ -105,8 +106,10 @@ class RunStream implements \IteratorAggregate, StreamHandle
 
         $modes = array_values(array_intersect(
             Convert::STREAM_EVENTS_V3_MODES,
-            array_merge(Pregel::SUPPORTED_STREAM_MODES, Pregel::HANDLER_STREAM_MODES),
+            ['values', 'updates', 'debug', 'messages', 'tools'],
         ));
+
+        $config = $config->with(['options' => array_merge($config->options, ['streamMode' => $modes])]);
 
         $source = (static function () use ($graph, $input, $config, $modes): \Generator {
             $run = clone $graph;
