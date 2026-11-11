@@ -262,7 +262,7 @@ class ChatXAIResponses extends ChatOpenAIResponses
 
             return new ChatResult(
                 [new ChatGeneration($message, $final->text, $final->generationInfo)],
-                $this->llmOutputFromUsage($message),
+                $this->streamedEstimatedUsageOutput($message),
             );
         }
 
@@ -291,6 +291,22 @@ class ChatXAIResponses extends ChatOpenAIResponses
         $usage = $this->llmOutputFromUsage($message)['tokenUsage'] ?? null;
 
         return $usage === null ? [] : ['estimatedTokenUsage' => $usage];
+    }
+
+    /**
+     * Streaming `_generate()` returns the full normalized `UsageMetadata`, including token details,
+     * under `estimatedTokenUsage`. PHP carries upstream's message `usage_metadata` property in
+     * `response_metadata['usage_metadata']`; an absent value is omitted like JavaScript `undefined`.
+     * Only xAI's own streaming generation branch uses this provider-specific shape. Core's
+     * callback-driven aggregation and public stream end callbacks retain their `tokenUsage` shape.
+     *
+     * @return array<string, mixed>
+     */
+    private function streamedEstimatedUsageOutput(BaseMessage $message): array
+    {
+        $usage = $message->response_metadata['usage_metadata'] ?? null;
+
+        return is_array($usage) && $usage !== [] ? ['estimatedTokenUsage' => $usage] : [];
     }
 
     /**
