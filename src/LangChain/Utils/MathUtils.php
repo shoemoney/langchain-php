@@ -10,12 +10,9 @@ namespace LangChain\Utils;
  * Port of `@langchain/core/utils/math`, with the three `ml-distance` kernels it
  * depends on (cosine, inner product, euclidean) inlined as private methods.
  *
- * Note for the integrator: `LangGraph\Store\StoreUtils::cosineSimilarity()` is a
- * second, vector-level cosine that returns 0.0 for a zero magnitude. This class
- * reaches the same answer through {@see self::cosineSimilarity()} (NaN folded to
- * 0 in {@see self::matrixFunc()}), so the store could delegate to
- * `MathUtils::cosineSimilarity([$a], [$b])[0][0]` and drop its copy. It is left
- * alone here because that file is not owned by this work package.
+ * The graph store's vector-level cosine delegates to {@see self::cosineSimilarityVectors()}.
+ * Both APIs share the raw kernel, while the vector API returns zero for a zero
+ * magnitude and preserves other NaN results. The matrix API normalizes NaN to zero.
  */
 final class MathUtils
 {
@@ -94,6 +91,26 @@ final class MathUtils
     public static function cosineSimilarity(array $x, array $y): array
     {
         return self::matrixFunc($x, $y, self::cosine(...));
+    }
+
+    /**
+     * Vector-level cosine with the graph store's zero-magnitude policy.
+     *
+     * This additive PHP helper shares the existing raw cosine kernel. Unlike the
+     * matrix API, it preserves NaN from nonzero undefined arithmetic.
+     *
+     * @param list<int|float> $a
+     * @param list<int|float> $b
+     *
+     * @throws \InvalidArgumentException When the vector lengths differ.
+     */
+    public static function cosineSimilarityVectors(array $a, array $b): float
+    {
+        if (count($a) !== count($b)) {
+            throw new \InvalidArgumentException('Vectors must have the same length');
+        }
+
+        return self::cosine($a, $b, zeroMagnitudeReturnsZero: true);
     }
 
     /**
@@ -221,7 +238,7 @@ final class MathUtils
      * @param list<int|float> $a
      * @param list<int|float> $b
      */
-    private static function cosine(array $a, array $b): float
+    private static function cosine(array $a, array $b, bool $zeroMagnitudeReturnsZero = false): float
     {
         $p = 0.0;
         $p2 = 0.0;
@@ -230,6 +247,10 @@ final class MathUtils
             $p += $value * $b[$i];
             $p2 += $value * $value;
             $q2 += $b[$i] * $b[$i];
+        }
+
+        if ($zeroMagnitudeReturnsZero && ($p2 === 0.0 || $q2 === 0.0)) {
+            return 0.0;
         }
 
         return self::divide($p, sqrt($p2) * sqrt($q2));
