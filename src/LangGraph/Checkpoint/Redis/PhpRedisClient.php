@@ -9,10 +9,20 @@ namespace LangGraph\Checkpoint\Redis;
  *
  * phpredis has no RedisJSON or RediSearch methods, so those go through
  * `rawCommand`. Requires a server with both modules (Redis Stack, or Redis 8).
+ * Cluster JSON commands route by key; Search commands share one discovered coordinator.
+ * Distributed Search must be provided by the server: this adapter does not merge shard results.
+ * Unlike native keyed commands, phpredis rawCommand does not follow MOVED/ASK redirects.
+ * RedisJSON during resharding/failover therefore remains a separate multi-node verification gap.
+ * Borrowed clients must leave OPT_PREFIX unset: raw JSON keys are sent without that prefix.
+ * Native cluster KEYS can return incomplete results or raise warnings/fatal errors for orphaned
+ * keys; this adapter does not make key discovery/deletion complete under those conditions.
  */
 final class PhpRedisClient implements RedisClientInterface
 {
-    public function __construct(private readonly \Redis $redis)
+    /** @var array{string, int}|null */
+    private ?array $searchNode = null;
+
+    public function __construct(private readonly \Redis|\RedisCluster $redis)
     {
     }
 
@@ -50,6 +60,68 @@ final class PhpRedisClient implements RedisClientInterface
         return new self($redis);
     }
 
+    /**
+     * Port of createCluster({rootNodes}) and connect(). ext-redis discovers slots in construction.
+     * Its single auth/TLS configuration requires consistent root-node credentials and schemes.
+     * The optional connector has RedisCluster's constructor signature and is a socket-free test seam.
+     *
+     * @param list<array{url: string}> $rootNodes
+     * @param callable(?string, list<string>, int, int, bool, string|array|null, ?array): \RedisCluster|null $connector
+     */
+    public static function fromCluster(array $rootNodes, ?callable $connector = null): self
+    {
+        if ($rootNodes === [] || !array_is_list($rootNodes)) {
+            throw new \InvalidArgumentException('Redis cluster requires a non-empty list of root nodes.');
+        }
+        $seeds = [];
+        $common = null;
+        foreach ($rootNodes as $node) {
+            $url = is_array($node) ? ($node['url'] ?? null) : null;
+            if (!is_string($url) || preg_match('/[\x00-\x20\x7f]/', $url)) {
+                throw new \InvalidArgumentException('Invalid Redis cluster root-node URL.');
+            }
+            try {
+                $parts = parse_url($url);
+            } catch (\ValueError) {
+                $parts = false;
+            }
+            if ($parts === false || !isset($parts['host']) || $parts['host'] === ''
+                || !in_array($parts['scheme'] ?? null, ['redis', 'rediss'], true)
+                || isset($parts['query']) || isset($parts['fragment'])
+                || ($parts['port'] ?? 6379) < 1
+                || !in_array($parts['path'] ?? '', ['', '/', '/0'], true)
+                || (isset($parts['user']) && $parts['user'] !== '' && !isset($parts['pass']))) {
+                throw new \InvalidArgumentException('Invalid Redis cluster root-node URL; only redis/rediss database 0 is supported.');
+            }
+            $auth = isset($parts['pass'])
+                ? (($parts['user'] ?? '') !== ''
+                    ? [rawurldecode($parts['user']), rawurldecode($parts['pass'])]
+                    : rawurldecode($parts['pass']))
+                : null;
+            $config = [$parts['scheme'] === 'rediss', $auth];
+            if ($common !== null && $common !== $config) {
+                throw new \InvalidArgumentException('Redis cluster root nodes must use identical authentication and TLS configuration.');
+            }
+            $common = $config;
+            $seeds[] = $parts['host'] . ':' . ($parts['port'] ?? 6379);
+        }
+        if (!class_exists(\RedisCluster::class, false)) {
+            throw new \RuntimeException('ext-redis with RedisCluster support is required; pass a RedisClientInterface instead.');
+        }
+        // An array, including [], enables TLS on discovered nodes as well as the initial seeds.
+        $arguments = [null, $seeds, 0, 0, false, $common[1], $common[0] ? [] : null];
+        try {
+            $redis = $connector === null ? new \RedisCluster(...$arguments) : $connector(...$arguments);
+        } catch (\RedisException|\RedisClusterException $e) {
+            throw new RedisClientException($e->getMessage(), 0, $e);
+        }
+        if (!$redis instanceof \RedisCluster) {
+            throw new \InvalidArgumentException('Redis cluster connector must return RedisCluster.');
+        }
+
+        return new self($redis);
+    }
+
     public function jsonGet(string $key): ?string
     {
         $reply = $this->raw('JSON.GET', $key);
@@ -72,7 +144,7 @@ final class PhpRedisClient implements RedisClientInterface
 
     public function keys(string $pattern): array
     {
-        return $this->guard(fn (): array => array_map('strval', (array) $this->redis->keys($pattern)));
+        return array_map('strval', (array) $this->guard(fn (): mixed => $this->redis->keys($pattern)));
     }
 
     public function exists(string $key): int
@@ -110,7 +182,7 @@ final class PhpRedisClient implements RedisClientInterface
 
     public function zRange(string $key, int $start, int $stop): array
     {
-        return $this->guard(fn (): array => array_map('strval', (array) $this->redis->zRange($key, $start, $stop)));
+        return array_map('strval', (array) $this->guard(fn (): mixed => $this->redis->zRange($key, $start, $stop)));
     }
 
     public function ftCreate(string $index, array $schema, string $prefix): void
@@ -212,7 +284,7 @@ final class PhpRedisClient implements RedisClientInterface
 
     public function quit(): void
     {
-        $this->redis->close();
+        $this->guard(fn (): bool => $this->redis->close());
     }
 
     /**
@@ -220,10 +292,80 @@ final class PhpRedisClient implements RedisClientInterface
      */
     private function raw(string ...$args): mixed
     {
-        $reply = $this->guard(fn (): mixed => $this->redis->rawCommand(...$args));
+        $searchCommand = str_starts_with($args[0], 'FT.');
+        try {
+            $reply = $this->guard(function () use ($args): mixed {
+                if ($this->redis instanceof \RedisCluster) {
+                    if (str_starts_with($args[0], 'JSON.')) {
+                        $route = $args[1];
+                    } else {
+                        if ($this->searchNode === null) {
+                            $masters = $this->redis->_masters();
+                            sort($masters);
+                            if ($masters === []) {
+                                throw new RedisClientException('Redis cluster has no Search coordinator.');
+                            }
+                            $this->searchNode = $masters[0];
+                        }
+                        $route = $this->searchNode;
+                    }
+
+                    return $this->clusterRaw($route, $args);
+                }
+
+                return $this->redis->rawCommand(...$args);
+            });
+            // FT commands never return nil. Standalone phpredis returns false for
+            // ordinary ERR replies without throwing, so retain its last-error text.
+            if ($searchCommand && $reply === false) {
+                $error = $this->redis->getLastError();
+                $this->redis->clearLastError();
+                throw new RedisClientException($error !== null && $error !== ''
+                    ? $error
+                    : $args[0] . ' returned false without a server error.');
+            }
+        } catch (\Throwable $e) {
+            if ($searchCommand && $this->redis instanceof \RedisCluster) {
+                // A directed-node failure must not poison every subsequent Search operation.
+                $this->searchNode = null;
+            }
+
+            throw $e;
+        }
 
         // A nil reply reaches PHP as false; keep `true` (a status reply) distinct from it.
         return $reply === false ? null : $reply;
+    }
+
+    /**
+     * Directed commands can warn and return false without setting lastError (Unknown node).
+     * Preserve that failure as an exception, restoring the caller's error handler in all paths.
+     *
+     * @param array{string, int}|string $route
+     * @param list<string> $args
+     */
+    private function clusterRaw(array|string $route, array $args): mixed
+    {
+        $warning = null;
+        $previous = null;
+        $previous = set_error_handler(static function (int $severity, string $message, string $file, int $line) use (&$warning, &$previous): mixed {
+            if (!in_array($severity, [E_WARNING, E_USER_WARNING], true)) {
+                return $previous !== null ? $previous($severity, $message, $file, $line) : false;
+            }
+            $warning = $message;
+
+            return true;
+        });
+        try {
+            $reply = $this->redis->rawCommand($route, ...$args);
+        } finally {
+            restore_error_handler();
+        }
+        if ($warning !== null) {
+            throw new RedisClientException($warning);
+        }
+
+        return $reply;
     }
 
     /**
@@ -234,13 +376,28 @@ final class PhpRedisClient implements RedisClientInterface
     private function guard(callable $call): mixed
     {
         try {
-            return $call();
-        } catch (\RedisException $e) {
+            if ($this->redis instanceof \RedisCluster) {
+                $this->redis->clearLastError();
+            }
+            $reply = $call();
+            if ($this->redis instanceof \RedisCluster) {
+                $error = $this->redis->getLastError();
+                if ($error !== null && $error !== '') {
+                    $this->redis->clearLastError();
+                    throw new RedisClientException($error);
+                }
+            }
+
+            return $reply;
+        } catch (\RedisException|\RedisClusterException $e) {
             // phpredis keeps the last error string after throwing; clear it so it cannot be
             // mistaken for the outcome of a later, successful command.
+            $message = $this->redis instanceof \RedisCluster
+                ? ($this->redis->getLastError() ?? $e->getMessage())
+                : $e->getMessage();
             $this->redis->clearLastError();
 
-            throw new RedisClientException($e->getMessage(), 0, $e);
+            throw new RedisClientException($message, 0, $e);
         }
     }
 }
