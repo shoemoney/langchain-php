@@ -72,6 +72,73 @@ final class MemoryVectorStoreTest extends TestCase
         ], $results);
     }
 
+    /** Upstream memory.test.ts: "MemoryVectorStore stores and retrieves document IDs". */
+    public function testStoresAndRetrievesDocumentIds(): void
+    {
+        $store = new MemoryVectorStore(new SyntheticEmbeddings(1536));
+        $retriever = $store->asRetriever([
+            'k' => 2,
+            'filter' => static fn (Document $doc): bool => $doc->metadata['namespace'] <= 2,
+        ]);
+        $retriever->addDocuments([
+            new Document('hello', ['namespace' => 1], '1'),
+            new Document('hello', ['namespace' => 2], '2'),
+            new Document('hello', ['namespace' => 3], '3'),
+            new Document('hello', ['namespace' => 4], '4'),
+        ]);
+
+        self::assertEquals([
+            new Document('hello', ['namespace' => 1], '1'),
+            new Document('hello', ['namespace' => 2], '2'),
+        ], $retriever->invoke('hello'));
+    }
+
+    public function testVectorAddsFiltersAndScoredSearchPreserveDocumentIds(): void
+    {
+        $store = new MemoryVectorStore(new FakeEmbeddings());
+        $documents = [new Document('one', [], '0'), new Document('two', [], ''), new Document('three')];
+        self::assertNull($store->addVectors([[1, 0], [0, 1], [1, 1]], $documents));
+        self::assertSame(['0', '', null], array_column($store->memoryVectors, 'id'));
+
+        $seen = [];
+        $results = $store->similaritySearchVectorWithScore([1, 0], 3, static function (Document $document) use (&$seen): bool {
+            $seen[] = $document->id;
+
+            return $document->id === '0';
+        });
+
+        self::assertSame(['0', '', null], $seen);
+        self::assertCount(1, $results);
+        self::assertSame('0', $results[0][0]->id);
+        self::assertEqualsWithDelta(1.0, $results[0][1], 1e-12);
+        self::assertNotSame($documents[0], $results[0][0]);
+    }
+
+    public function testMmrAndItsRetrieverKeepIdsWhenFilteringAndReordering(): void
+    {
+        $store = MemoryVectorStore::fromDocuments([
+            new Document('hello', ['n' => 1], 'first'),
+            new Document('hi', ['n' => 2], 'second'),
+            new Document('bye', ['n' => 3], 'third'),
+        ], new SyntheticEmbeddings(64));
+        $seen = [];
+        $filter = static function (Document $document) use (&$seen): bool {
+            $seen[] = $document->id;
+
+            return $document->id !== 'second';
+        };
+        $retriever = $store->asRetriever([
+            'k' => 2, 'searchType' => 'mmr', 'filter' => $filter,
+            'searchKwargs' => ['fetchK' => 3, 'lambda' => 0.5],
+        ]);
+
+        $results = $retriever->invoke('hello');
+
+        self::assertSame(['first', 'second', 'third'], $seen);
+        self::assertSame(['first', 'third'], array_column($results, 'id'));
+        self::assertSame(['hello', 'bye'], array_column($results, 'pageContent'));
+    }
+
     public function testCustomSimilarityIsCalledOncePerStoredVector(): void
     {
         $calls = 0;
